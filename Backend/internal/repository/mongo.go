@@ -1,0 +1,421 @@
+package repository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/DICEsda/IOT-TileNodeCoordinator/backend/internal/types"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
+)
+
+var _ Repository = (*MongoRepository)(nil)
+
+type MongoRepository struct {
+	db     *mongo.Database
+	logger *zap.Logger
+}
+
+func NewMongoRepository(db *mongo.Database, logger *zap.Logger) *MongoRepository {
+	return &MongoRepository{
+		db:     db,
+		logger: logger,
+	}
+}
+
+func (r *MongoRepository) GetCoordinatorById(id string) (*types.Coordinator, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("coordinators")
+	coordinator := &types.Coordinator{}
+	// Try both _id and coord_id for backwards compatibility
+	filter := bson.M{"$or": []bson.M{
+		{"_id": id},
+		{"coord_id": id},
+	}}
+	if err := coll.FindOne(ctx, filter).Decode(coordinator); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("coordinator with id %s not found: %w", id, err)
+		}
+		return nil, err
+	}
+	return coordinator, nil
+}
+
+func (r *MongoRepository) GetNodeById(id string) (*types.Node, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("nodes")
+	node := &types.Node{}
+	if err := coll.FindOne(ctx, bson.M{"_id": id}).Decode(node); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("node with id %s not found: %w", id, err)
+		}
+		return nil, err
+	}
+	return node, nil
+}
+
+func (r *MongoRepository) GetOTAJobById(id string) (*types.OTAJob, error) {
+	ctx := context.Background()
+
+	coll := r.db.Collection("ota_jobs")
+	otaJob := &types.OTAJob{}
+	if err := coll.FindOne(ctx, bson.M{"_id": id}).Decode(otaJob); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("ota job with id %s not found: %w", id, err)
+		}
+		return nil, err
+	}
+	return otaJob, nil
+}
+
+func (r *MongoRepository) GetSites() ([]types.Site, error) {
+	ctx := context.Background()
+
+	coll := r.db.Collection("sites")
+	cursor, err := coll.Find(ctx, struct{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	results := []types.Site{}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (r *MongoRepository) GetSiteById(id string) (*types.Site, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("sites")
+	site := &types.Site{}
+	if err := coll.FindOne(ctx, bson.M{"_id": id}).Decode(site); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// Auto-create site001 if requested and missing (Development convenience)
+			if id == "site001" {
+				r.logger.Info("Auto-creating default site001")
+				defaultSite := &types.Site{
+					Id:        "site001",
+					Name:      "Default Site",
+					Location:  "Local",
+					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
+				}
+				if err := r.CreateSite(ctx, defaultSite); err == nil {
+					return defaultSite, nil
+				}
+			}
+			return nil, fmt.Errorf("site with id %s not found: %w", id, err)
+		}
+		return nil, err
+	}
+	return site, nil
+}
+
+func (r *MongoRepository) UpsertCoordinator(ctx context.Context, coordinator *types.Coordinator) error {
+	coll := r.db.Collection("coordinators")
+	
+	// Use coord_id as the unique key for matching, not _id
+	filter := bson.M{"coord_id": coordinator.CoordId}
+	update := bson.M{"$set": coordinator}
+	opts := options.Update().SetUpsert(true)
+	
+	if _, err := coll.UpdateOne(ctx, filter, update, opts); err != nil {
+		r.logger.Error("Failed to upsert coordinator", zap.Error(err), zap.String("coord_id", coordinator.CoordId))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) UpsertNode(ctx context.Context, node *types.Node) error {
+	coll := r.db.Collection("nodes")
+	update := bson.M{"$set": node}
+	opts := options.Update().SetUpsert(true)
+	if _, err := coll.UpdateOne(ctx, bson.M{"_id": node.Id}, update, opts); err != nil {
+		r.logger.Error("Failed to upsert node", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) CreateOTAJob(ctx context.Context, job *types.OTAJob) error {
+	coll := r.db.Collection("ota_jobs")
+	_, err := coll.InsertOne(ctx, job)
+	if err != nil {
+		r.logger.Error("Failed to create OTA job", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) UpdateOTAJobStatus(ctx context.Context, id string, status types.Status) error {
+	coll := r.db.Collection("ota_jobs")
+	update := bson.M{"$set": bson.M{
+		"status":     status,
+		"updated_at": context.Background(),
+	}}
+	if _, err := coll.UpdateOne(ctx, bson.M{"_id": id}, update); err != nil {
+		r.logger.Error("Failed to update OTA job status", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) CreateSite(ctx context.Context, site *types.Site) error {
+	coll := r.db.Collection("sites")
+	_, err := coll.InsertOne(ctx, site)
+	if err != nil {
+		r.logger.Error("Failed to create site", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) UpsertSite(ctx context.Context, site *types.Site) error {
+	coll := r.db.Collection("sites")
+	update := bson.M{"$set": site}
+	opts := options.Update().SetUpsert(true)
+	if _, err := coll.UpdateOne(ctx, bson.M{"_id": site.Id}, update, opts); err != nil {
+		r.logger.Error("Failed to upsert site", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) InsertMmwaveFrame(ctx context.Context, frame *types.MmwaveFrame) error {
+	coll := r.db.Collection("mmwave_frames")
+	if frame.Timestamp.IsZero() {
+		frame.Timestamp = time.Now().UTC()
+	}
+	if _, err := coll.InsertOne(ctx, frame); err != nil {
+		r.logger.Error("Failed to insert mmWave frame", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *MongoRepository) GetMmwaveFrames(ctx context.Context, siteId string, coordinatorId string, limit int) ([]types.MmwaveFrame, error) {
+	coll := r.db.Collection("mmwave_frames")
+	filter := bson.M{}
+	if siteId != "" {
+		filter["site_id"] = siteId
+	}
+	if coordinatorId != "" {
+		filter["coordinator_id"] = coordinatorId
+	}
+	opts := options.Find().SetSort(bson.M{"timestamp": -1})
+	if limit > 0 {
+		opts.SetLimit(int64(limit))
+	}
+	cursor, err := coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var frames []types.MmwaveFrame
+	if err := cursor.All(ctx, &frames); err != nil {
+		return nil, err
+	}
+	return frames, nil
+}
+
+// GetCoordinatorBySiteAndId retrieves a coordinator by site and coordinator ID
+func (r *MongoRepository) GetCoordinatorBySiteAndId(siteId string, coordId string) (*types.Coordinator, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("coordinators")
+	coordinator := &types.Coordinator{}
+	filter := bson.M{
+		"site_id": siteId,
+		"_id":     coordId,
+	}
+	if err := coll.FindOne(ctx, filter).Decode(coordinator); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("coordinator not found: %w", err)
+		}
+		return nil, err
+	}
+	return coordinator, nil
+}
+
+// GetNodesByCoordinator retrieves all nodes for a coordinator
+func (r *MongoRepository) GetNodesByCoordinator(siteId string, coordId string) ([]*types.Node, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("nodes")
+	filter := bson.M{
+		"site_id":        siteId,
+		"coordinator_id": coordId,
+	}
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var nodes []*types.Node
+	if err := cursor.All(ctx, &nodes); err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+// DeleteNode removes a node from the database
+func (r *MongoRepository) DeleteNode(siteId string, coordId string, nodeId string) error {
+	ctx := context.Background()
+	coll := r.db.Collection("nodes")
+	filter := bson.M{
+		"site_id":        siteId,
+		"coordinator_id": coordId,
+		"node_id":        nodeId,
+	}
+	_, err := coll.DeleteOne(ctx, filter)
+	return err
+}
+
+// UpdateNodeZone updates the zone assignment for a node
+func (r *MongoRepository) UpdateNodeZone(siteId string, coordId string, nodeId string, zoneId string) error {
+	ctx := context.Background()
+	coll := r.db.Collection("nodes")
+	filter := bson.M{
+		"site_id":        siteId,
+		"coordinator_id": coordId,
+		"node_id":        nodeId,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"zone_id":    zoneId,
+			"updated_at": time.Now(),
+		},
+	}
+	_, err := coll.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// UpdateNodeName updates the name for a node
+func (r *MongoRepository) UpdateNodeName(siteId string, coordId string, nodeId string, name string) error {
+	ctx := context.Background()
+	coll := r.db.Collection("nodes")
+	filter := bson.M{
+		"site_id":        siteId,
+		"coordinator_id": coordId,
+		"node_id":        nodeId,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"name":       name,
+			"updated_at": time.Now(),
+		},
+	}
+	_, err := coll.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// GetSettings retrieves settings for a site
+func (r *MongoRepository) GetSettings(siteId string) (*Settings, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("settings")
+	settings := &Settings{}
+	if err := coll.FindOne(ctx, bson.M{"site_id": siteId}).Decode(settings); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("settings not found: %w", err)
+		}
+		return nil, err
+	}
+	return settings, nil
+}
+
+// SaveSettings saves or updates settings for a site
+func (r *MongoRepository) SaveSettings(settings *Settings) error {
+	ctx := context.Background()
+	coll := r.db.Collection("settings")
+	filter := bson.M{"site_id": settings.SiteID}
+	update := bson.M{"$set": settings}
+	opts := options.Update().SetUpsert(true)
+	_, err := coll.UpdateOne(ctx, filter, update, opts)
+	return err
+}
+
+// CreateZone creates a new zone
+func (r *MongoRepository) CreateZone(ctx context.Context, zone *types.Zone) error {
+	coll := r.db.Collection("zones")
+	zone.CreatedAt = time.Now()
+	zone.UpdatedAt = time.Now()
+	_, err := coll.InsertOne(ctx, zone)
+	return err
+}
+
+// GetZoneById retrieves a zone by ID
+func (r *MongoRepository) GetZoneById(id string) (*types.Zone, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("zones")
+	zone := &types.Zone{}
+	if err := coll.FindOne(ctx, bson.M{"_id": id}).Decode(zone); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("zone with id %s not found: %w", id, err)
+		}
+		return nil, err
+	}
+	return zone, nil
+}
+
+// GetZonesBySite retrieves all zones for a site
+func (r *MongoRepository) GetZonesBySite(siteId string) ([]*types.Zone, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("zones")
+	cursor, err := coll.Find(ctx, bson.M{"site_id": siteId})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var zones []*types.Zone
+	if err := cursor.All(ctx, &zones); err != nil {
+		return nil, err
+	}
+	return zones, nil
+}
+
+// GetZoneByCoordinator retrieves the zone assigned to a specific coordinator
+func (r *MongoRepository) GetZoneByCoordinator(siteId string, coordinatorId string) (*types.Zone, error) {
+	ctx := context.Background()
+	coll := r.db.Collection("zones")
+	zone := &types.Zone{}
+	filter := bson.M{
+		"site_id":        siteId,
+		"coordinator_id": coordinatorId,
+	}
+	if err := coll.FindOne(ctx, filter).Decode(zone); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil // No zone assigned to this coordinator
+		}
+		return nil, err
+	}
+	return zone, nil
+}
+
+// DeleteZone deletes a zone
+func (r *MongoRepository) DeleteZone(ctx context.Context, zoneId string) error {
+	coll := r.db.Collection("zones")
+	_, err := coll.DeleteOne(ctx, bson.M{"_id": zoneId})
+	if err != nil {
+		return err
+	}
+
+	// Remove zone assignment from all nodes in this zone
+	nodesColl := r.db.Collection("nodes")
+	_, err = nodesColl.UpdateMany(ctx, bson.M{"zone_id": zoneId}, bson.M{"$unset": bson.M{"zone_id": ""}})
+	return err
+}
+
+// UpdateZone updates a zone
+func (r *MongoRepository) UpdateZone(ctx context.Context, zone *types.Zone) error {
+	coll := r.db.Collection("zones")
+	zone.UpdatedAt = time.Now()
+	filter := bson.M{"_id": zone.Id}
+	update := bson.M{"$set": zone}
+	_, err := coll.UpdateOne(ctx, filter, update)
+	return err
+}

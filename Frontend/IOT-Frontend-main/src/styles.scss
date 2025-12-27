@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Spartan UI / shadcn CSS Variables - Dark Theme for IoT Dashboard */
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 0 0% 13%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 100%;
+    --radius: 0.5rem;
+
+    /* IoT Dashboard specific variables - preserved from original */
+    --bg-primary: #000000;
+    --bg-secondary: #202122;
+    --bg-tertiary: #151516;
+    --bg-card: #1e1e1e;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --text-muted: #6b7280;
+    --accent-primary: #ffffff;
+    --accent-secondary: #ffffff;
+    --accent-warning: #f59e0b;
+    --accent-danger: #ef4444;
+    --border-color: #2a2f3a;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+    --glow-white: 0 0 20px rgba(255, 255, 255, 0.5);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
+}
+
+/* Legacy utility classes - preserved for backward compatibility */
+@layer components {
+  .card-legacy {
+    background: var(--bg-card);
+    border: none;
+    border-radius: 8px;
+    padding: 1.25rem;
+    box-shadow: none;
+    
+    @media (max-width: 768px) {
+      padding: 1rem;
+    }
+  }
+
+  .button-legacy {
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.875rem;
+  }
+
+  .button-primary-legacy {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+  }
+
+  .button-primary-legacy:hover {
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .button-success-legacy {
+    background: var(--accent-secondary);
+    color: var(--bg-primary);
+  }
+
+  .button-success-legacy:hover {
+    background: #e5e5e5;
+  }
+
+  /* IoT Status indicators */
+  .status-online {
+    @apply bg-green-500;
+  }
+
+  .status-offline {
+    @apply bg-red-500;
+  }
+
+  .status-warning {
+    @apply bg-amber-500;
+  }
+
+  .status-presence {
+    @apply bg-blue-500;
+  }
+
+  /* Pulse animation for live indicators */
+  .pulse-live {
+    @apply animate-pulse-glow;
+  }
+}
+
+/* Form element styling preserved from original */
+input:not([type="checkbox"]):not([type="radio"]):not([hlmInput]),
+select:not([hlmSelect]),
+textarea:not([hlmTextarea]) {
+  background: var(--bg-tertiary);
+  border: none;
+  color: var(--text-primary);
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([hlmInput]):focus,
+select:not([hlmSelect]):focus,
+textarea:not([hlmTextarea]):focus {
+  outline: none;
+  background: var(--bg-secondary);
+}
+
+/* Toggle switch - preserved from original */
+.toggle-switch {
+  position: relative;
+  width: 50px;
+  height: 26px;
+  background: var(--bg-tertiary);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-switch.active {
+  background: #ffffff;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: var(--bg-primary);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.toggle-switch.active::after {
+  transform: translateX(24px);
+}

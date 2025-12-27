@@ -1,0 +1,175 @@
+<aside class="sidebar">
+  <!-- Logo Section -->
+  <div class="sidebar-header">
+    <div class="logo-container">
+      <div class="logo-icon">
+        <ng-icon name="lucideCommand" size="20" />
+      </div>
+      <div class="logo-text">
+        <span class="company-name">HydroFarm</span>
+        <span class="company-tier">Enterprise</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Platform Navigation -->
+  <nav class="sidebar-nav">
+    <div class="nav-section">
+      <span class="nav-section-title">Platform</span>
+      
+      @for (item of platformItems(); track item.label) {
+        @if (item.children) {
+          <!-- Expandable Item -->
+          <div class="nav-item-group">
+            <button 
+              class="nav-item expandable"
+              [class.expanded]="item.expanded"
+              (click)="toggleExpand(item)"
+            >
+              <ng-icon [name]="item.icon" size="18" />
+              <span class="nav-label">{{ item.label }}</span>
+              <ng-icon 
+                [name]="item.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                size="16" 
+                class="chevron"
+              />
+            </button>
+            
+            @if (item.expanded) {
+              <div class="nav-children">
+                @for (child of item.children; track child.label) {
+                  <a 
+                    [routerLink]="child.route" 
+                    routerLinkActive="active"
+                    class="nav-item child"
+                  >
+                    <span class="nav-label">{{ child.label }}</span>
+                  </a>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <!-- Single Item -->
+          <a 
+            [routerLink]="item.route" 
+            routerLinkActive="active"
+            class="nav-item"
+          >
+            <ng-icon [name]="item.icon" size="18" />
+            <span class="nav-label">{{ item.label }}</span>
+          </a>
+        }
+      }
+    </div>
+
+    <!-- Projects Section -->
+    <div class="nav-section">
+      <span class="nav-section-title">Projects</span>
+      
+      @for (project of projects(); track project.label) {
+        <a 
+          [routerLink]="project.route" 
+          routerLinkActive="active"
+          class="nav-item"
+        >
+          <ng-icon [name]="project.icon" size="18" />
+          <span class="nav-label">{{ project.label }}</span>
+        </a>
+      }
+    </div>
+  </nav>
+
+  <!-- Bottom Section - System Status & Role Switcher -->
+  <div class="sidebar-footer">
+    <!-- System Status Section -->
+    <div class="system-status">
+      <span class="status-section-title">System Status</span>
+      
+      <!-- MQTT Status -->
+      <div class="status-item">
+        <div class="status-indicator" [class.online]="wsConnected()" [class.offline]="!wsConnected()">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideWifi" size="16" />
+        <span class="status-label">MQTT</span>
+        <span class="status-value" [class.online]="wsConnected()">
+          {{ wsConnected() ? 'Connected' : 'Disconnected' }}
+        </span>
+      </div>
+      
+      <!-- Backend Status -->
+      <div class="status-item">
+        <div class="status-indicator" [class.online]="backendConnected()" [class.offline]="!backendConnected()">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideDatabase" size="16" />
+        <span class="status-label">Backend</span>
+        <span class="status-value" [class.online]="backendConnected()">
+          {{ backendConnected() ? 'Online' : 'Offline' }}
+        </span>
+      </div>
+      
+      <!-- Connected Coordinators -->
+      <div class="status-item">
+        <div class="status-indicator" [class.online]="onlineCoordinators() > 0" [class.offline]="onlineCoordinators() === 0">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideServer" size="16" />
+        <span class="status-label">Coordinators</span>
+        <span class="status-value" [class.online]="onlineCoordinators() > 0">
+          {{ onlineCoordinators() }}/{{ totalCoordinators() }}
+        </span>
+      </div>
+      
+      <!-- Connected Nodes -->
+      <div class="status-item">
+        <div class="status-indicator" [class.online]="onlineNodes() > 0" [class.offline]="onlineNodes() === 0">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideFlower2" size="16" />
+        <span class="status-label">Nodes</span>
+        <span class="status-value" [class.online]="onlineNodes() > 0">
+          {{ onlineNodes() }}/{{ totalNodes() }}
+        </span>
+      </div>
+    </div>
+    
+    <!-- Role Switcher -->
+    <div class="role-switcher" (clickOutside)="closeDropdown()">
+      <button class="role-button" (click)="toggleRoleDropdown()">
+        <div class="role-icon">
+          <ng-icon [name]="currentRoleDisplay()?.icon || 'lucideUser'" size="18" />
+        </div>
+        <div class="role-info">
+          <span class="role-title">{{ currentRoleDisplay()?.label }}</span>
+          <span class="role-subtitle">Switch Role</span>
+        </div>
+        <ng-icon 
+          name="lucideChevronDown" 
+          size="16" 
+          class="role-chevron"
+          [class.rotated]="roleDropdownOpen()" 
+        />
+      </button>
+      
+      @if (roleDropdownOpen()) {
+        <div class="role-dropdown">
+          @for (option of roleOptions; track option.value) {
+            <button 
+              class="role-option"
+              [class.active]="currentRole() === option.value"
+              (click)="selectRole(option.value)"
+            >
+              <ng-icon [name]="option.icon" size="16" />
+              <span>{{ option.label }}</span>
+              @if (currentRole() === option.value) {
+                <span class="check-mark">✓</span>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</aside>

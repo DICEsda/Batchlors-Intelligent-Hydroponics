@@ -1,0 +1,32 @@
+<header class="top-header">
+  <div class="header-left">
+    <button class="sidebar-toggle">
+      <ng-icon name="lucidePanelLeft" size="18" />
+    </button>
+    
+    <nav class="breadcrumb">
+      @for (crumb of breadcrumbs; track crumb.label; let last = $last) {
+        @if (crumb.route) {
+          <a [href]="crumb.route" class="breadcrumb-item">{{ crumb.label }}</a>
+        } @else {
+          <span class="breadcrumb-item" [class.active]="last">{{ crumb.label }}</span>
+        }
+        @if (!last) {
+          <ng-icon name="lucideChevronRight" size="14" class="breadcrumb-separator" />
+        }
+      }
+    </nav>
+  </div>
+
+  <div class="header-right">
+    <div class="search-container">
+      <ng-icon name="lucideSearch" size="16" class="search-icon" />
+      <input 
+        type="text" 
+        class="search-input" 
+        placeholder="Type to search..."
+        [(ngModel)]="searchQuery"
+      />
+    </div>
+  </div>
+</header>

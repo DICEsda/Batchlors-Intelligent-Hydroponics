@@ -1,0 +1,103 @@
+<div class="monitor-container">
+  <!-- Stats Card -->
+  <div class="stats-card card">
+    <h3>System Overview</h3>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <span class="stat-label">Total Lights</span>
+        <span class="stat-value">{{ totalLights() }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Active Now</span>
+        <span class="stat-value active">{{ activeLights() }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Active Nodes</span>
+        <span class="stat-value">{{ activeNodesCount }}/6</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Light Nodes -->
+  <div class="nodes-container">
+    @for (node of nodes(); track node.id) {
+      <div class="node-card card" [class.active]="node.status === 'active'">
+        <div class="node-header">
+          <div class="node-info">
+            <h4>{{ node.name }}</h4>
+            <div class="node-meta">
+              <span class="node-status" [class]="node.status">
+                <span class="status-dot"></span>
+                {{ node.status }}
+              </span>
+              @if (node.tempC !== undefined && node.tempC !== null) {
+                <span class="node-temp">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                  </svg>
+                  {{ node.tempC.toFixed(1) }}°C
+                </span>
+              }
+            </div>
+          </div>
+          <button
+            class="toggle-all-btn"
+            (click)="toggleNode(node.id)"
+            [class.active]="node.totalOn === 6">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M2 12h20"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="bulbs-strip">
+          @for (bulb of node.bulbs; track bulb.id) {
+            <div
+              class="bulb"
+              [class.on]="bulb.isOn"
+              [style.--bulb-r]="bulb.r"
+              [style.--bulb-g]="bulb.g"
+              [style.--bulb-b]="bulb.b"
+              [style.--bulb-w]="bulb.w"
+              (click)="toggleBulb(node.id, bulb.id)">
+              <div class="bulb-indicator">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z"/>
+                </svg>
+              </div>
+              <span class="bulb-label">{{ bulb.id }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="node-footer">
+          <span class="count-label">{{ node.totalOn }}/{{ node.bulbs.length }} Active</span>
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="(node.totalOn / node.bulbs.length) * 100"></div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Sensor Chart Card -->
+    <div class="sensor-chart-card card">
+      <div class="chart-header">
+        <h4>Coordinator Sensors</h4>
+        <div class="legend">
+          <div class="legend-item">
+            <span class="legend-color temp"></span>
+            <span>Temperature (°C)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color lux"></span>
+            <span>Light (lux)</span>
+          </div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas #sensorChart></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+

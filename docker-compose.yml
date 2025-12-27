@@ -1,0 +1,111 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: iot-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-iot_smarttile}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - iot-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Mosquitto MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: iot-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./Backend/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./Backend/config/pwfile:/mosquitto/config/pwfile
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-u", "user1", "-P", "user1", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ASP.NET Core Backend API
+  backend:
+    build:
+      context: ./Backend/src/IoT.Backend
+      dockerfile: Dockerfile
+    container_name: iot-backend
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__MongoDB: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-admin123}@mongodb:27017
+      MongoDB__Database: ${MONGO_DB:-iot_smarttile}
+      Mqtt__Host: mosquitto
+      Mqtt__Port: 1883
+      Mqtt__Username: ${MQTT_USERNAME:-user1}
+      Mqtt__Password: ${MQTT_PASSWORD:-user1}
+      Cors__Origins__0: http://localhost:4200
+      Cors__Origins__1: http://frontend:80
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Angular Frontend
+  frontend:
+    build:
+      context: ./Frontend/IOT-Frontend-main
+      dockerfile: Dockerfile
+    container_name: iot-frontend
+    restart: unless-stopped
+    environment:
+      API_URL: ${API_URL:-http://backend:8000}
+      WS_URL: ${WS_URL:-ws://backend:8000/ws}
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  iot-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+  mosquitto_data:
+  mosquitto_log:

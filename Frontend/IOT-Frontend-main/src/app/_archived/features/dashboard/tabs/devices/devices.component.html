@@ -1,0 +1,143 @@
+<div class="flex flex-col gap-6">
+  @if (!loading()) {
+    <!-- Coordinator Panel -->
+    @if (coordinator(); as coord) {
+      <div hlmCard class="p-0">
+        <div hlmCardHeader class="pb-3">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-xs uppercase text-muted-foreground tracking-wider mb-1">Coordinator</p>
+              <h3 hlmCardTitle class="text-xl">{{ coord.coord_id || 'Unknown coordinator' }}</h3>
+              <p class="text-sm text-muted-foreground mt-1">{{ coord.site_id || 'No site assigned' }}</p>
+            </div>
+            <app-status-badge [status]="coordinatorStatus()" size="default" />
+          </div>
+        </div>
+        
+        <div hlmCardContent class="pt-0">
+          <!-- Coordinator Metrics -->
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+            <div class="space-y-1">
+              <span class="text-xs uppercase text-muted-foreground tracking-wide">Firmware</span>
+              <p class="text-sm font-medium">{{ coord.firmware_version || 'No data' }}</p>
+            </div>
+            <div class="space-y-1">
+              <span class="text-xs uppercase text-muted-foreground tracking-wide">Ambient Light</span>
+              <p class="text-sm font-medium">
+                {{ coord.light_lux !== null && coord.light_lux !== undefined ? (coord.light_lux | number:'1.0-1') + ' lx' : 'No data' }}
+              </p>
+            </div>
+            <div class="space-y-1">
+              <span class="text-xs uppercase text-muted-foreground tracking-wide">Temperature</span>
+              <p class="text-sm font-medium">
+                {{ coord.temp_c !== null && coord.temp_c !== undefined ? (coord.temp_c | number:'1.1-1') + '°C' : 'No data' }}
+              </p>
+            </div>
+            <div class="space-y-1">
+              <span class="text-xs uppercase text-muted-foreground tracking-wide">Heap Free</span>
+              <p class="text-sm font-medium">
+                {{ coord.heap_free !== null && coord.heap_free !== undefined ? (coord.heap_free | number) + ' B' : 'No data' }}
+              </p>
+            </div>
+            <div class="space-y-1">
+              <span class="text-xs uppercase text-muted-foreground tracking-wide">LED Control</span>
+              <div class="flex items-center gap-2">
+                <input 
+                  type="color" 
+                  (change)="onLedColorChange($event)" 
+                  [value]="currentLedColor" 
+                  class="h-8 w-10 rounded cursor-pointer border-0 bg-transparent"
+                />
+                <button 
+                  hlmBtn 
+                  variant="outline" 
+                  size="xs"
+                  (click)="resetLed()"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+            <div class="space-y-1">
+              <span class="text-xs uppercase text-muted-foreground tracking-wide">Actions</span>
+              <button 
+                hlmBtn 
+                variant="default" 
+                size="sm"
+                (click)="startPairing()"
+              >
+                Start Pairing
+              </button>
+            </div>
+          </div>
+          
+          <!-- Connection Bridge -->
+          <div class="flex items-center gap-3 pt-2" [class.opacity-50]="coordinatorStatus() !== 'online'">
+            <div 
+              class="flex-1 h-0.5 rounded-full"
+              [class]="coordinatorStatus() === 'online' 
+                ? 'bg-gradient-to-r from-white to-transparent shadow-[0_0_12px_rgba(255,255,255,0.4)]' 
+                : 'bg-gradient-to-r from-muted-foreground/50 to-transparent'"
+            ></div>
+            <span class="text-xs uppercase tracking-wide text-muted-foreground">
+              {{ getConnectionSubtitle() }}
+            </span>
+          </div>
+        </div>
+      </div>
+    } @else {
+      <!-- No Coordinator -->
+      <div hlmCard class="text-center py-8">
+        <div hlmCardContent>
+          <h3 class="text-lg font-semibold mb-2">No coordinator detected</h3>
+          <p class="text-muted-foreground">Once the coordinator connects, it will appear here with its live serial link.</p>
+        </div>
+      </div>
+    }
+
+    <!-- Devices Header with Stats -->
+    <div hlmCard>
+      <div hlmCardContent class="py-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <h2 class="text-xl font-semibold">Devices & Sensors</h2>
+          <div class="flex gap-6">
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-2xl font-bold text-foreground">{{ onlineDevicesCount }}</span>
+              <span class="text-xs uppercase tracking-wide text-muted-foreground">Online</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-2xl font-bold text-amber-500">{{ warningDevicesCount }}</span>
+              <span class="text-xs uppercase tracking-wide text-muted-foreground">Warning</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-2xl font-bold text-destructive">{{ offlineDevicesCount }}</span>
+              <span class="text-xs uppercase tracking-wide text-muted-foreground">Offline</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Devices Grid -->
+    @if (getNodesList().length) {
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (node of getNodesList(); track node.node_id) {
+          <app-device-card [node]="node" [showSensors]="true" />
+        }
+      </div>
+    } @else {
+      <!-- No Nodes -->
+      <div hlmCard class="text-center py-8">
+        <div hlmCardContent>
+          <h3 class="text-lg font-semibold mb-2">No nodes reporting yet</h3>
+          <p class="text-muted-foreground">Pair a tile node or wait for telemetry to stream in.</p>
+        </div>
+      </div>
+    }
+  } @else {
+    <!-- Loading State -->
+    <app-loading-skeleton variant="coordinator" />
+    <app-loading-skeleton variant="card" />
+    <app-skeleton-grid [count]="6" variant="device-card" [columns]="3" />
+  }
+</div>

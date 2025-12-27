@@ -1,0 +1,426 @@
+<div class="settings-container">
+  <div class="settings-header card">
+    <h2>System Settings</h2>
+  </div>
+
+  <div class="settings-grid">
+    
+    <!-- Coordinator Control -->
+    <div class="settings-section card">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2l9 4.9V12c0 5.25-3.6 10.17-9 11.4-5.4-1.23-9-6.15-9-11.4V6.9L12 2z"/>
+        </svg>
+        Coordinator Control
+      </h3>
+
+      <div *ngIf="!coordinatorOnline()" class="loading-state">
+        <p>Waiting for coordinator</p>
+        <div class="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+
+      <div *ngIf="coordinatorOnline()" class="coordinator-info">
+        <div class="info-row">
+          <span class="label">Coordinator ID:</span>
+          <span class="value">{{ coordinatorId }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Status:</span>
+          <span class="value" [class.online]="coordinatorOnline()">
+            {{ coordinatorOnline() ? 'Online' : 'Offline' }}
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="label">Firmware:</span>
+          <span class="value">{{ firmwareVersion }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="coordinatorOnline()" class="control-buttons">
+        <button 
+          class="button button-primary"
+          (click)="enterPairingMode()"
+          [disabled]="!coordinatorOnline() || pairingMode()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+          {{ pairingMode() ? 'Pairing Mode Active...' : 'Enter Pairing Mode' }}
+        </button>
+        
+        <button 
+          class="button"
+          (click)="restartCoordinator()"
+          [disabled]="!coordinatorOnline()"
+          style="background: var(--bg-tertiary); color: var(--text-secondary);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Restart Coordinator
+        </button>
+      </div>
+
+      <div class="setting-item" *ngIf="pairingMode()">
+        <div class="pairing-countdown">
+          <p>Pairing mode active for {{ pairingTimeLeft }}s</p>
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="pairingProgress()"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Node Management -->
+    <div class="settings-section card">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="4" width="16" height="16" rx="2"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        Node Management
+      </h3>
+
+      <div *ngIf="!coordinatorOnline()" class="loading-state">
+        <p>Waiting for node</p>
+        <div class="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+
+      <div *ngIf="coordinatorOnline() && !node()" class="empty-state-inline">
+        <p>No node paired yet</p>
+        <button class="button button-primary" (click)="enterPairingMode()">
+          Pair a Node
+        </button>
+      </div>
+
+      <ng-template #nodeManagement>
+        <div *ngIf="coordinatorOnline()" class="node-card">
+          <div class="node-header">
+            <div class="node-info">
+              <h4>{{ node()?.name || node()?.node_id }}</h4>
+              <span class="node-status" [class]="node()?.status">
+                {{ node()?.status || 'offline' }}
+              </span>
+            </div>
+            <button 
+              class="button button-danger"
+              (click)="deleteNode()"
+              title="Remove Node">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="node-controls">
+            <div class="setting-item">
+              <label>Zone Assignment</label>
+              <select [(ngModel)]="nodeZone" (change)="updateNodeZone()" class="zone-select">
+                <option value="">No Zone</option>
+                <option *ngFor="let zone of zones" [value]="zone">{{ zone }}</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <label>Node Name</label>
+              <input 
+                type="text" 
+                [(ngModel)]="nodeName"
+                (blur)="updateNodeName()"
+                placeholder="Enter node name"
+                class="text-input">
+            </div>
+
+            <div class="setting-item">
+              <label>LED Color Test</label>
+              <div class="color-picker-wrapper">
+                <input 
+                  type="color" 
+                  [(ngModel)]="testColor"
+                  (change)="sendTestColor()"
+                  class="color-picker">
+                <button 
+                  class="button"
+                  (click)="turnOffLEDs()"
+                  style="background: var(--bg-tertiary); margin-left: 0.5rem;">
+                  Turn Off
+                </button>
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <label>Brightness: {{ nodeBrightness }}%</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                [(ngModel)]="nodeBrightness"
+                (change)="updateBrightness()"
+                class="slider">
+            </div>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- Zone Management -->
+    <div class="settings-section card">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        Zone Management
+      </h3>
+
+      <div *ngIf="!coordinatorOnline()" class="loading-state">
+        <p>Waiting for coordinator</p>
+        <div class="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+
+      <!-- Zone creation form -->
+      <div *ngIf="coordinatorOnline() && showZoneForm" class="zone-form">
+      <div *ngIf="showZoneForm" class="zone-form">
+        <div class="form-group">
+          <label>Zone Name</label>
+          <input 
+            type="text" 
+            [(ngModel)]="newZoneName"
+            placeholder="Enter zone name (e.g., Living Room)"
+            class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label>Select Coordinator</label>
+          <select [(ngModel)]="newZoneCoordinator" class="form-select">
+            <option value="">-- Select a coordinator --</option>
+            <option *ngFor="let coord of availableCoordinators()" [value]="coord.coord_id">
+              {{ coord.coord_id }} {{ coord.status === 'online' ? '(Online)' : '(Offline)' }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button class="button button-primary" (click)="createZone()" [disabled]="!newZoneName || !newZoneCoordinator || isCreatingZone">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            {{ isCreatingZone ? 'Creating...' : 'Create Zone' }}
+          </button>
+          <button class="button" (click)="cancelZoneForm()" style="background: var(--bg-tertiary); color: var(--text-secondary);">
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Existing zones list -->
+      <div *ngIf="coordinatorOnline() && !showZoneForm && managedZones().length > 0" class="zones-list">
+        <div *ngFor="let zone of managedZones()" class="zone-card">
+          <div class="zone-header">
+            <div class="zone-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <h4>{{ zone.name }}</h4>
+            </div>
+            <button 
+              class="button button-danger-outline button-sm"
+              (click)="deleteZoneConfirm(zone)"
+              title="Delete Zone">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              Delete
+            </button>
+          </div>
+
+          <div class="zone-info">
+            <div class="info-row">
+              <span class="label">Coordinator:</span>
+              <span class="value">{{ zone.coordinator_id }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Nodes Assigned:</span>
+              <span class="value">{{ getNodesInZone(zone._id || '').length }} nodes</span>
+            </div>
+            <div *ngIf="getNodesInZone(zone._id || '').length > 0" class="nodes-list-inline">
+              <span *ngFor="let node of getNodesInZone(zone._id || '')" class="node-badge">
+                {{ node.node_id || node._id }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div *ngIf="coordinatorOnline() && !showZoneForm && managedZones().length === 0" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <p>No zones configured yet</p>
+        <p class="empty-state-hint">Create a zone to organize your nodes</p>
+      </div>
+
+      <!-- Add zone button -->
+      <button 
+        *ngIf="coordinatorOnline() && !showZoneForm"
+        class="button" 
+        (click)="showZoneForm = true" 
+        style="margin-top: 1rem; width: 100%;"
+        [disabled]="availableCoordinators().length === 0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        {{ availableCoordinators().length === 0 ? 'No Available Coordinators' : 'Add Zone' }}
+      </button>
+
+      <!-- Flash confirmation message -->
+      <div *ngIf="zoneFlashMessage" class="flash-message success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        {{ zoneFlashMessage }}
+      </div>
+    </div>
+
+
+    <!-- mmWave Zone Creator -->
+    <div class="settings-section card" style="grid-column: span 2;">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="20" rx="4"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        mmWave Zone Creator
+      </h3>
+
+      <div *ngIf="!coordinatorOnline()" class="loading-state">
+        <p>Waiting for coordinator</p>
+        <div class="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+
+      <div *ngIf="coordinatorOnline()" class="setting-item">
+        <label>Draw mmWave Zones (2D)</label>
+        <div style="border:1px solid #ccc; width:100%; max-width:800px; height:600px; position:relative; background:#f9f9f9; margin: 0 auto;">
+          <!-- Placeholder for 2D zone drawing canvas -->
+          <canvas #zoneCanvas width="800" height="600" style="width:100%;height:100%;"></canvas>
+        </div>
+        <button class="button button-primary" (click)="saveMmwaveZones()" style="margin-top:1rem;">Save Zones</button>
+      </div>
+      <div *ngIf="coordinatorOnline() && mmwaveZones.length">
+        <h4>Defined Zones</h4>
+        <ul>
+          <li *ngFor="let zone of mmwaveZones">Zone: ({{ zone.x }}, {{ zone.y }}, {{ zone.radius }})</li>
+        </ul>
+      </div>
+      <div *ngIf="coordinatorOnline()" class="setting-item">
+        <p class="hint">Zones are viewable in the radar live monitor. When a target enters a zone, the corresponding node LED will turn on.</p>
+      </div>
+    </div>
+
+    <!-- Google Home Integration -->
+    <div class="settings-section card">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Google Home Integration
+      </h3>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <label>Enable Google Home</label>
+          <p>Control lights with Google Assistant</p>
+        </div>
+        <div
+          class="toggle-switch"
+          [class.active]="googleHomeEnabled"
+          (click)="googleHomeEnabled = !googleHomeEnabled">
+        </div>
+      </div>
+
+      <div *ngIf="googleHomeEnabled" class="google-config">
+        <div class="setting-item">
+          <label>Project ID</label>
+          <input 
+            type="text" 
+            [(ngModel)]="googleProjectId"
+            placeholder="your-google-cloud-project-id"
+            class="text-input">
+        </div>
+
+        <div class="setting-item">
+          <label>Client ID</label>
+          <input 
+            type="text" 
+            [(ngModel)]="googleClientId"
+            placeholder="your-client-id.apps.googleusercontent.com"
+            class="text-input">
+        </div>
+
+        <div class="setting-item">
+          <label>Client Secret</label>
+          <input 
+            type="password" 
+            [(ngModel)]="googleClientSecret"
+            placeholder="Enter client secret"
+            class="text-input">
+        </div>
+
+        <div class="setting-item">
+          <label>API Key</label>
+          <input 
+            type="text" 
+            [(ngModel)]="googleApiKey"
+            placeholder="Enter API key"
+            class="text-input">
+        </div>
+
+        <div class="connection-status" *ngIf="googleHomeEnabled">
+          <span class="status-indicator" [class.connected]="googleHomeConnected">
+            {{ googleHomeConnected ? 'Connected' : 'Not Connected' }}
+          </span>
+          <button 
+            *ngIf="!googleHomeConnected"
+            class="button button-primary"
+            (click)="connectGoogleHome()">
+            Link Account
+          </button>
+          <button 
+            *ngIf="googleHomeConnected"
+            class="button"
+            (click)="disconnectGoogleHome()"
+            style="background: var(--accent-danger);">
+            Unlink Account
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

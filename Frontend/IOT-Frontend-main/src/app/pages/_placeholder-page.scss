@@ -1,0 +1,103 @@
+// Shared placeholder page styles
+// Used by: predictions, digital-twin, ota-dashboard, settings, alerts
+
+.placeholder-page {
+  padding: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+
+  .back-btn {
+    margin-top: 0.25rem;
+  }
+
+  .header-content {
+    flex: 1;
+
+    .page-title {
+      font-size: 1.875rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      margin: 0;
+    }
+
+    .page-description {
+      color: hsl(var(--muted-foreground));
+      margin: 0.25rem 0 0;
+    }
+  }
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.placeholder-card {
+  .placeholder-icon {
+    width: 3rem;
+    height: 3rem;
+    color: hsl(142 76% 36%);
+    margin-bottom: 1rem;
+  }
+
+  [hlmCardHeader] {
+    text-align: center;
+  }
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 0.5rem;
+    transition: background 150ms ease;
+
+    &:hover {
+      background: hsl(var(--muted) / 0.5);
+    }
+
+    ng-icon {
+      color: hsl(142 76% 36%);
+      flex-shrink: 0;
+    }
+
+    span {
+      color: hsl(var(--foreground));
+      font-size: 0.875rem;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .placeholder-page {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+
+    .header-content {
+      .page-title {
+        font-size: 1.5rem;
+      }
+    }
+  }
+}

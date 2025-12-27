@@ -1,0 +1,63 @@
+@startuml Coordinator Telemetry Flow
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam backgroundColor #FEFEFE
+
+title Coordinator Telemetry Flow (2 Zones)
+
+participant "ESP32-S3\nCoordinator 1\n(Zone 1)" as Coord1
+participant "ESP32-S3\nCoordinator N\n(Zone N)" as CoordN
+participant "Mosquitto\nMQTT Broker" as MQTT
+participant "Go Backend\nREST API" as Backend
+participant "MongoDB" as DB
+participant "Angular\nFrontend" as Frontend
+
+note over Coord1, CoordN
+  2 Coordinators (Zone 1 & Zone N) publish independently
+  Each coordinator has: Light sensor, Temp sensor, mmWave radar
+end note
+
+== Zone 1: Coordinator 1 Publishes Telemetry ==
+
+Coord1 -> Coord1: Read local sensors\n- Ambient Light (ADC)\n- TSL2561 Light\n- LD2450 mmWave\n- WiFi RSSI
+Coord1 -> MQTT: Publish\nsite/{siteId}/coord/1/telemetry\n{\n  "coordId": "1",\n  "zoneId": "1",\n  "light": 450,\n  "temperature": 22.5,\n  "mmWave": {"present": true}\n}
+
+Coord1 -> MQTT: Publish\nsite/{siteId}/coord/1/mmwave\n(mmWave detailed data)
+
+Coord1 -> MQTT: Publish\nsite/{siteId}/coord/1/status\n{\n  "wifi": "connected",\n  "mqtt": "connected",\n  "nodes": 5,\n  "zoneId": "1"\n}
+
+== Zone N: Coordinator N Publishes Telemetry ==
+
+CoordN -> CoordN: Read local sensors\n- Ambient Light (ADC)\n- TSL2561 Light\n- LD2450 mmWave\n- WiFi RSSI
+CoordN -> MQTT: Publish\nsite/{siteId}/coord/N/telemetry\n{\n  "coordId": "N",\n  "zoneId": "N",\n  "light": 380,\n  "temperature": 21.8\n}
+
+CoordN -> MQTT: Publish\nsite/{siteId}/coord/N/status
+
+== Backend Aggregates Data from Both Zones ==
+
+MQTT -> Backend: MQTT messages\n(from Coordinator 1 & N)
+activate Backend
+Backend -> DB: Store coordinator data\n(Zone 1 & Zone N)
+note right of DB
+  Collections:
+  - coordinators (2 zones)
+  - telemetry_history
+  - mmwave_events
+  - zones (definitions)
+end note
+Backend -> Frontend: WebSocket push\n(aggregated data from both zones)
+deactivate Backend
+
+Frontend -> Frontend: Update zone views\n- Zone 1 & Zone N cards\n- Light/Temp charts\n- mmWave presence indicators\n- 2-zone topology map
+
+note right of Frontend
+  Dashboard shows 2 zones:
+  • Zone 1 (Coordinator 1)
+  • Zone N (Coordinator N)
+  • Per-zone sensor readings
+  • Per-zone node count
+  • WiFi signal strength
+end note
+
+@enduml

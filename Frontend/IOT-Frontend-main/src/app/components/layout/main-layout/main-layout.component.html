@@ -1,0 +1,15 @@
+<div class="app-layout">
+  <!-- Sidebar -->
+  <app-sidebar />
+  
+  <!-- Main Content Area -->
+  <div class="main-area">
+    <!-- Header -->
+    <app-header [breadcrumbs]="breadcrumbs" />
+    
+    <!-- Page Content -->
+    <main class="page-content">
+      <router-outlet />
+    </main>
+  </div>
+</div>
