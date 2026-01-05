@@ -19,10 +19,17 @@ import {
   lucideShield,
   lucideUser,
   lucideBuilding,
-  lucideBeaker
+  lucideBeaker,
+  lucideBrain,
+  lucideEgg,
+  lucideLightbulb,
+  lucideCpu,
+  lucideGrid3x3,
+  lucideRadar,
+  lucideDownload
 } from '@ng-icons/lucide';
 import { WebSocketService } from '../../../core/services/websocket.service';
-import { HydroponicDataService } from '../../../core/services/hydroponic-data.service';
+import { IoTDataService } from '../../../core/services/iot-data.service';
 import { Subject, interval, takeUntil } from 'rxjs';
 
 interface NavItem {
@@ -63,7 +70,14 @@ type UserRole = 'admin' | 'user';
       lucideShield,
       lucideUser,
       lucideBuilding,
-      lucideBeaker
+      lucideBeaker,
+      lucideBrain,
+      lucideEgg,
+      lucideLightbulb,
+      lucideCpu,
+      lucideGrid3x3,
+      lucideRadar,
+      lucideDownload
     })
   ],
   templateUrl: './sidebar.component.html',
@@ -71,7 +85,7 @@ type UserRole = 'admin' | 'user';
 })
 export class SidebarComponent implements OnInit, OnDestroy {
   private readonly wsService = inject(WebSocketService);
-  private readonly dataService = inject(HydroponicDataService);
+  private readonly dataService = inject(IoTDataService);
   private readonly destroy$ = new Subject<void>();
 
   // Navigation structure - Dashboard standalone, Devices with Coordinators/Nodes
@@ -86,14 +100,24 @@ export class SidebarComponent implements OnInit, OnDestroy {
       icon: 'lucideBox',
       expanded: true,
       children: [
-        { label: 'Coordinators', icon: 'lucideServer', route: '/coordinators' },
-        { label: 'Nodes', icon: 'lucideFlower2', route: '/nodes' }
+        { label: 'Coordinators', icon: 'lucideCpu', route: '/reservoirs' },
+        { label: 'Nodes', icon: 'lucideLightbulb', route: '/towers' }
       ]
+    },
+    {
+      label: 'Zones',
+      icon: 'lucideGrid3x3',
+      route: '/zones'
     },
     {
       label: 'Alerts',
       icon: 'lucideBell',
       route: '/alerts'
+    },
+    {
+      label: 'OTA Updates',
+      icon: 'lucideDownload',
+      route: '/ota'
     },
     {
       label: 'Settings',
@@ -102,10 +126,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
   ]);
 
-  // Projects section - Greenhouses and Hydroponics Lab
+  // Projects section - Digital Twin, Radar, Machine Learning
   projects = signal<ProjectItem[]>([
-    { label: 'Greenhouses', icon: 'lucideBuilding', route: '/greenhouses' },
-    { label: 'Hydroponics Lab', icon: 'lucideBeaker', route: '/digital-twin' }
+    { label: 'Digital Twin', icon: 'lucideBeaker', route: '/digital-twin' },
+    { label: 'Radar View', icon: 'lucideRadar', route: '/radar' },
+    { label: 'Machine Learning', icon: 'lucideBrain', route: '/machine-learning' }
   ]);
 
   // System status signals
@@ -115,8 +140,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   // Device counts from data service
   readonly onlineCoordinators = this.dataService.onlineCoordinatorCount;
   readonly totalCoordinators = this.dataService.totalCoordinatorCount;
-  readonly onlineNodes = this.dataService.onlineTowerCount;
-  readonly totalNodes = this.dataService.totalTowerCount;
+  readonly onlineNodes = this.dataService.onlineNodeCount;
+  readonly totalNodes = this.dataService.totalNodeCount;
 
   // User role management
   currentRole = signal<UserRole>('admin');

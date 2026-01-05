@@ -1,71 +1,37 @@
 /**
- * Coordinator Models for Hydroponic Farm System
- * Coordinators manage reservoir systems and connected towers
+ * Coordinator Models for Smart Tile IoT System
+ * Coordinators manage zones and connected nodes (smart tiles)
  */
 
 // ============================================================================
-// Reservoir State
+// Coordinator Status
 // ============================================================================
 
-export interface ReservoirState {
-  ph: number;
-  ec: number;              // Electrical conductivity (mS/cm)
-  temperature: number;     // Celsius
-  waterLevel: number;      // Percentage (0-100)
-  lastUpdated: Date;
-}
-
-export interface ReservoirThresholds {
-  phMin: number;
-  phMax: number;
-  ecMin: number;
-  ecMax: number;
-  tempMin: number;
-  tempMax: number;
-  waterLevelMin: number;
-}
+export type CoordinatorStatus = 'online' | 'offline' | 'warning' | 'error';
 
 // ============================================================================
 // Coordinator
 // ============================================================================
 
-export type CoordinatorStatus = 'online' | 'offline' | 'warning' | 'error';
-
 export interface Coordinator {
   _id: string;
-  coordId: string;
-  name: string;
-  macAddress: string;
-  ipAddress?: string;
+  coord_id: string;
+  site_id: string;
+  fw_version: string;
+  nodes_online: number;
+  wifi_rssi: number;
+  mmwave_event_rate: number;    // mmWave radar event rate
+  light_lux: number;            // Ambient light level
+  temp_c: number;               // Temperature in Celsius
+  last_seen: Date;
   
-  // Connection info
-  wifiSsid?: string;
-  wifiRssi?: number;
-  mqttBroker?: string;
-  mqttConnected: boolean;
+  // Optional fields from extended coordinator info
+  name?: string;
+  ip_address?: string;
+  mac_address?: string;
   
-  // Firmware
-  firmwareVersion: string;
-  hardwareRevision?: string;
-  
-  // System health
-  status: CoordinatorStatus;
-  uptime: number;           // Seconds
-  heapFree: number;         // Bytes
-  cpuTemp?: number;         // Celsius
-  
-  // Reservoir
-  reservoir: ReservoirState;
-  thresholds: ReservoirThresholds;
-  
-  // Connected towers
-  towerIds: string[];
-  towerCount: number;
-  
-  // Timestamps
-  lastSeen: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  // Status field - can be computed or stored
+  status?: CoordinatorStatus;
 }
 
 // ============================================================================
@@ -74,35 +40,102 @@ export interface Coordinator {
 
 export interface CoordinatorSummary {
   _id: string;
-  coordId: string;
-  name: string;
+  coord_id: string;
+  name?: string;
+  site_id: string;
   status: CoordinatorStatus;
-  towerCount: number;
-  reservoir: {
-    ph: number;
-    ec: number;
-    temperature: number;
-    waterLevel: number;
-  };
-  lastSeen: Date;
+  nodes_online: number;
+  wifi_rssi: number;
+  light_lux: number;
+  temp_c: number;
+  last_seen: Date;
+}
+
+// ============================================================================
+// Coordinator Telemetry (real-time data)
+// ============================================================================
+
+export interface CoordinatorTelemetry {
+  coord_id: string;
+  site_id: string;
+  timestamp: Date;
+  nodes_online: number;
+  wifi_rssi: number;
+  mmwave_event_rate: number;
+  light_lux: number;
+  temp_c: number;
 }
 
 // ============================================================================
 // Coordinator Commands
 // ============================================================================
 
-export interface ReservoirAdjustCommand {
-  coordId: string;
-  phTarget?: number;
-  ecTarget?: number;
-  addNutrients?: boolean;
-  addPhUp?: boolean;
-  addPhDown?: boolean;
+/**
+ * Command to start pairing mode on a coordinator.
+ * Matches backend StartPairingRequest in coordinator_handlers.go
+ */
+export interface CoordinatorPairCommand {
+  site_id: string;
+  coordinator_id: string;
+  duration_ms?: number;  // defaults to 60000 (60 seconds) on backend
+}
+
+/**
+ * Default pairing duration in milliseconds
+ */
+export const DEFAULT_PAIRING_DURATION_MS = 60000;
+
+export interface CoordinatorRestartCommand {
+  coord_id: string;
+}
+
+export interface CoordinatorWifiCommand {
+  coord_id: string;
+  ssid: string;
+  password: string;
 }
 
 export interface CoordinatorConfigUpdate {
-  coordId: string;
+  coord_id: string;
   name?: string;
-  thresholds?: Partial<ReservoirThresholds>;
-  mqttBroker?: string;
+}
+
+// ============================================================================
+// mmWave Radar Data
+// ============================================================================
+
+export interface MmWaveTarget {
+  x: number;
+  y: number;
+  speed: number;
+  resolution: number;
+}
+
+export interface MmWaveFrame {
+  coord_id: string;
+  timestamp: Date;
+  targets: MmWaveTarget[];
+}
+
+// ============================================================================
+// Status Helper Functions
+// ============================================================================
+
+export function getCoordinatorStatus(coordinator: Coordinator | CoordinatorSummary): CoordinatorStatus {
+  const lastSeen = new Date(coordinator.last_seen);
+  const now = new Date();
+  const diffMs = now.getTime() - lastSeen.getTime();
+  const diffMinutes = diffMs / (1000 * 60);
+  
+  if (diffMinutes > 5) return 'offline';
+  if (diffMinutes > 2) return 'warning';
+  if (coordinator.wifi_rssi < -80) return 'warning';
+  return 'online';
+}
+
+export function getSignalStrength(rssi: number): 'excellent' | 'good' | 'fair' | 'poor' {
+  if (rssi >= -50) return 'excellent';
+  if (rssi >= -60) return 'good';
+  if (rssi >= -70) return 'fair';
+  return 'poor';
 }

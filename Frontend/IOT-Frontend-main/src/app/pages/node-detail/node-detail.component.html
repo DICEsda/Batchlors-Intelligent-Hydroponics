@@ -1,0 +1,368 @@
+<div class="node-detail">
+  <!-- Header with back navigation -->
+  <header class="page-header">
+    <div class="header-left">
+      <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
+        <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
+      </a>
+      <div class="header-content">
+        @if (loading()) {
+          <hlm-skeleton class="title-skeleton" />
+        } @else {
+          <h1 class="page-title">{{ node()?.name || node()?.light_id || 'Node' }}</h1>
+          <p class="page-description">
+            @if (node()) {
+              <span hlmBadge [variant]="getStatusBadgeVariant(nodeStatus())">
+                <ng-icon hlmIcon [name]="nodeStatus() === 'operational' ? 'lucideWifi' : 'lucideWifiOff'" size="xs" />
+                {{ nodeStatus() }}
+              </span>
+              <span class="separator">|</span>
+              <span>Smart Tile Node</span>
+            }
+          </p>
+        }
+      </div>
+    </div>
+    <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="secondary" class="mock-badge">
+          Mock Data
+        </span>
+      }
+      <span
+        hlmBadge
+        [variant]="wsConnected() ? 'outline' : 'destructive'"
+        class="live-badge"
+      >
+        <span class="live-dot" [class.active]="wsConnected()"></span>
+        {{ wsConnected() ? 'Live' : 'Offline' }}
+      </span>
+      <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        Refresh
+      </button>
+      <button hlmBtn variant="outline" size="sm">
+        <ng-icon hlmIcon name="lucideSettings" size="sm" />
+        Settings
+      </button>
+    </div>
+  </header>
+
+  <!-- Error State -->
+  @if (error()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>{{ error() }}</span>
+      <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="loading-grid">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div hlmCard class="metric-card">
+          <hlm-skeleton class="metric-skeleton" />
+        </div>
+      }
+    </div>
+  } @else if (node()) {
+    <!-- Node Info Section -->
+    <section class="node-info-section">
+      <h2 class="section-title">Node Information</h2>
+      <div class="info-grid">
+        <!-- Light ID -->
+        <div hlmCard class="info-card">
+          <div hlmCardHeader class="info-header">
+            <ng-icon hlmIcon name="lucideLightbulb" size="lg" class="info-icon" />
+            <div class="info-content">
+              <span hlmCardDescription>Light ID</span>
+              <span hlmCardTitle class="info-value">{{ node()!.light_id }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Firmware Version -->
+        <div hlmCard class="info-card">
+          <div hlmCardHeader class="info-header">
+            <ng-icon hlmIcon name="lucideCpu" size="lg" class="info-icon" />
+            <div class="info-content">
+              <span hlmCardDescription>Firmware</span>
+              <span hlmCardTitle class="info-value">{{ node()!.fw_version || 'Unknown' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parent Coordinator -->
+        @if (parentCoordinator()) {
+          <a [routerLink]="['/reservoirs', parentCoordinator()!._id]" class="card-link">
+            <div hlmCard class="info-card clickable">
+              <div hlmCardHeader class="info-header">
+                <ng-icon hlmIcon name="lucideServer" size="lg" class="info-icon" />
+                <div class="info-content">
+                  <span hlmCardDescription>Coordinator</span>
+                  <span hlmCardTitle class="info-value">{{ parentCoordinator()!.name || parentCoordinator()!.coord_id }}</span>
+                </div>
+              </div>
+            </div>
+          </a>
+        }
+
+        <!-- Assigned Zone -->
+        @if (assignedZone()) {
+          <div hlmCard class="info-card">
+            <div hlmCardHeader class="info-header">
+              <ng-icon hlmIcon name="lucideMapPin" size="lg" class="info-icon" />
+              <div class="info-content">
+                <span hlmCardDescription>Zone</span>
+                <span hlmCardTitle class="info-value">{{ assignedZone()!.name }}</span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Sensor Metrics Section -->
+    <section class="metrics-section">
+      <h2 class="section-title">Sensor Readings</h2>
+      <div class="metrics-grid">
+        <!-- Temperature -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon name="lucideThermometer" size="lg" class="metric-icon temp" />
+            <div class="metric-info">
+              <span hlmCardDescription>Temperature</span>
+              <span hlmCardTitle class="metric-value">
+                {{ temperature() !== null ? temperature()!.toFixed(1) : '--' }}°C
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Battery -->
+        <div hlmCard class="metric-card" [class]="'battery-' + batteryStatus()">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon [name]="getBatteryIcon()" size="lg" class="metric-icon battery" />
+            <div class="metric-info">
+              <span hlmCardDescription>Battery</span>
+              <span hlmCardTitle class="metric-value">
+                {{ batteryPercent() }}%
+              </span>
+            </div>
+          </div>
+          <div hlmCardContent class="metric-content">
+            <div class="battery-bar-container">
+              <div class="battery-bar" [style.width.%]="batteryPercent()" [class]="'battery-' + batteryStatus()"></div>
+            </div>
+            <span class="battery-voltage">{{ node()!.vbat_mv }}mV</span>
+          </div>
+        </div>
+
+        <!-- Signal Strength (RSSI) -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon [name]="getSignalIcon()" size="lg" class="metric-icon signal" />
+            <div class="metric-info">
+              <span hlmCardDescription>Signal Strength</span>
+              <span hlmCardTitle class="metric-value">
+                {{ rssi() !== null ? rssi() : '--' }} dBm
+              </span>
+            </div>
+          </div>
+          <div hlmCardContent class="metric-content">
+            <span class="signal-strength" [class]="'strength-' + signalStrength()">
+              {{ signalStrength() }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Status Mode -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon name="lucideActivity" size="lg" class="metric-icon status" />
+            <div class="metric-info">
+              <span hlmCardDescription>Status Mode</span>
+              <span hlmCardTitle class="metric-value status-text">
+                {{ nodeStatus() }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Last update timestamp -->
+      <div class="last-update">
+        <ng-icon hlmIcon name="lucideClock" size="xs" />
+        <span>Last seen: {{ formatTimeAgo(node()!.last_seen) }}</span>
+        <span class="timestamp-full">({{ formatTimestamp(node()!.last_seen) }})</span>
+        @if (wsConnected()) {
+          <span hlmBadge variant="outline" class="live-indicator">
+            <ng-icon hlmIcon name="lucideZap" size="xs" />
+            Real-time
+          </span>
+        }
+      </div>
+    </section>
+
+    <!-- LED Control Section -->
+    <section class="led-control-section">
+      <h2 class="section-title">
+        <ng-icon hlmIcon name="lucidePalette" size="sm" />
+        LED Control
+      </h2>
+
+      <div hlmCard class="led-control-card">
+        <div hlmCardContent>
+          <!-- Color Presets -->
+          <div class="control-group">
+            <label hlmLabel>Color Presets</label>
+            <div class="color-presets">
+              @for (preset of colorPresets; track preset.name) {
+                <button
+                  type="button"
+                  class="preset-btn"
+                  [style.background-color]="getColorStyle(preset.color)"
+                  [class.active]="testColor().r === preset.color.r && testColor().g === preset.color.g && testColor().b === preset.color.b"
+                  (click)="selectColorPreset(preset)"
+                  [title]="preset.name"
+                >
+                  <span class="preset-name">{{ preset.name }}</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Color Sliders -->
+          <div class="color-sliders">
+            <div class="slider-group">
+              <label hlmLabel>Red: {{ testColor().r }}</label>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                [value]="testColor().r"
+                (input)="updateColorR($event)"
+                class="color-slider slider-red"
+              />
+            </div>
+            <div class="slider-group">
+              <label hlmLabel>Green: {{ testColor().g }}</label>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                [value]="testColor().g"
+                (input)="updateColorG($event)"
+                class="color-slider slider-green"
+              />
+            </div>
+            <div class="slider-group">
+              <label hlmLabel>Blue: {{ testColor().b }}</label>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                [value]="testColor().b"
+                (input)="updateColorB($event)"
+                class="color-slider slider-blue"
+              />
+            </div>
+            <div class="slider-group">
+              <label hlmLabel>White: {{ testColor().w }}</label>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                [value]="testColor().w"
+                (input)="updateColorW($event)"
+                class="color-slider slider-white"
+              />
+            </div>
+          </div>
+
+          <!-- Color Preview -->
+          <div class="color-preview-section">
+            <label hlmLabel>Color Preview</label>
+            <div class="color-preview" [style.background-color]="getColorStyle(testColor())">
+              @if ((testColor().w ?? 0) > 0) {
+                <span class="white-indicator">+W: {{ testColor().w }}</span>
+              }
+            </div>
+          </div>
+
+          <!-- Brightness Slider -->
+          <div class="control-group brightness-group">
+            <label hlmLabel>
+              <ng-icon hlmIcon name="lucideSun" size="sm" />
+              Brightness: {{ brightness() }}%
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              [value]="brightness()"
+              (input)="updateBrightness($event)"
+              class="brightness-slider"
+            />
+          </div>
+
+          <!-- Control Buttons -->
+          <div class="led-actions">
+            <button
+              hlmBtn
+              variant="default"
+              (click)="testLedColor()"
+              [disabled]="ledControlLoading()"
+            >
+              @if (ledControlLoading()) {
+                <ng-icon hlmIcon name="lucideRefreshCw" size="sm" class="spin" />
+              } @else {
+                <ng-icon hlmIcon name="lucidePalette" size="sm" />
+              }
+              Test Color (5s)
+            </button>
+
+            <button
+              hlmBtn
+              variant="outline"
+              (click)="setLedBrightness()"
+              [disabled]="ledControlLoading()"
+            >
+              <ng-icon hlmIcon name="lucideSliders" size="sm" />
+              Set Brightness
+            </button>
+
+            @if (ledOn()) {
+              <button
+                hlmBtn
+                variant="secondary"
+                (click)="turnOffLed()"
+                [disabled]="ledControlLoading()"
+              >
+                <ng-icon hlmIcon name="lucideLightbulbOff" size="sm" />
+                Turn Off
+              </button>
+            } @else {
+              <button
+                hlmBtn
+                variant="default"
+                (click)="turnOnLed()"
+                [disabled]="ledControlLoading()"
+              >
+                <ng-icon hlmIcon name="lucideLightbulb" size="sm" />
+                Turn On
+              </button>
+            }
+          </div>
+
+          <!-- LED Status -->
+          <div class="led-status">
+            <span class="led-indicator" [class.on]="ledOn()"></span>
+            <span>LED is {{ ledOn() ? 'ON' : 'OFF' }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+</div>

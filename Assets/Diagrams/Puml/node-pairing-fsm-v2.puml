@@ -1,0 +1,114 @@
+@startuml Node Pairing State Machine V2
+
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #F8F8F8
+    BorderColor #666666
+    ArrowColor #333333
+}
+
+title Node Pairing State Machine\n(Zigbee-like Discovery Model)
+
+[*] --> INIT : Power on
+
+state INIT {
+    INIT : Initialize hardware
+    INIT : Load NVS credentials
+    INIT : Check pairing status
+}
+
+INIT --> UNPAIRED : No valid credentials
+INIT --> OPERATIONAL : Valid credentials found
+
+state UNPAIRED {
+    UNPAIRED : No coordinator bound
+    UNPAIRED : LED: Slow blink red (1Hz)
+    UNPAIRED : Awaiting user action
+}
+
+UNPAIRED --> PAIRING_ADVERTISE : Button press\nor auto-start
+
+state PAIRING_ADVERTISE {
+    PAIRING_ADVERTISE : Broadcasting availability
+    PAIRING_ADVERTISE : LED: Fast blink blue (4Hz)
+    PAIRING_ADVERTISE : ---
+    PAIRING_ADVERTISE : Send PAIRING_ADVERTISEMENT
+    PAIRING_ADVERTISE : every 100ms (±20ms jitter)
+    PAIRING_ADVERTISE : ---
+    PAIRING_ADVERTISE : Nonce rotates every 30s
+    PAIRING_ADVERTISE : Sequence increments each TX
+}
+
+PAIRING_ADVERTISE --> PAIRING_WAIT : PAIRING_OFFER received\n(valid nonce_echo)
+PAIRING_ADVERTISE --> UNPAIRED : Timeout (5 min)\nno offer received
+PAIRING_ADVERTISE --> UNPAIRED : User cancels
+
+state PAIRING_WAIT {
+    PAIRING_WAIT : Offer received, awaiting confirm
+    PAIRING_WAIT : LED: Solid blue
+    PAIRING_WAIT : ---
+    PAIRING_WAIT : Stop advertising
+    PAIRING_WAIT : Send PAIRING_ACCEPT
+    PAIRING_WAIT : Start confirm timer (5s)
+}
+
+PAIRING_WAIT --> BOUND : PAIRING_CONFIRM received\n(valid token)
+PAIRING_WAIT --> UNPAIRED : Timeout (5s)\nno confirm received
+PAIRING_WAIT --> UNPAIRED : PAIRING_REJECT received
+
+state BOUND {
+    BOUND : Pairing confirmed
+    BOUND : LED: Flash green 3x
+    BOUND : ---
+    BOUND : Persist to NVS:
+    BOUND : • coordinator_mac
+    BOUND : • tower_id
+    BOUND : • farm_id
+    BOUND : • encryption_key
+}
+
+BOUND --> OPERATIONAL : Credentials saved
+
+state OPERATIONAL {
+    OPERATIONAL : Normal operation
+    OPERATIONAL : LED: Off / Status indicator
+    OPERATIONAL : ---
+    OPERATIONAL : Send TOWER_TELEMETRY
+    OPERATIONAL : Receive commands
+    OPERATIONAL : Monitor coordinator heartbeat
+}
+
+OPERATIONAL --> UNPAIRED : Unpair command received
+OPERATIONAL --> UNPAIRED : Factory reset
+OPERATIONAL --> UNPAIRED : Coordinator lost (5 min)
+
+note right of PAIRING_ADVERTISE
+    **Advertisement Packet**
+    • MAC address (6 bytes)
+    • Device type (1 byte)
+    • Firmware version (4 bytes)
+    • Capabilities (2 bytes)
+    • Nonce (4 bytes)
+    • Sequence (2 bytes)
+end note
+
+note right of PAIRING_WAIT
+    **PAIRING_ACCEPT contains**
+    • node_mac
+    • offer_token (proves receipt)
+    • accepted_tower_id
+end note
+
+note left of BOUND
+    **NVS Storage**
+    Namespace: "pairing"
+    Keys:
+    - coord_mac
+    - tower_id
+    - farm_id
+    - enc_key
+    - paired_at
+end note
+
+@enduml

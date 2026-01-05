@@ -3,23 +3,32 @@ import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http'
 import { Observable, throwError, catchError, retry, timeout } from 'rxjs';
 import { EnvironmentService } from './environment.service';
 import {
+  // Site
+  Site,
   // Coordinator
   Coordinator,
   CoordinatorSummary,
-  ReservoirAdjustCommand,
-  CoordinatorConfigUpdate,
-  // Tower
-  Tower,
-  TowerSummary,
-  TowerLedCommand,
-  TowerConfigUpdate,
-  PlantSlotUpdate,
+  CoordinatorPairCommand,
+  CoordinatorRestartCommand,
+  CoordinatorWifiCommand,
+  // Node
+  Node,
+  NodeSummary,
+  LedControlCommand,
+  TestColorCommand,
+  BrightnessCommand,
+  NodeNameUpdate,
+  NodeZoneUpdate,
+  // Zone
+  Zone,
+  CreateZoneRequest,
+  UpdateZoneRequest,
   // Telemetry
-  ReservoirTelemetry,
-  TowerTelemetry,
-  ReservoirHistory,
-  TowerHistory,
-  FarmMetrics,
+  CoordinatorTelemetryData,
+  NodeTelemetryData,
+  CoordinatorHistory,
+  NodeHistory,
+  SystemMetrics,
   Alert,
   TimeRange,
   // OTA
@@ -47,11 +56,21 @@ import {
   PaginatedResponse,
   HealthStatus,
   PaginationParams,
-  TelemetryQueryParams,
 } from '../models';
 
 /**
- * API Service for Hydroponic Farm System
+ * Settings interface for Smart Tile system
+ */
+export interface SmartTileSettings {
+  brightness_default: number;
+  motion_sensitivity: number;
+  occupancy_timeout_sec: number;
+  ambient_light_threshold: number;
+  [key: string]: any;
+}
+
+/**
+ * API Service for Smart Tile IoT System
  * Handles all HTTP communication with the backend API
  */
 @Injectable({
@@ -73,81 +92,245 @@ export class ApiService {
     return this.get<HealthStatus>('/health');
   }
 
-  getFarmMetrics(): Observable<FarmMetrics> {
-    return this.get<FarmMetrics>('/api/v1/metrics');
+  getSystemMetrics(): Observable<SystemMetrics> {
+    return this.get<SystemMetrics>('/api/v1/metrics');
+  }
+
+  // ============================================================================
+  // Sites API
+  // ============================================================================
+
+  getSites(): Observable<Site[]> {
+    return this.get<Site[]>('/sites');
+  }
+
+  getSite(siteId: string): Observable<Site> {
+    return this.get<Site>(`/sites/${siteId}`);
   }
 
   // ============================================================================
   // Coordinators API
   // ============================================================================
 
+  /**
+   * Get all coordinators (aggregated from all sites)
+   * Note: Backend doesn't have a direct /coordinators endpoint for list,
+   * so this may need to aggregate from sites or use a custom endpoint
+   */
   getCoordinators(): Observable<CoordinatorSummary[]> {
+    // The backend has GET /coordinators/{id} for single coordinator
+    // For list, we need to go through sites
     return this.get<CoordinatorSummary[]>('/api/v1/coordinators');
   }
 
-  getCoordinator(coordId: string): Observable<Coordinator> {
-    return this.get<Coordinator>(`/api/v1/coordinators/${coordId}`);
+  /**
+   * Get coordinator by site and coordinator ID
+   */
+  getCoordinator(siteId: string, coordId: string): Observable<Coordinator> {
+    return this.get<Coordinator>(`/sites/${siteId}/coordinators/${coordId}`);
   }
 
-  updateCoordinator(config: CoordinatorConfigUpdate): Observable<Coordinator> {
-    return this.put<Coordinator>(`/api/v1/coordinators/${config.coordId}`, config);
+  /**
+   * Get coordinator by ID only (when site is unknown)
+   */
+  getCoordinatorById(coordId: string): Observable<Coordinator> {
+    return this.get<Coordinator>(`/coordinators/${coordId}`);
   }
 
-  adjustReservoir(command: ReservoirAdjustCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/coordinators/reservoir/adjust', command);
+  /**
+   * Start pairing mode on coordinator
+   */
+  startPairing(command: CoordinatorPairCommand): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/coordinator/pair', command);
+  }
+
+  /**
+   * Stop pairing mode on coordinator
+   */
+  stopPairing(coordinatorId: string): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/coordinator/pair/stop', { coordinator_id: coordinatorId });
+  }
+
+  /**
+   * Approve a discovered node during pairing
+   */
+  approveNode(request: { coordinator_id: string; node_id: string; mac_address: string; name?: string }): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/pairing/approve', request);
+  }
+
+  /**
+   * Reject a discovered node during pairing
+   */
+  rejectNode(request: { coordinator_id: string; node_id: string }): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/pairing/reject', request);
+  }
+
+  /**
+   * Restart coordinator
+   */
+  restartCoordinator(command: CoordinatorRestartCommand): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/coordinator/restart', command);
+  }
+
+  /**
+   * Update coordinator WiFi settings
+   */
+  updateCoordinatorWifi(command: CoordinatorWifiCommand): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/coordinator/wifi', command);
   }
 
   // ============================================================================
-  // Towers API
+  // Nodes API
   // ============================================================================
 
-  getTowers(coordId?: string): Observable<TowerSummary[]> {
-    const params: Record<string, string> = coordId ? { coordId } : {};
-    return this.get<TowerSummary[]>('/api/v1/towers', params);
+  /**
+   * Get all nodes (system-wide) or nodes for a specific coordinator
+   */
+  getNodes(): Observable<NodeSummary[]>;
+  getNodes(siteId: string, coordId: string): Observable<Node[]>;
+  getNodes(siteId?: string, coordId?: string): Observable<Node[] | NodeSummary[]> {
+    if (siteId && coordId) {
+      return this.get<Node[]>(`/sites/${siteId}/coordinators/${coordId}/nodes`);
+    }
+    // Get all nodes across the system
+    return this.get<NodeSummary[]>('/api/v1/nodes');
   }
 
-  getTower(towerId: string): Observable<Tower> {
-    return this.get<Tower>(`/api/v1/towers/${towerId}`);
+  /**
+   * Get node by ID
+   */
+  getNode(nodeId: string): Observable<Node> {
+    return this.get<Node>(`/nodes/${nodeId}`);
   }
 
-  getTowersByCoordinator(coordId: string): Observable<TowerSummary[]> {
-    return this.get<TowerSummary[]>(`/api/v1/coordinators/${coordId}/towers`);
+  /**
+   * Delete a node
+   */
+  deleteNode(siteId: string, coordId: string, nodeId: string): Observable<ApiResponse<void>> {
+    return this.delete<ApiResponse<void>>(`/sites/${siteId}/coordinators/${coordId}/nodes/${nodeId}`);
   }
 
-  updateTower(config: TowerConfigUpdate): Observable<Tower> {
-    return this.put<Tower>(`/api/v1/towers/${config.towerId}`, config);
+  /**
+   * Update node name
+   */
+  updateNodeName(update: NodeNameUpdate): Observable<ApiResponse<void>> {
+    return this.put<ApiResponse<void>>('/api/v1/node/name', update);
   }
 
-  controlTowerLed(command: TowerLedCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/towers/led', command);
+  /**
+   * Assign node to zone
+   */
+  updateNodeZone(update: NodeZoneUpdate): Observable<ApiResponse<void>> {
+    return this.put<ApiResponse<void>>('/api/v1/node/zone', update);
   }
 
-  updatePlantSlot(update: PlantSlotUpdate): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/towers/plants', update);
+  /**
+   * Test node color (temporary)
+   */
+  testNodeColor(command: TestColorCommand): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/node/test-color', command);
+  }
+
+  /**
+   * Turn off node LED
+   */
+  turnOffNode(nodeId: string): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/node/off', { node_id: nodeId });
+  }
+
+  /**
+   * Set node brightness
+   */
+  setNodeBrightness(command: BrightnessCommand): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/node/brightness', command);
+  }
+
+  /**
+   * Control node light (full control)
+   */
+  controlNodeLight(command: LedControlCommand): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/v1/node/light/control', command);
   }
 
   // ============================================================================
-  // Telemetry API
+  // Zones API
   // ============================================================================
 
-  getReservoirTelemetry(coordId: string): Observable<ReservoirTelemetry> {
-    return this.get<ReservoirTelemetry>(`/api/v1/telemetry/reservoir/${coordId}`);
+  /**
+   * Get all zones
+   */
+  getZones(): Observable<Zone[]> {
+    return this.get<Zone[]>('/api/v1/zones');
   }
 
-  getTowerTelemetry(towerId: string): Observable<TowerTelemetry> {
-    return this.get<TowerTelemetry>(`/api/v1/telemetry/tower/${towerId}`);
+  /**
+   * Create a zone
+   */
+  createZone(request: CreateZoneRequest): Observable<Zone> {
+    return this.post<Zone>('/api/v1/zones', request);
   }
 
-  getReservoirHistory(coordId: string, timeRange: TimeRange): Observable<ReservoirHistory> {
-    return this.get<ReservoirHistory>(`/api/v1/telemetry/reservoir/${coordId}/history`, {
+  /**
+   * Get zone by ID
+   */
+  getZone(zoneId: string): Observable<Zone> {
+    return this.get<Zone>(`/api/v1/zones/${zoneId}`);
+  }
+
+  /**
+   * Update a zone
+   */
+  updateZone(zoneId: string, request: UpdateZoneRequest): Observable<Zone> {
+    return this.put<Zone>(`/api/v1/zones/${zoneId}`, request);
+  }
+
+  /**
+   * Delete a zone
+   */
+  deleteZone(zoneId: string): Observable<ApiResponse<void>> {
+    return this.delete<ApiResponse<void>>(`/api/v1/zones/${zoneId}`);
+  }
+
+  // ============================================================================
+  // Settings API
+  // ============================================================================
+
+  /**
+   * Get system settings
+   */
+  getSettings(): Observable<SmartTileSettings> {
+    return this.get<SmartTileSettings>('/api/v1/settings');
+  }
+
+  /**
+   * Update system settings
+   */
+  updateSettings(settings: Partial<SmartTileSettings>): Observable<SmartTileSettings> {
+    return this.put<SmartTileSettings>('/api/v1/settings', settings);
+  }
+
+  // ============================================================================
+  // Telemetry API (if available)
+  // ============================================================================
+
+  getCoordinatorTelemetry(coordId: string): Observable<CoordinatorTelemetryData> {
+    return this.get<CoordinatorTelemetryData>(`/api/v1/telemetry/coordinator/${coordId}`);
+  }
+
+  getNodeTelemetry(nodeId: string): Observable<NodeTelemetryData> {
+    return this.get<NodeTelemetryData>(`/api/v1/telemetry/node/${nodeId}`);
+  }
+
+  getCoordinatorHistory(coordId: string, timeRange: TimeRange): Observable<CoordinatorHistory> {
+    return this.get<CoordinatorHistory>(`/api/v1/telemetry/coordinator/${coordId}/history`, {
       start: timeRange.start.toISOString(),
       end: timeRange.end.toISOString(),
       interval: timeRange.interval
     });
   }
 
-  getTowerHistory(towerId: string, timeRange: TimeRange): Observable<TowerHistory> {
-    return this.get<TowerHistory>(`/api/v1/telemetry/tower/${towerId}/history`, {
+  getNodeHistory(nodeId: string, timeRange: TimeRange): Observable<NodeHistory> {
+    return this.get<NodeHistory>(`/api/v1/telemetry/node/${nodeId}/history`, {
       start: timeRange.start.toISOString(),
       end: timeRange.end.toISOString(),
       interval: timeRange.interval
@@ -173,11 +356,19 @@ export class ApiService {
     return this.post<ApiResponse<void>>(`/api/v1/alerts/${alertId}/acknowledge`, {});
   }
 
+  updateAlert(alertId: string, update: { status?: string; acknowledgedBy?: string; resolvedBy?: string }): Observable<Alert> {
+    return this.put<Alert>(`/api/v1/alerts/${alertId}`, update);
+  }
+
+  deleteAlert(alertId: string): Observable<ApiResponse<void>> {
+    return this.delete<ApiResponse<void>>(`/api/v1/alerts/${alertId}`);
+  }
+
   // ============================================================================
   // OTA API
   // ============================================================================
 
-  getFirmwareVersions(targetType?: 'coordinator' | 'tower'): Observable<FirmwareVersion[]> {
+  getFirmwareVersions(targetType?: 'coordinator' | 'node'): Observable<FirmwareVersion[]> {
     const params: Record<string, string> = targetType ? { targetType } : {};
     return this.get<FirmwareVersion[]>('/api/v1/ota/firmware', params);
   }
@@ -221,16 +412,11 @@ export class ApiService {
   }
 
   // ============================================================================
-  // ML Predictions API
+  // ML Predictions API (if available)
   // ============================================================================
 
-  getPrediction(towerId: string, slotIndex?: number): Observable<HeightPrediction> {
-    const params: Record<string, string> = slotIndex !== undefined ? { slotIndex: slotIndex.toString() } : {};
-    return this.get<HeightPrediction>(`/api/v1/predictions/tower/${towerId}`, params);
-  }
-
-  getTowerPredictions(towerId: string): Observable<TowerPredictions> {
-    return this.get<TowerPredictions>(`/api/v1/predictions/tower/${towerId}/all`);
+  getPrediction(nodeId: string): Observable<HeightPrediction> {
+    return this.get<HeightPrediction>(`/api/v1/predictions/node/${nodeId}`);
   }
 
   getFarmPredictionSummary(): Observable<FarmPredictionSummary> {
@@ -245,8 +431,8 @@ export class ApiService {
     return this.post<TowerPredictions[]>('/api/v1/predictions/batch', request);
   }
 
-  getGrowthAnalysis(towerId: string, slotIndex: number): Observable<GrowthAnalysis> {
-    return this.get<GrowthAnalysis>(`/api/v1/predictions/analysis/${towerId}/${slotIndex}`);
+  getGrowthAnalysis(nodeId: string): Observable<GrowthAnalysis> {
+    return this.get<GrowthAnalysis>(`/api/v1/predictions/analysis/${nodeId}`);
   }
 
   getAnomalies(params?: PaginationParams & { severity?: string; status?: string }): Observable<PaginatedResponse<GrowthAnomaly>> {
@@ -269,7 +455,7 @@ export class ApiService {
   }
 
   // ============================================================================
-  // Digital Twin API
+  // Digital Twin API (if available)
   // ============================================================================
 
   getFarmTopology(): Observable<FarmTopology> {

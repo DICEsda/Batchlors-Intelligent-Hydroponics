@@ -1,13 +1,19 @@
 /**
- * Core Models Barrel Export - Hydroponic Farm System
+ * Core Models Barrel Export - Smart Tile IoT System
  * Import models from a single location
  */
 
-// Coordinator and Reservoir models
+// Site models
+export * from './site.model';
+
+// Coordinator models (Smart Tile system)
 export * from './coordinator.model';
 
-// Tower and Plant models
-export * from './tower.model';
+// Node models (Smart Tiles/Lights)
+export * from './node.model';
+
+// Zone models
+export * from './zone.model';
 
 // Telemetry and Historical Data
 export * from './telemetry.model';
@@ -20,6 +26,9 @@ export * from './prediction.model';
 
 // Digital Twin and 3D Visualization
 export * from './digital-twin.model';
+
+// Alerts and Notifications
+export * from './alert.model';
 
 // Common/Shared types
 export * from './common.model';

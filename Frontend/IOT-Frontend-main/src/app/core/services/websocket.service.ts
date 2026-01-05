@@ -6,7 +6,13 @@ import {
   TowerTelemetry,
   Alert,
   WSMessage,
-  WSMessageType
+  WSMessageType,
+  WSPairingStartedPayload,
+  WSPairingStoppedPayload,
+  WSNodeDiscoveredPayload,
+  WSNodePairedPayload,
+  WSPairingTimeoutPayload,
+  DiscoveredNode
 } from '../models';
 
 /**
@@ -68,6 +74,35 @@ export interface WSPredictionUpdateMessage extends WSMessage {
   };
 }
 
+// ============================================================================
+// Pairing WebSocket Messages
+// ============================================================================
+
+export interface WSPairingStartedMessage extends WSMessage {
+  type: 'pairing_started';
+  payload: WSPairingStartedPayload;
+}
+
+export interface WSPairingStoppedMessage extends WSMessage {
+  type: 'pairing_stopped';
+  payload: WSPairingStoppedPayload;
+}
+
+export interface WSNodeDiscoveredMessage extends WSMessage {
+  type: 'node_discovered';
+  payload: WSNodeDiscoveredPayload;
+}
+
+export interface WSNodePairedMessage extends WSMessage {
+  type: 'node_paired';
+  payload: WSNodePairedPayload;
+}
+
+export interface WSPairingTimeoutMessage extends WSMessage {
+  type: 'pairing_timeout';
+  payload: WSPairingTimeoutPayload;
+}
+
 /**
  * Union type for all WebSocket messages
  */
@@ -79,6 +114,11 @@ export type HydroponicWSMessage =
   | WSOtaProgressMessage
   | WSDigitalTwinUpdateMessage
   | WSPredictionUpdateMessage
+  | WSPairingStartedMessage
+  | WSPairingStoppedMessage
+  | WSNodeDiscoveredMessage
+  | WSNodePairedMessage
+  | WSPairingTimeoutMessage
   | WSMessage;
 
 /**
@@ -113,6 +153,13 @@ export class WebSocketService {
   private readonly digitalTwinSubject = new Subject<WSDigitalTwinUpdateMessage['payload']>();
   private readonly predictionSubject = new Subject<WSPredictionUpdateMessage['payload']>();
   private readonly errorSubject = new Subject<{ message: string; error?: unknown }>();
+  
+  // Pairing event streams
+  private readonly pairingStartedSubject = new Subject<WSPairingStartedPayload>();
+  private readonly pairingStoppedSubject = new Subject<WSPairingStoppedPayload>();
+  private readonly nodeDiscoveredSubject = new Subject<WSNodeDiscoveredPayload>();
+  private readonly nodePairedSubject = new Subject<WSNodePairedPayload>();
+  private readonly pairingTimeoutSubject = new Subject<WSPairingTimeoutPayload>();
 
   // Observable streams for consumers
   public readonly messages$ = this.messageSubject.asObservable();
@@ -124,6 +171,13 @@ export class WebSocketService {
   public readonly digitalTwinUpdates$ = this.digitalTwinSubject.asObservable();
   public readonly predictions$ = this.predictionSubject.asObservable();
   public readonly errors$ = this.errorSubject.asObservable();
+  
+  // Pairing observable streams
+  public readonly pairingStarted$ = this.pairingStartedSubject.asObservable();
+  public readonly pairingStopped$ = this.pairingStoppedSubject.asObservable();
+  public readonly nodeDiscovered$ = this.nodeDiscoveredSubject.asObservable();
+  public readonly nodePaired$ = this.nodePairedSubject.asObservable();
+  public readonly pairingTimeout$ = this.pairingTimeoutSubject.asObservable();
 
   constructor() {
     if (this.env.isDevelopment) {
@@ -400,6 +454,49 @@ export class WebSocketService {
           message: (data.payload as { message?: string })?.message || 'Unknown error',
           error: data.payload
         });
+        break;
+
+      // ========================================================================
+      // Pairing Events
+      // ========================================================================
+      case 'pairing_started':
+        const pairingStartedMsg = data as WSPairingStartedMessage;
+        this.pairingStartedSubject.next(pairingStartedMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Pairing started:', pairingStartedMsg.payload.coordinatorId);
+        }
+        break;
+
+      case 'pairing_stopped':
+        const pairingStoppedMsg = data as WSPairingStoppedMessage;
+        this.pairingStoppedSubject.next(pairingStoppedMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Pairing stopped:', pairingStoppedMsg.payload.coordinatorId, pairingStoppedMsg.payload.reason);
+        }
+        break;
+
+      case 'node_discovered':
+        const nodeDiscoveredMsg = data as WSNodeDiscoveredMessage;
+        this.nodeDiscoveredSubject.next(nodeDiscoveredMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Node discovered:', nodeDiscoveredMsg.payload.nodeId, 'RSSI:', nodeDiscoveredMsg.payload.rssi);
+        }
+        break;
+
+      case 'node_paired':
+        const nodePairedMsg = data as WSNodePairedMessage;
+        this.nodePairedSubject.next(nodePairedMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Node paired:', nodePairedMsg.payload.nodeId);
+        }
+        break;
+
+      case 'pairing_timeout':
+        const pairingTimeoutMsg = data as WSPairingTimeoutMessage;
+        this.pairingTimeoutSubject.next(pairingTimeoutMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Pairing timeout:', pairingTimeoutMsg.payload.coordinatorId);
+        }
         break;
 
       default:

@@ -1,48 +1,428 @@
-<div class="placeholder-page">
+<div class="ota-dashboard">
+  <!-- Header -->
   <header class="page-header">
-    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
-      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
-    </a>
-    <div class="header-content">
-      <h1 class="page-title">OTA Updates</h1>
-      <p class="page-description">Firmware over-the-air update management</p>
+    <div class="header-left">
+      <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
+        <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
+      </a>
+      <div class="header-content">
+        <h1 class="page-title">OTA Updates</h1>
+        <p class="page-description">Firmware over-the-air update management</p>
+      </div>
     </div>
-    <span hlmBadge variant="secondary">Coming Soon</span>
+    <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="secondary" class="mock-badge">Mock Data</span>
+      }
+      @if (updateAvailableCount() > 0) {
+        <button 
+          hlmBtn 
+          variant="default" 
+          size="sm"
+          (click)="updateAllDevices()"
+          [disabled]="isLoading()"
+        >
+          <ng-icon hlmIcon name="lucideDownload" size="sm" />
+          Update All ({{ updateAvailableCount() }})
+        </button>
+      }
+      <button hlmBtn variant="outline" size="sm" (click)="refreshData()" [disabled]="isLoading()">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" [class.animate-spin]="isLoading()" />
+        Refresh
+      </button>
+    </div>
   </header>
 
-  <div class="placeholder-content">
-    <div class="placeholder-card" hlmCard>
-      <div hlmCardHeader>
-        <ng-icon hlmIcon name="lucideDownload" class="placeholder-icon" />
-        <span hlmCardTitle>OTA Update Dashboard</span>
-        <span hlmCardDescription>
-          Manage firmware updates for all ESP32 devices
-        </span>
-      </div>
-      <div hlmCardContent>
-        <ul class="feature-list">
-          <li>
-            <ng-icon hlmIcon name="lucideUpload" size="sm" />
-            <span>Upload new firmware versions</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideServer" size="sm" />
-            <span>View device firmware status</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideActivity" size="sm" />
-            <span>Real-time update progress monitoring</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideGitBranch" size="sm" />
-            <span>Staged rollout with device groups</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideRotateCcw" size="sm" />
-            <span>Rollback to previous versions</span>
-          </li>
-        </ul>
-      </div>
+  <!-- Error State -->
+  @if (error()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>{{ error() }}</span>
+      <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
     </div>
-  </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-grid">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div hlmCard class="stat-card">
+          <hlm-skeleton class="stat-skeleton" />
+        </div>
+      }
+    </div>
+  } @else {
+    <!-- Statistics Cards -->
+    <section class="stats-section">
+      <div class="stats-grid">
+        <!-- Up to Date -->
+        <div hlmCard class="stat-card stat-success">
+          <div hlmCardHeader class="stat-header">
+            <ng-icon hlmIcon name="lucideCheckCircle" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardDescription>Up to Date</span>
+              <span hlmCardTitle class="stat-value">{{ upToDateCount() }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Updates Available -->
+        <div hlmCard class="stat-card stat-warning">
+          <div hlmCardHeader class="stat-header">
+            <ng-icon hlmIcon name="lucideDownload" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardDescription>Updates Available</span>
+              <span hlmCardTitle class="stat-value">{{ updateAvailableCount() }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Currently Updating -->
+        <div hlmCard class="stat-card stat-info">
+          <div hlmCardHeader class="stat-header">
+            <ng-icon hlmIcon name="lucideLoader2" size="lg" class="stat-icon" [class.animate-spin]="updatingCount() > 0" />
+            <div class="stat-content">
+              <span hlmCardDescription>Updating</span>
+              <span hlmCardTitle class="stat-value">{{ updatingCount() }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Failed -->
+        <div hlmCard class="stat-card stat-danger">
+          <div hlmCardHeader class="stat-header">
+            <ng-icon hlmIcon name="lucideAlertTriangle" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardDescription>Failed</span>
+              <span hlmCardTitle class="stat-value">{{ failedCount() }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Active Jobs Section -->
+    @if (activeJobs().length > 0) {
+      <section class="active-jobs-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <ng-icon hlmIcon name="lucideZap" size="sm" class="section-icon" />
+            Active Updates
+          </h2>
+          <span hlmBadge variant="secondary">{{ activeJobs().length }} in progress</span>
+        </div>
+
+        <div class="jobs-grid">
+          @for (job of activeJobs(); track trackByJobId($index, job)) {
+            <div hlmCard class="job-card active">
+              <div hlmCardHeader class="job-header">
+                <div class="job-info">
+                  <span hlmCardTitle>{{ job.targetName }}</span>
+                  <span hlmCardDescription>
+                    {{ job.fromVersion }} → {{ job.toVersion }}
+                  </span>
+                </div>
+                <span hlmBadge [variant]="getStatusBadgeVariant(job.status)" size="sm">
+                  @if (isJobActive(job.status)) {
+                    <ng-icon hlmIcon name="lucideLoader2" size="xs" class="animate-spin" />
+                  }
+                  {{ job.status }}
+                </span>
+              </div>
+              <div hlmCardContent class="job-content">
+                <!-- Progress Bar -->
+                <div class="progress-container">
+                  <div class="progress-bar">
+                    <div class="progress-fill" [style.width.%]="job.progress"></div>
+                  </div>
+                  <span class="progress-text">{{ job.progress }}%</span>
+                </div>
+                <div class="job-meta">
+                  <span class="meta-item">
+                    <ng-icon hlmIcon name="lucideClock" size="xs" />
+                    Started {{ formatTimeAgo(job.startedAt || job.createdAt) }}
+                  </span>
+                </div>
+              </div>
+              <div class="job-actions">
+                <button 
+                  hlmBtn 
+                  variant="ghost" 
+                  size="sm"
+                  (click)="cancelJob(job._id)"
+                >
+                  <ng-icon hlmIcon name="lucideSquare" size="sm" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Device Status Section -->
+    <section class="devices-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <ng-icon hlmIcon name="lucideServer" size="sm" class="section-icon" />
+          Device Firmware Status
+        </h2>
+        <div class="filter-buttons">
+          <button 
+            hlmBtn 
+            [variant]="deviceTypeFilter() === 'all' ? 'default' : 'outline'" 
+            size="sm"
+            (click)="setDeviceFilter('all')"
+          >
+            All ({{ totalDevices() }})
+          </button>
+          <button 
+            hlmBtn 
+            [variant]="deviceTypeFilter() === 'coordinator' ? 'default' : 'outline'" 
+            size="sm"
+            (click)="setDeviceFilter('coordinator')"
+          >
+            Coordinators ({{ coordinatorStatus().length }})
+          </button>
+          <button 
+            hlmBtn 
+            [variant]="deviceTypeFilter() === 'node' ? 'default' : 'outline'" 
+            size="sm"
+            (click)="setDeviceFilter('node')"
+          >
+            Nodes ({{ nodeStatus().length }})
+          </button>
+        </div>
+      </div>
+
+      @if (filteredDevices().length === 0) {
+        <div class="empty-state">
+          <ng-icon hlmIcon name="lucideServer" size="xl" />
+          <h3>No Devices Found</h3>
+          <p>No devices match the current filter.</p>
+        </div>
+      } @else {
+        <div class="devices-grid">
+          @for (device of filteredDevices(); track trackByDeviceId($index, device)) {
+            <div hlmCard class="device-card" [class.update-available]="device.updateAvailable" [class.updating]="device.pendingJobId" [class.failed]="device.lastUpdateStatus === 'failed'">
+              <div hlmCardHeader class="device-header">
+                <div class="device-info">
+                  <div class="device-title-row">
+                    <ng-icon hlmIcon [name]="device.deviceType === 'coordinator' ? 'lucideServer' : 'lucideRadio'" size="sm" class="device-type-icon" />
+                    <span hlmCardTitle>{{ device.deviceName }}</span>
+                  </div>
+                  <span hlmCardDescription>{{ device.deviceId }}</span>
+                </div>
+                <span hlmBadge [variant]="getDeviceStatusBadgeVariant(device)" size="sm">
+                  @if (device.pendingJobId) {
+                    <ng-icon hlmIcon name="lucideLoader2" size="xs" class="animate-spin" />
+                  }
+                  {{ getDeviceStatusText(device) }}
+                </span>
+              </div>
+              <div hlmCardContent class="device-content">
+                <div class="version-info">
+                  <div class="version-row">
+                    <span class="version-label">Current</span>
+                    <span class="version-value">v{{ device.currentVersion }}</span>
+                  </div>
+                  @if (device.updateAvailable) {
+                    <div class="version-row latest">
+                      <span class="version-label">Latest</span>
+                      <span class="version-value">v{{ device.latestVersion }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+              @if (device.updateAvailable && !device.pendingJobId) {
+                <div class="device-actions">
+                  <button 
+                    hlmBtn 
+                    variant="default" 
+                    size="sm"
+                    (click)="startUpdate(device)"
+                  >
+                    <ng-icon hlmIcon name="lucideDownload" size="sm" />
+                    Update
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Firmware Versions Section -->
+    <section class="firmware-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <ng-icon hlmIcon name="lucidePackage" size="sm" class="section-icon" />
+          Available Firmware
+        </h2>
+      </div>
+
+      <div class="tabs-container">
+        <div hlmTabsList class="firmware-tabs-list">
+          <button 
+            hlmTabsTrigger 
+            [value]="'coordinator'"
+            [isActive]="activeTab() === 'coordinator'"
+            (activated)="setActiveTab('coordinator')"
+          >
+            <ng-icon hlmIcon name="lucideServer" size="sm" />
+            Coordinator ({{ coordinatorFirmware().length }})
+          </button>
+          <button 
+            hlmTabsTrigger 
+            [value]="'node'"
+            [isActive]="activeTab() === 'node'"
+            (activated)="setActiveTab('node')"
+          >
+            <ng-icon hlmIcon name="lucideRadio" size="sm" />
+            Node ({{ nodeFirmware().length }})
+          </button>
+        </div>
+
+        <!-- Coordinator Firmware Tab -->
+        <div hlmTabsContent [value]="'coordinator'" [isActive]="activeTab() === 'coordinator'">
+          @if (coordinatorFirmware().length === 0) {
+            <div class="empty-firmware">
+              <p>No coordinator firmware versions available.</p>
+            </div>
+          } @else {
+            <div class="firmware-list">
+              @for (fw of coordinatorFirmware(); track trackByFirmwareId($index, fw)) {
+                <div hlmCard class="firmware-card" [class.latest]="fw === latestCoordinatorVersion()">
+                  <div hlmCardHeader class="firmware-header">
+                    <div class="firmware-info">
+                      <span hlmCardTitle class="firmware-version">
+                        v{{ fw.version }}
+                        @if (fw === latestCoordinatorVersion()) {
+                          <span hlmBadge variant="default" size="sm">Latest</span>
+                        }
+                        @if (fw.isStable) {
+                          <span hlmBadge variant="outline" size="sm">Stable</span>
+                        }
+                      </span>
+                      <span hlmCardDescription>Released {{ formatDate(fw.releasedAt) }}</span>
+                    </div>
+                    <span class="firmware-size">{{ formatFileSize(fw.fileSize) }}</span>
+                  </div>
+                  @if (fw.releaseNotes) {
+                    <div hlmCardContent class="firmware-content">
+                      <div class="release-notes">
+                        <ng-icon hlmIcon name="lucideFileText" size="xs" />
+                        <span>{{ fw.releaseNotes }}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Node Firmware Tab -->
+        <div hlmTabsContent [value]="'node'" [isActive]="activeTab() === 'node'">
+          @if (nodeFirmware().length === 0) {
+            <div class="empty-firmware">
+              <p>No node firmware versions available.</p>
+            </div>
+          } @else {
+            <div class="firmware-list">
+              @for (fw of nodeFirmware(); track trackByFirmwareId($index, fw)) {
+                <div hlmCard class="firmware-card" [class.latest]="fw === latestNodeVersion()">
+                  <div hlmCardHeader class="firmware-header">
+                    <div class="firmware-info">
+                      <span hlmCardTitle class="firmware-version">
+                        v{{ fw.version }}
+                        @if (fw === latestNodeVersion()) {
+                          <span hlmBadge variant="default" size="sm">Latest</span>
+                        }
+                        @if (fw.isStable) {
+                          <span hlmBadge variant="outline" size="sm">Stable</span>
+                        }
+                      </span>
+                      <span hlmCardDescription>Released {{ formatDate(fw.releasedAt) }}</span>
+                    </div>
+                    <span class="firmware-size">{{ formatFileSize(fw.fileSize) }}</span>
+                  </div>
+                  @if (fw.releaseNotes) {
+                    <div hlmCardContent class="firmware-content">
+                      <div class="release-notes">
+                        <ng-icon hlmIcon name="lucideFileText" size="xs" />
+                        <span>{{ fw.releaseNotes }}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Update History -->
+    <section class="history-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <ng-icon hlmIcon name="lucideClock" size="sm" class="section-icon" />
+          Recent Update History
+        </h2>
+      </div>
+
+      @if (recentJobs().length === 0) {
+        <div class="empty-state">
+          <ng-icon hlmIcon name="lucideClock" size="xl" />
+          <h3>No Update History</h3>
+          <p>Completed and failed updates will appear here.</p>
+        </div>
+      } @else {
+        <div class="history-list">
+          @for (job of recentJobs(); track trackByJobId($index, job)) {
+            <div hlmCard class="history-card" [class.completed]="job.status === 'completed'" [class.failed]="job.status === 'failed'">
+              <div class="history-icon">
+                <ng-icon hlmIcon [name]="getStatusIcon(job.status)" size="sm" [class.animate-spin]="isJobActive(job.status)" />
+              </div>
+              <div class="history-content">
+                <div class="history-header">
+                  <span class="history-title">{{ job.targetName }}</span>
+                  <span hlmBadge [variant]="getStatusBadgeVariant(job.status)" size="sm">
+                    {{ job.status }}
+                  </span>
+                </div>
+                <div class="history-details">
+                  <span>{{ job.fromVersion }} → {{ job.toVersion }}</span>
+                  <span class="separator">•</span>
+                  <span>{{ formatTimeAgo(job.completedAt || job.updatedAt) }}</span>
+                </div>
+                @if (job.errorMessage) {
+                  <div class="history-error">
+                    <ng-icon hlmIcon name="lucideAlertTriangle" size="xs" />
+                    <span>{{ job.errorMessage }}</span>
+                  </div>
+                }
+              </div>
+              @if (job.status === 'failed') {
+                <div class="history-actions">
+                  <button 
+                    hlmBtn 
+                    variant="ghost" 
+                    size="sm"
+                    (click)="retryJob(job)"
+                  >
+                    <ng-icon hlmIcon name="lucideRotateCcw" size="sm" />
+                    Retry
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
 </div>

@@ -1,48 +1,606 @@
-<div class="placeholder-page">
+<div class="settings-page">
+  <!-- Header -->
   <header class="page-header">
-    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
-      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
-    </a>
-    <div class="header-content">
-      <h1 class="page-title">Settings</h1>
-      <p class="page-description">Configure your hydroponic farm system</p>
+    <div class="header-left">
+      <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
+        <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
+      </a>
+      <div class="header-content">
+        <div class="title-row">
+          <h1 class="page-title">Settings</h1>
+          @if (hasChanges()) {
+            <span hlmBadge variant="outline" class="changes-badge">Unsaved Changes</span>
+          }
+        </div>
+        <p class="page-description">Configure your hydroponic farm system settings</p>
+      </div>
     </div>
-    <span hlmBadge variant="secondary">Coming Soon</span>
+    <div class="header-actions">
+      @if (saveSuccess()) {
+        <span class="save-success">
+          <ng-icon hlmIcon name="lucideCheck" size="sm" />
+          Settings saved
+        </span>
+      }
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        (click)="resetToDefaults()"
+        [disabled]="isSaving()"
+      >
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        Reset to Defaults
+      </button>
+      <button
+        hlmBtn
+        variant="default"
+        size="sm"
+        (click)="saveSettings()"
+        [disabled]="!hasChanges() || isSaving()"
+      >
+        @if (isSaving()) {
+          <ng-icon hlmIcon name="lucideRefreshCw" size="sm" class="animate-spin" />
+          Saving...
+        } @else {
+          <ng-icon hlmIcon name="lucideSave" size="sm" />
+          Save Changes
+        }
+      </button>
+    </div>
   </header>
 
-  <div class="placeholder-content">
-    <div class="placeholder-card" hlmCard>
-      <div hlmCardHeader>
-        <ng-icon hlmIcon name="lucideSettings" class="placeholder-icon" />
-        <span hlmCardTitle>System Settings</span>
-        <span hlmCardDescription>
-          Configure thresholds, schedules, and system behavior
-        </span>
-      </div>
-      <div hlmCardContent>
-        <ul class="feature-list">
-          <li>
-            <ng-icon hlmIcon name="lucideSliders" size="sm" />
-            <span>Sensor threshold configuration</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideBell" size="sm" />
-            <span>Alert and notification preferences</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideSun" size="sm" />
-            <span>Default LED schedules</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideWifi" size="sm" />
-            <span>Network and MQTT configuration</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideUser" size="sm" />
-            <span>User profile and access control</span>
-          </li>
-        </ul>
-      </div>
+  <!-- Main Content -->
+  <div class="settings-content">
+    <!-- Tab Navigation -->
+    <nav class="settings-nav">
+      @for (tab of tabs; track tab.id) {
+        <button
+          class="nav-item"
+          [class.active]="activeTab() === tab.id"
+          (click)="setActiveTab(tab.id)"
+        >
+          <ng-icon hlmIcon [name]="tab.icon" size="sm" />
+          <span>{{ tab.label }}</span>
+        </button>
+      }
+    </nav>
+
+    <!-- Tab Content -->
+    <div class="settings-panels">
+      <!-- Thresholds Tab -->
+      @if (activeTab() === 'thresholds') {
+        <div class="panel-content">
+          <div class="panel-header">
+            <h2 class="panel-title">Sensor Thresholds</h2>
+            <p class="panel-description">
+              Configure warning and critical thresholds for sensor readings. Alerts will be triggered when values exceed these limits.
+            </p>
+          </div>
+
+          <div class="threshold-cards">
+            @for (threshold of thresholds(); track threshold.id; let i = $index) {
+              <div hlmCard class="threshold-card">
+                <div hlmCardHeader class="threshold-header">
+                  <div class="threshold-icon">
+                    <ng-icon hlmIcon [name]="threshold.icon" size="lg" />
+                  </div>
+                  <div class="threshold-info">
+                    <span hlmCardTitle>{{ threshold.name }}</span>
+                    <span hlmCardDescription>Unit: {{ threshold.unit }}</span>
+                  </div>
+                </div>
+                <div hlmCardContent class="threshold-content">
+                  <div class="threshold-row">
+                    <div class="threshold-field">
+                      <label hlmLabel class="field-label warning">
+                        <ng-icon hlmIcon name="lucideAlertTriangle" size="xs" />
+                        Warning Low
+                      </label>
+                      <input
+                        hlmInput
+                        type="number"
+                        [value]="threshold.warningLow"
+                        [min]="threshold.min"
+                        [max]="threshold.max"
+                        (change)="updateThreshold(i, 'warningLow', $any($event.target).valueAsNumber)"
+                        class="threshold-input"
+                      />
+                    </div>
+                    <div class="threshold-field">
+                      <label hlmLabel class="field-label warning">
+                        <ng-icon hlmIcon name="lucideAlertTriangle" size="xs" />
+                        Warning High
+                      </label>
+                      <input
+                        hlmInput
+                        type="number"
+                        [value]="threshold.warningHigh"
+                        [min]="threshold.min"
+                        [max]="threshold.max"
+                        (change)="updateThreshold(i, 'warningHigh', $any($event.target).valueAsNumber)"
+                        class="threshold-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="threshold-row">
+                    <div class="threshold-field">
+                      <label hlmLabel class="field-label critical">
+                        <ng-icon hlmIcon name="lucideZap" size="xs" />
+                        Critical Low
+                      </label>
+                      <input
+                        hlmInput
+                        type="number"
+                        [value]="threshold.criticalLow"
+                        [min]="threshold.min"
+                        [max]="threshold.max"
+                        (change)="updateThreshold(i, 'criticalLow', $any($event.target).valueAsNumber)"
+                        class="threshold-input"
+                      />
+                    </div>
+                    <div class="threshold-field">
+                      <label hlmLabel class="field-label critical">
+                        <ng-icon hlmIcon name="lucideZap" size="xs" />
+                        Critical High
+                      </label>
+                      <input
+                        hlmInput
+                        type="number"
+                        [value]="threshold.criticalHigh"
+                        [min]="threshold.min"
+                        [max]="threshold.max"
+                        (change)="updateThreshold(i, 'criticalHigh', $any($event.target).valueAsNumber)"
+                        class="threshold-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="threshold-range">
+                    <span class="range-label">Valid range: {{ threshold.min }} - {{ threshold.max }} {{ threshold.unit }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Notifications Tab -->
+      @if (activeTab() === 'notifications') {
+        <div class="panel-content">
+          <div class="panel-header">
+            <h2 class="panel-title">Notification Preferences</h2>
+            <p class="panel-description">
+              Choose which notifications you want to receive about your hydroponic system.
+            </p>
+          </div>
+
+          <div hlmCard class="notifications-card">
+            <div hlmCardContent class="notifications-list">
+              @for (notification of notifications(); track notification.id; let i = $index; let last = $last) {
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <span class="notification-name">{{ notification.name }}</span>
+                    <span class="notification-description">{{ notification.description }}</span>
+                  </div>
+                  <hlm-switch
+                    [checked]="notification.enabled"
+                    (checkedChange)="toggleNotification(i)"
+                  />
+                </div>
+                @if (!last) {
+                  <hr hlmSeparator class="notification-separator" />
+                }
+              }
+            </div>
+          </div>
+
+          <div class="notification-actions">
+            <button hlmBtn variant="outline" size="sm" (click)="toggleAllNotifications()">
+              Toggle All
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Network Tab -->
+      @if (activeTab() === 'network') {
+        <div class="panel-content">
+          <div class="panel-header">
+            <h2 class="panel-title">Network Configuration</h2>
+            <p class="panel-description">
+              Configure MQTT broker, API endpoints, and connection settings.
+            </p>
+          </div>
+
+          <div class="network-sections">
+            <!-- MQTT Settings -->
+            <div hlmCard class="network-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideServer" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>MQTT Broker</span>
+                    <span hlmCardDescription>Message broker connection settings</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="network-fields">
+                <div class="field-group">
+                  <label hlmLabel for="mqttBroker">Broker URL</label>
+                  <input
+                    hlmInput
+                    id="mqttBroker"
+                    type="text"
+                    [value]="networkSettings().mqttBroker"
+                    (input)="updateNetworkSetting('mqttBroker', $any($event.target).value)"
+                    placeholder="mqtt://localhost"
+                  />
+                </div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label hlmLabel for="mqttPort">Port</label>
+                    <input
+                      hlmInput
+                      id="mqttPort"
+                      type="number"
+                      [value]="networkSettings().mqttPort"
+                      (change)="updateNetworkSetting('mqttPort', $any($event.target).valueAsNumber)"
+                    />
+                  </div>
+                  <div class="field-group">
+                    <label hlmLabel for="mqttUsername">Username</label>
+                    <input
+                      hlmInput
+                      id="mqttUsername"
+                      type="text"
+                      [value]="networkSettings().mqttUsername"
+                      (input)="updateNetworkSetting('mqttUsername', $any($event.target).value)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- API Settings -->
+            <div hlmCard class="network-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideGlobe" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>API Endpoints</span>
+                    <span hlmCardDescription>Backend API and WebSocket configuration</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="network-fields">
+                <div class="field-group">
+                  <label hlmLabel for="apiEndpoint">API Endpoint</label>
+                  <input
+                    hlmInput
+                    id="apiEndpoint"
+                    type="text"
+                    [value]="networkSettings().apiEndpoint"
+                    (input)="updateNetworkSetting('apiEndpoint', $any($event.target).value)"
+                    placeholder="http://localhost:5000/api"
+                  />
+                </div>
+                <div class="field-group">
+                  <label hlmLabel for="wsEndpoint">WebSocket Endpoint</label>
+                  <input
+                    hlmInput
+                    id="wsEndpoint"
+                    type="text"
+                    [value]="networkSettings().wsEndpoint"
+                    (input)="updateNetworkSetting('wsEndpoint', $any($event.target).value)"
+                    placeholder="ws://localhost:5000/ws"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Connection Settings -->
+            <div hlmCard class="network-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideClock" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>Connection Settings</span>
+                    <span hlmCardDescription>Timeout and reconnection behavior</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="network-fields">
+                <div class="field-row">
+                  <div class="field-group">
+                    <label hlmLabel for="connectionTimeout">Connection Timeout (seconds)</label>
+                    <input
+                      hlmInput
+                      id="connectionTimeout"
+                      type="number"
+                      [value]="networkSettings().connectionTimeout"
+                      (change)="updateNetworkSetting('connectionTimeout', $any($event.target).valueAsNumber)"
+                      min="5"
+                      max="120"
+                    />
+                  </div>
+                  <div class="field-group">
+                    <label hlmLabel for="reconnectInterval">Reconnect Interval (seconds)</label>
+                    <input
+                      hlmInput
+                      id="reconnectInterval"
+                      type="number"
+                      [value]="networkSettings().reconnectInterval"
+                      (change)="updateNetworkSetting('reconnectInterval', $any($event.target).valueAsNumber)"
+                      min="1"
+                      max="60"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Display Tab -->
+      @if (activeTab() === 'display') {
+        <div class="panel-content">
+          <div class="panel-header">
+            <h2 class="panel-title">Display Settings</h2>
+            <p class="panel-description">
+              Customize the appearance and behavior of the dashboard.
+            </p>
+          </div>
+
+          <div class="display-sections">
+            <!-- Theme Settings -->
+            <div hlmCard class="display-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucidePalette" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>Appearance</span>
+                    <span hlmCardDescription>Theme and visual settings</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="display-fields">
+                <div class="field-group">
+                  <label hlmLabel>Theme</label>
+                  <div class="theme-options">
+                    <button
+                      class="theme-option"
+                      [class.active]="displaySettings().theme === 'light'"
+                      (click)="updateDisplaySetting('theme', 'light')"
+                    >
+                      <ng-icon hlmIcon name="lucideSun" size="sm" />
+                      <span>Light</span>
+                    </button>
+                    <button
+                      class="theme-option"
+                      [class.active]="displaySettings().theme === 'dark'"
+                      (click)="updateDisplaySetting('theme', 'dark')"
+                    >
+                      <ng-icon hlmIcon name="lucideMoon" size="sm" />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      class="theme-option"
+                      [class.active]="displaySettings().theme === 'system'"
+                      (click)="updateDisplaySetting('theme', 'system')"
+                    >
+                      <ng-icon hlmIcon name="lucideMonitor" size="sm" />
+                      <span>System</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="toggle-field">
+                  <div class="toggle-info">
+                    <span class="toggle-name">Enable Animations</span>
+                    <span class="toggle-description">Show smooth transitions and animations</span>
+                  </div>
+                  <hlm-switch
+                    [checked]="displaySettings().animationsEnabled"
+                    (checkedChange)="updateDisplaySetting('animationsEnabled', $event)"
+                  />
+                </div>
+
+                <div class="toggle-field">
+                  <div class="toggle-info">
+                    <span class="toggle-name">Compact Mode</span>
+                    <span class="toggle-description">Reduce spacing for denser information display</span>
+                  </div>
+                  <hlm-switch
+                    [checked]="displaySettings().compactMode"
+                    (checkedChange)="updateDisplaySetting('compactMode', $event)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Units & Format -->
+            <div hlmCard class="display-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideGlobe" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>Units & Format</span>
+                    <span hlmCardDescription>Regional and measurement preferences</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="display-fields">
+                <div class="field-group">
+                  <label hlmLabel>Temperature Unit</label>
+                  <div class="unit-options">
+                    <button
+                      class="unit-option"
+                      [class.active]="displaySettings().temperatureUnit === 'celsius'"
+                      (click)="updateDisplaySetting('temperatureUnit', 'celsius')"
+                    >
+                      Celsius (°C)
+                    </button>
+                    <button
+                      class="unit-option"
+                      [class.active]="displaySettings().temperatureUnit === 'fahrenheit'"
+                      (click)="updateDisplaySetting('temperatureUnit', 'fahrenheit')"
+                    >
+                      Fahrenheit (°F)
+                    </button>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-group">
+                    <label hlmLabel for="dateFormat">Date Format</label>
+                    <select
+                      hlmInput
+                      id="dateFormat"
+                      [value]="displaySettings().dateFormat"
+                      (change)="updateDisplaySetting('dateFormat', $any($event.target).value)"
+                    >
+                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label hlmLabel for="refreshInterval">Auto-refresh Interval (seconds)</label>
+                    <input
+                      hlmInput
+                      id="refreshInterval"
+                      type="number"
+                      [value]="displaySettings().refreshInterval"
+                      (change)="updateDisplaySetting('refreshInterval', $any($event.target).valueAsNumber)"
+                      min="1"
+                      max="60"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- System Tab -->
+      @if (activeTab() === 'system') {
+        <div class="panel-content">
+          <div class="panel-header">
+            <h2 class="panel-title">System Information</h2>
+            <p class="panel-description">
+              View system status, export/import settings, and manage data.
+            </p>
+          </div>
+
+          <div class="system-sections">
+            <!-- System Info -->
+            <div hlmCard class="system-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideInfo" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>System Information</span>
+                    <span hlmCardDescription>Current system status and version</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="system-info-grid">
+                <div class="info-item">
+                  <span class="info-label">Version</span>
+                  <span class="info-value">{{ systemInfo().version }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Build Date</span>
+                  <span class="info-value">{{ systemInfo().buildDate }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Environment</span>
+                  <span hlmBadge variant="outline" class="info-value">{{ systemInfo().environment }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">API Version</span>
+                  <span class="info-value">{{ systemInfo().apiVersion }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Total Coordinators</span>
+                  <span class="info-value">{{ systemInfo().totalCoordinators }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Total Nodes</span>
+                  <span class="info-value">{{ systemInfo().totalNodes }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">System Uptime</span>
+                  <span class="info-value">{{ systemInfo().uptime }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Last Backup</span>
+                  <span class="info-value">{{ systemInfo().lastBackup }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Import/Export -->
+            <div hlmCard class="system-card">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideHardDrive" size="lg" class="section-icon" />
+                  <div>
+                    <span hlmCardTitle>Import & Export</span>
+                    <span hlmCardDescription>Backup and restore your settings</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="import-export-actions">
+                <button hlmBtn variant="outline" (click)="exportSettings()">
+                  <ng-icon hlmIcon name="lucideDownload" size="sm" />
+                  Export Settings
+                </button>
+                <label class="import-btn">
+                  <input
+                    type="file"
+                    accept=".json"
+                    (change)="importSettings($event)"
+                    hidden
+                  />
+                  <span hlmBtn variant="outline">
+                    <ng-icon hlmIcon name="lucideUpload" size="sm" />
+                    Import Settings
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div hlmCard class="system-card danger-zone">
+              <div hlmCardHeader>
+                <div class="card-title-row">
+                  <ng-icon hlmIcon name="lucideAlertTriangle" size="lg" class="section-icon danger" />
+                  <div>
+                    <span hlmCardTitle class="danger-title">Danger Zone</span>
+                    <span hlmCardDescription>Irreversible actions - use with caution</span>
+                  </div>
+                </div>
+              </div>
+              <div hlmCardContent class="danger-actions">
+                <div class="danger-item">
+                  <div class="danger-info">
+                    <span class="danger-name">Clear All Cached Data</span>
+                    <span class="danger-description">Remove all locally stored data and preferences</span>
+                  </div>
+                  <button hlmBtn variant="destructive" size="sm" (click)="clearAllData()">
+                    <ng-icon hlmIcon name="lucideTrash2" size="sm" />
+                    Clear Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   </div>
 </div>

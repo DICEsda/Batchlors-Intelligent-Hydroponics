@@ -20,13 +20,18 @@ public:
     void loop();
     bool isConnected();
 
-    // Publishing methods
+    // Publishing methods - Smart Tile (legacy)
     void publishLightState(const String& lightId, uint8_t brightness);
     void publishThermalEvent(const String& nodeId, const NodeThermalData& data);
     void publishMmWaveEvent(const MmWaveEvent& event);
     void publishNodeStatus(const NodeStatusMessage& status);
     void publishCoordinatorTelemetry(const CoordinatorSensorSnapshot& snapshot);
     void publishSerialLog(const String& message, const String& level = "INFO", const String& tag = "");
+    
+    // Publishing methods - Hydroponic System
+    void publishTowerTelemetry(const TowerTelemetryMessage& telemetry);
+    void publishReservoirTelemetry(const ReservoirTelemetryMessage& telemetry);
+    void publishOtaStatus(const String& status, int progress, const String& message, const String& error = "");
     
     // Configuration
     void setBrokerConfig(const char* host, uint16_t port, const char* username, const char* password);
@@ -38,8 +43,11 @@ public:
     // Read-only broker info for telemetry/log formatting
     String getBrokerHost() const { return brokerHost; }
     uint16_t getBrokerPort() const { return brokerPort; }
-    String getSiteId() const { return siteId; }
+    String getFarmId() const { return farmId; }
     String getCoordinatorId() const { return coordId; }
+    
+    // Legacy compatibility - maps to farmId
+    String getSiteId() const { return farmId; }
     
     // Interactive configuration
     bool runProvisioningWizard();
@@ -54,10 +62,10 @@ private:
     uint16_t brokerPort;
     String brokerUsername;
     String brokerPassword;
-    String siteId;
-    String coordId;
-         bool configLoaded = false;
-         bool discoveryAttempted = false;
+    String farmId;      // Hydroponic farm identifier (replaces siteId)
+    String coordId;     // Coordinator identifier
+    bool configLoaded = false;
+    bool discoveryAttempted = false;
     
     WifiManager* wifiManager;
     std::function<void(const String& topic, const String& payload)> commandCallback;
@@ -71,16 +79,23 @@ private:
     void persistConfig();
     static void handleMqttMessage(char* topic, uint8_t* payload, unsigned int length);
     void processMessage(const String& topic, const String& payload);
-         bool autoDiscoverBroker();
-         bool tryBrokerCandidate(const IPAddress& candidate);
+    bool autoDiscoverBroker();
+    bool tryBrokerCandidate(const IPAddress& candidate);
     void logConnectionFailureDetail(int8_t state);
     const char* describeMqttState(int8_t state) const;
     void warnIfLoopbackHost();
     void runReachabilityProbe();
 
-    String nodeTelemetryTopic(const String& nodeId) const;
+    // Topic builders - Hydroponic structure: farm/{farmId}/coord/{coordId}/...
+    String towerTelemetryTopic(const String& towerId) const;
+    String reservoirTelemetryTopic() const;
     String coordinatorTelemetryTopic() const;
     String coordinatorCmdTopic() const;
     String coordinatorSerialTopic() const;
     String coordinatorMmwaveTopic() const;
+    String coordinatorOtaStatusTopic() const;
+    String towerCmdTopic(const String& towerId) const;
+    
+    // Legacy topic builders (for backward compatibility during migration)
+    String nodeTelemetryTopic(const String& nodeId) const;
 };

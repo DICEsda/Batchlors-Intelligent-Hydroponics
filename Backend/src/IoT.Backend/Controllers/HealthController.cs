@@ -1,6 +1,6 @@
+using IoT.Backend.Repositories;
 using IoT.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 
 namespace IoT.Backend.Controllers;
 
@@ -12,13 +12,19 @@ namespace IoT.Backend.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly IMqttService _mqtt;
-    private readonly IMongoDatabase _db;
+    private readonly IRepository _repository;
+    private readonly ICoordinatorRepository _coordinatorRepo;
     private readonly ILogger<HealthController> _logger;
 
-    public HealthController(IMqttService mqtt, IMongoDatabase db, ILogger<HealthController> logger)
+    public HealthController(
+        IMqttService mqtt,
+        IRepository repository,
+        ICoordinatorRepository coordinatorRepo,
+        ILogger<HealthController> logger)
     {
         _mqtt = mqtt;
-        _db = db;
+        _repository = repository;
+        _coordinatorRepo = coordinatorRepo;
         _logger = logger;
     }
 
@@ -32,10 +38,7 @@ public class HealthController : ControllerBase
         bool dbHealthy = false;
         try
         {
-            // Ping the database to check connectivity
-            var command = new MongoDB.Bson.BsonDocument("ping", 1);
-            await _db.RunCommandAsync<MongoDB.Bson.BsonDocument>(command);
-            dbHealthy = true;
+            dbHealthy = await _repository.CheckConnectionAsync();
         }
         catch (Exception ex)
         {
@@ -46,10 +49,7 @@ public class HealthController : ControllerBase
         bool coordinatorOnline = false;
         try
         {
-            var coordinators = _db.GetCollection<MongoDB.Bson.BsonDocument>("coordinators");
-            var recentThreshold = DateTime.UtcNow.AddMinutes(-5);
-            var filter = MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Gte("last_seen", recentThreshold);
-            var count = await coordinators.CountDocumentsAsync(filter);
+            var count = await _coordinatorRepo.CountOnlineAsync(TimeSpan.FromMinutes(5));
             coordinatorOnline = count > 0;
         }
         catch (Exception ex)

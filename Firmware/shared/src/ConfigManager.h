@@ -25,6 +25,35 @@ namespace ConfigKeys {
     static const char* const DERATE_MIN_DUTY_PCT = "derate_min_duty_pct";
     static const char* const RETRY_COUNT         = "retry_count";
     static const char* const CMD_TTL_MS          = "cmd_ttl_ms";
+    
+    // Hydroponic System - Identifiers
+    static const char* const FARM_ID             = "farm_id";
+    static const char* const COORD_ID            = "coord_id";
+    static const char* const TOWER_ID            = "tower_id";
+    
+    // Hydroponic System - Water Quality Thresholds
+    static const char* const PH_MIN              = "ph_min";
+    static const char* const PH_MAX              = "ph_max";
+    static const char* const EC_MIN_MS_CM        = "ec_min_ms_cm";
+    static const char* const EC_MAX_MS_CM        = "ec_max_ms_cm";
+    static const char* const WATER_TEMP_MIN_C    = "water_temp_min_c";
+    static const char* const WATER_TEMP_MAX_C    = "water_temp_max_c";
+    
+    // Hydroponic System - Water Level
+    static const char* const WATER_LEVEL_MIN_PCT = "water_level_min_pct";
+    static const char* const WATER_LEVEL_MAX_CM  = "water_level_max_cm";
+    
+    // Hydroponic System - Pump Control
+    static const char* const PUMP_MAX_DURATION_S = "pump_max_duration_s";
+    static const char* const PUMP_COOLDOWN_S     = "pump_cooldown_s";
+    
+    // Hydroponic System - Telemetry
+    static const char* const TELEMETRY_INTERVAL_MS = "telemetry_ms";
+    
+    // Hydroponic System - Grow Light
+    static const char* const LIGHT_ON_HOUR       = "light_on_hour";
+    static const char* const LIGHT_OFF_HOUR      = "light_off_hour";
+    static const char* const LIGHT_INTENSITY_PCT = "light_intensity_pct";
 }
 
 namespace Defaults {
@@ -45,6 +74,30 @@ namespace Defaults {
     static constexpr int DERATE_MIN_DUTY_PCT = 30;
     static constexpr int RETRY_COUNT         = 3;
     static constexpr int CMD_TTL_MS          = 1500;
+    
+    // Hydroponic System - Water Quality (optimal ranges for leafy greens)
+    static constexpr float PH_MIN            = 5.5f;
+    static constexpr float PH_MAX            = 6.5f;
+    static constexpr float EC_MIN_MS_CM      = 1.0f;   // mS/cm
+    static constexpr float EC_MAX_MS_CM      = 2.5f;   // mS/cm
+    static constexpr float WATER_TEMP_MIN_C  = 18.0f;
+    static constexpr float WATER_TEMP_MAX_C  = 24.0f;
+    
+    // Hydroponic System - Water Level
+    static constexpr float WATER_LEVEL_MIN_PCT = 20.0f;  // alert threshold
+    static constexpr float WATER_LEVEL_MAX_CM  = 30.0f;  // reservoir depth
+    
+    // Hydroponic System - Pump Control
+    static constexpr int PUMP_MAX_DURATION_S   = 300;    // 5 minute safety limit
+    static constexpr int PUMP_COOLDOWN_S       = 60;     // 1 minute between cycles
+    
+    // Hydroponic System - Telemetry
+    static constexpr int TELEMETRY_INTERVAL_MS = 30000;  // 30 seconds
+    
+    // Hydroponic System - Grow Light (default 16/8 light cycle)
+    static constexpr int LIGHT_ON_HOUR         = 6;      // 6 AM
+    static constexpr int LIGHT_OFF_HOUR        = 22;     // 10 PM
+    static constexpr int LIGHT_INTENSITY_PCT   = 80;     // 80% brightness
 }
 
 class ConfigManager {

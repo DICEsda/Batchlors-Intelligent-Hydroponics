@@ -1,5 +1,6 @@
 #include "Coordinator.h"
 #include "../utils/Logger.h"
+#include "../utils/OtaUpdater.h"
 #include "../../shared/src/EspNowMessage.h"
 #include "../../shared/src/ConfigManager.h"
 #include "../comm/WifiManager.h"
@@ -45,7 +46,7 @@ bool Coordinator::begin() {
     // Don't call Logger::begin here - it's already called in main.cpp
     Logger::setMinLevel(Logger::INFO); // Reduce noise: default to INFO
     delay(500);
-    bootStatus.clear();
+    bootManager.clear();
     
     Logger::info("Smart Tile Coordinator starting...");
     publishLog("Smart Tile Coordinator starting...", "INFO", "setup");
@@ -65,7 +66,7 @@ bool Coordinator::begin() {
     // Initialize ESP-NOW first (before WiFi connects)
     Logger::info("Initializing ESP-NOW...");
     bool espNowOk = espNow->begin();
-    recordBootStatus("ESP-NOW", espNowOk, espNowOk ? "Radio ready" : "init failed");
+    bootManager.record("ESP-NOW", espNowOk, espNowOk ? "Radio ready" : "init failed");
     if (!espNowOk) {
         Logger::error("Failed to initialize ESP-NOW");
         return false;
@@ -89,7 +90,7 @@ bool Coordinator::begin() {
     } else {
         wifiDetail = "Needs setup";
     }
-    recordBootStatus("Wi-Fi", wifiReady, wifiDetail);
+    bootManager.record("Wi-Fi", wifiReady, wifiDetail);
     if (!wifiReady) {
         Logger::warn("Wi-Fi not connected at boot; continuing with offline fallback");
     }
@@ -186,7 +187,7 @@ bool Coordinator::begin() {
     bool mqttInitOk = mqtt->begin();
     bool mqttConnected = mqtt->isConnected();
     String brokerLabel = mqtt->getBrokerHost().isEmpty() ? String("auto") : mqtt->getBrokerHost();
-    recordBootStatus("MQTT", mqttConnected, mqttConnected ? String("Connected ") + brokerLabel : String("Waiting on ") + brokerLabel);
+    bootManager.record("MQTT", mqttConnected, mqttConnected ? String("Connected ") + brokerLabel : String("Waiting on ") + brokerLabel);
     if (!mqttInitOk) {
         Logger::error("Failed to initialize MQTT");
         return false;
@@ -199,7 +200,7 @@ bool Coordinator::begin() {
     Logger::info("Initializing mmWave sensor...");
     bool mmWaveOk = mmWave->begin();
     bool mmWaveOnline = mmWave->isOnline();
-    recordBootStatus("mmWave", mmWaveOnline, mmWaveOnline ? "LD2450 streaming" : "will retry");
+    bootManager.record("mmWave", mmWaveOnline, mmWaveOnline ? "LD2450 streaming" : "will retry");
     if (!mmWaveOk) {
         Logger::warn("Failed to initialize mmWave sensor - continuing without it");
     } else if (!mmWaveOnline) {
@@ -210,7 +211,7 @@ bool Coordinator::begin() {
 
     Logger::info("Initializing node registry...");
     bool nodesOk = nodes->begin();
-    recordBootStatus("Nodes", nodesOk, nodesOk ? "registry ready" : "init failed");
+    bootManager.record("Nodes", nodesOk, nodesOk ? "registry ready" : "init failed");
     if (!nodesOk) {
         Logger::error("Failed to initialize node registry");
         return false;
@@ -274,7 +275,7 @@ bool Coordinator::begin() {
     rebuildLedMappingFromRegistry();
 
     bool zonesOk = zones->begin();
-    recordBootStatus("Zones", zonesOk, zonesOk ? "control ready" : "init failed");
+    bootManager.record("Zones", zonesOk, zonesOk ? "control ready" : "init failed");
     if (!zonesOk) {
         Logger::error("Failed to initialize zone control");
         return false;
@@ -284,14 +285,14 @@ bool Coordinator::begin() {
     statusLed.setIdleBreathing(false);
 
     bool buttonsOk = buttons->begin();
-    recordBootStatus("Button", buttonsOk, buttonsOk ? "GPIO ready" : "init failed");
+    bootManager.record("Button", buttonsOk, buttonsOk ? "GPIO ready" : "init failed");
     if (!buttonsOk) {
         Logger::error("Failed to initialize button control");
         return false;
     }
 
     bool thermalOk = thermal->begin();
-    recordBootStatus("Thermal", thermalOk, thermalOk ? "monitoring" : "init failed");
+    bootManager.record("Thermal", thermalOk, thermalOk ? "monitoring" : "init failed");
     if (!thermalOk) {
         Logger::error("Failed to initialize thermal control");
         return false;
@@ -302,7 +303,7 @@ bool Coordinator::begin() {
         Logger::warn("TSL2561 ambient light sensor init failed (continuing)");
         ambientOk = false;
     }
-    recordBootStatus("Ambient", ambientOk, ambientOk ? "TSL2561 ready" : "sensor offline");
+    bootManager.record("Ambient", ambientOk, ambientOk ? "TSL2561 ready" : "sensor offline");
 
     // Register event handlers
     mmWave->setEventCallback([this](const MmWaveEvent& event) {
@@ -341,7 +342,33 @@ bool Coordinator::begin() {
         Logger::info("===========================================");
     });
 
-printBootSummary();
+bootManager.printSummary();
+
+// Configure serial console callbacks
+serialConsole.onWifiConfig([this]() {
+    if (wifi) {
+        wifi->reconfigureWifi();
+    } else {
+        Serial.println("✗ WiFi manager not available");
+    }
+});
+serialConsole.onMqttConfig([this]() {
+    if (mqtt) {
+        mqtt->runProvisioningWizard();
+    } else {
+        Serial.println("✗ MQTT not available");
+    }
+});
+serialConsole.onStatus([this]() {
+    printSerialTelemetry();
+});
+serialConsole.onPair([this]() {
+    startPairingWindow(60000, "serial command");
+});
+serialConsole.onReboot([]() {
+    ESP.restart();
+});
+
 Logger::info("Coordinator initialization complete");
 Logger::info("==============================================");
 Logger::info("System ready! Press BOOT button to pair nodes.");
@@ -353,7 +380,7 @@ return true;
 
 void Coordinator::loop() {
     // Handle serial commands (must be before other loops to respond quickly)
-    handleSerialCommands();
+    serialConsole.process();
     
     if (wifi) {
         wifi->loop();
@@ -593,6 +620,104 @@ void Coordinator::handleNodeMessage(const String& nodeId, const uint8_t* data, s
             if (!espNow->sendToMac(mac, ackJson)) {
                 Logger::debug("Failed to send telemetry ACK to %s", nodeId.c_str());
             }
+        }
+    }
+
+    // ===== Hydroponic Tower Telemetry Forwarding =====
+    // Forward tower telemetry from ESP-NOW to MQTT for backend/dashboard consumption
+    if (mt == MessageType::TOWER_TELEMETRY && mqtt) {
+        EspNowMessage* msg = MessageFactory::createMessage(payload);
+        if (msg && msg->type == MessageType::TOWER_TELEMETRY) {
+            TowerTelemetryMessage* telemetry = static_cast<TowerTelemetryMessage*>(msg);
+            
+            // Log tower environmental data
+            Logger::info("[Tower %s] Air: %.1f°C, Humidity: %.1f%%, Light: %.0f lux", 
+                         telemetry->tower_id.c_str(),
+                         telemetry->air_temp_c, 
+                         telemetry->humidity_pct,
+                         telemetry->light_lux);
+            Logger::info("[Tower %s] Pump: %s, Light: %s (brightness: %d)", 
+                         telemetry->tower_id.c_str(),
+                         telemetry->pump_on ? "ON" : "OFF",
+                         telemetry->light_on ? "ON" : "OFF",
+                         telemetry->light_brightness);
+            
+            // Forward to MQTT broker
+            mqtt->publishTowerTelemetry(*telemetry);
+            
+            // Send ACK back to tower node
+            uint8_t mac[6];
+            if (EspNow::macStringToBytes(nodeId, mac)) {
+                AckMessage ack;
+                ack.cmd_id = "tower_telemetry_ack";
+                String ackJson = ack.toJson();
+                if (!espNow->sendToMac(mac, ackJson)) {
+                    Logger::debug("Failed to send tower telemetry ACK to %s", nodeId.c_str());
+                }
+            }
+            
+            delete msg;
+        }
+    }
+
+    // ===== Hydroponic Tower Join Request =====
+    // Handle tower-specific join requests (different from legacy node join)
+    if (mt == MessageType::TOWER_JOIN_REQUEST && mqtt) {
+        EspNowMessage* msg = MessageFactory::createMessage(payload);
+        if (msg && msg->type == MessageType::TOWER_JOIN_REQUEST) {
+            TowerJoinRequestMessage* joinReq = static_cast<TowerJoinRequestMessage*>(msg);
+            
+            // Add as ESP-NOW peer
+            uint8_t mac[6];
+            if (EspNow::macStringToBytes(nodeId, mac)) {
+                espNow->addPeer(mac);
+            }
+            
+            // Generate tower ID from MAC
+            char towerIdBuf[24];
+            snprintf(towerIdBuf, sizeof(towerIdBuf), "T%s", nodeId.substring(nodeId.length() - 8).c_str());
+            String towerId = String(towerIdBuf);
+            towerId.replace(":", "");
+            
+            Logger::info("Tower join request from %s (FW: %s), assigning ID: %s", 
+                         nodeId.c_str(), joinReq->fw.c_str(), towerId.c_str());
+            Logger::info("  Capabilities: DHT=%d, Light=%d, Pump=%d, GrowLight=%d, Slots=%d",
+                         joinReq->caps.dht_sensor, joinReq->caps.light_sensor,
+                         joinReq->caps.pump_relay, joinReq->caps.grow_light,
+                         joinReq->caps.slot_count);
+            
+            // Store tower ID to MAC mapping for command routing
+            towerIdToMac[towerId] = nodeId;
+            Logger::info("  Stored MAC mapping: %s -> %s", towerId.c_str(), nodeId.c_str());
+            
+            // Send join accept response
+            TowerJoinAcceptMessage accept;
+            accept.tower_id = towerId;
+            accept.coord_id = mqtt->getCoordinatorId();
+            accept.farm_id = mqtt->getFarmId();
+            accept.lmk = "";  // TODO: implement secure pairing with LMK
+            
+            // Get current WiFi channel
+            uint8_t currentChannel = 1;
+            wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
+            esp_wifi_get_channel(&currentChannel, &second);
+            accept.wifi_channel = currentChannel;
+            
+            // Default configuration
+            accept.cfg.telemetry_interval_ms = 30000;  // 30 seconds
+            accept.cfg.pump_max_duration_s = 300;      // 5 minutes max
+            
+            String json = accept.toJson();
+            if (EspNow::macStringToBytes(nodeId, mac)) {
+                if (!espNow->sendToMac(mac, json)) {
+                    Logger::warn("Failed to send tower_join_accept to %s", nodeId.c_str());
+                } else {
+                    Logger::info("Sent tower_join_accept to %s (tower_id: %s)", 
+                                 nodeId.c_str(), towerId.c_str());
+                }
+            }
+            
+            delete msg;
         }
     }
 }
@@ -959,6 +1084,123 @@ void Coordinator::handleMqttCommand(const String& topic, const String& payload) 
         } else {
             Logger::warn("update_config command received with empty config object");
         }
+    } else if (cmd == "ota") {
+        // ============================================================
+        // COORDINATOR OTA UPDATE
+        // Command: {"cmd": "ota", "url": "http://...", "checksum": "sha256:..."}
+        // ============================================================
+        String otaUrl = doc["url"] | "";
+        String otaChecksum = doc["checksum"] | "";
+        
+        if (otaUrl.length() == 0) {
+            Logger::error("OTA command missing 'url' field");
+            publishLog("OTA failed: missing URL", "ERROR", "ota");
+            return;
+        }
+        
+        Logger::info("Starting OTA update from: %s", otaUrl.c_str());
+        publishLog("OTA starting: " + otaUrl, "INFO", "ota");
+        
+        // Create progress callback that publishes to MQTT
+        auto progressCb = [this](OtaUpdater::Status status, int progress, const String& message) {
+            if (mqtt) {
+                mqtt->publishOtaStatus(
+                    OtaUpdater::statusToString(status),
+                    progress,
+                    message,
+                    status == OtaUpdater::Status::FAILED ? message : ""
+                );
+            }
+        };
+        
+        // Perform the OTA update
+        const char* checksumPtr = otaChecksum.length() > 0 ? otaChecksum.c_str() : nullptr;
+        OtaUpdater::Result result = OtaUpdater::updateFromUrl(otaUrl.c_str(), checksumPtr, progressCb);
+        
+        if (result.ok) {
+            Logger::info("OTA update successful, rebooting...");
+            publishLog("OTA successful, rebooting...", "INFO", "ota");
+            delay(1000);  // Give time for MQTT message to be sent
+            ESP.restart();
+        } else {
+            Logger::error("OTA update failed: %s (HTTP %d)", result.message.c_str(), result.httpCode);
+            publishLog("OTA failed: " + result.message, "ERROR", "ota");
+        }
+    } else if (topic.indexOf("/tower/") >= 0 && topic.endsWith("/cmd")) {
+        // ============================================================
+        // TOWER COMMAND FORWARDING (MQTT -> ESP-NOW)
+        // Topic pattern: farm/{farmId}/coord/{coordId}/tower/{towerId}/cmd
+        // ============================================================
+        
+        // Extract towerId from topic
+        int towerStart = topic.indexOf("/tower/") + 7;  // Skip "/tower/"
+        int towerEnd = topic.indexOf("/cmd");
+        
+        if (towerEnd <= towerStart) {
+            Logger::warn("Invalid tower command topic format: %s", topic.c_str());
+            return;
+        }
+        
+        String towerId = topic.substring(towerStart, towerEnd);
+        Logger::info("Tower command received for tower=%s cmd=%s", towerId.c_str(), cmd.c_str());
+        
+        // Look up MAC address from towerIdToMac map
+        auto it = towerIdToMac.find(towerId);
+        if (it == towerIdToMac.end()) {
+            Logger::warn("Unknown tower ID: %s (not in towerIdToMac map)", towerId.c_str());
+            publishLog("Tower command failed: unknown tower " + towerId, "WARN", "tower");
+            return;
+        }
+        
+        String macStr = it->second;
+        uint8_t mac[6];
+        if (!EspNow::macStringToBytes(macStr, mac)) {
+            Logger::error("Invalid MAC address for tower %s: %s", towerId.c_str(), macStr.c_str());
+            return;
+        }
+        
+        // Build TowerCommandMessage from JSON payload
+        TowerCommandMessage cmdMsg;
+        cmdMsg.msg = "tower_cmd";
+        cmdMsg.tower_id = towerId;
+        cmdMsg.command = cmd;
+        cmdMsg.ttl_ms = doc["ttl_ms"] | 3000;
+        
+        // Parse command-specific fields
+        if (cmd == "set_pump" || cmd == "tower_control") {
+            cmdMsg.pump_on = doc["pump_on"] | false;
+            cmdMsg.pump_duration_s = doc["pump_duration_s"] | 0;
+        }
+        
+        if (cmd == "set_light" || cmd == "tower_control") {
+            cmdMsg.light_on = doc["light_on"] | false;
+            cmdMsg.light_brightness = doc["light_brightness"] | 0;
+            cmdMsg.light_duration_m = doc["light_duration_m"] | 0;
+        }
+        
+        if (cmd == "ota") {
+            cmdMsg.ota_url = doc["ota_url"] | doc["url"] | "";
+            cmdMsg.ota_checksum = doc["ota_checksum"] | doc["checksum"] | "";
+        }
+        
+        // Send via ESP-NOW
+        if (!espNow) {
+            Logger::error("ESP-NOW not initialized, cannot forward tower command");
+            publishLog("Tower command failed: ESP-NOW not ready", "ERROR", "tower");
+            return;
+        }
+        
+        String json = cmdMsg.toJson();
+        Logger::debug("Sending tower command to %s: %s", macStr.c_str(), json.c_str());
+        
+        bool sent = espNow->sendToMac(mac, json);
+        if (sent) {
+            Logger::info("Tower command sent to %s (%s): %s", towerId.c_str(), macStr.c_str(), cmd.c_str());
+            publishLog("Tower command sent: " + towerId + " -> " + cmd, "INFO", "tower");
+        } else {
+            Logger::warn("Failed to send tower command to %s (%s)", towerId.c_str(), macStr.c_str());
+            publishLog("Tower command failed: ESP-NOW send error to " + towerId, "WARN", "tower");
+        }
     }
 }
 
@@ -1116,114 +1358,10 @@ void Coordinator::printSerialTelemetry() {
     Serial.println("==========================================");
 }
 
-void Coordinator::recordBootStatus(const char* name, bool ok, const String& detail) {
-    BootStatusEntry entry;
-    entry.name = name ? name : "Subsystem";
-    entry.ok = ok;
-    entry.detail = detail;
-    bootStatus.push_back(entry);
-}
-
 void Coordinator::publishLog(const String& message, const String& level, const String& tag) {
     if (mqtt && mqtt->isConnected()) {
         mqtt->publishSerialLog(message, level, tag);
     }
 }
 
-void Coordinator::printBootSummary() {
-    if (bootStatus.empty()) {
-        return;
-    }
-    Serial.println();
-    Serial.println("┌────────────┬──────────────────────────────┐");
-    Serial.println("│ Subsystem  │ Status                       │");
-    Serial.println("├────────────┼──────────────────────────────┤");
-    for (const auto& entry : bootStatus) {
-        String detail = entry.detail;
-        if (detail.isEmpty()) {
-            detail = entry.ok ? "OK" : "See logs";
-        }
-        if (detail.length() > 28) {
-            detail = detail.substring(0, 25) + "...";
-        }
-        String status = String(entry.ok ? "✓ " : "! ") + detail;
-        Serial.printf("│ %-10s │ %-30s │\n", entry.name.c_str(), status.c_str());
-    }
-    Serial.println("└────────────┴──────────────────────────────┘");
-    Serial.println();
-}
 
-
-void Coordinator::handleSerialCommands() {
-    static String commandBuffer;
-    
-    while (Serial.available()) {
-        char c = Serial.read();
-        
-        if (c == '\n' || c == '\r') {
-            if (commandBuffer.length() > 0) {
-                commandBuffer.trim();
-                commandBuffer.toLowerCase();
-                
-                // Process command
-                if (commandBuffer == "help" || commandBuffer == "?") {
-                    Serial.println();
-                    Serial.println("═══════════════════════════════════════");
-                    Serial.println("  COORDINATOR SERIAL MENU");
-                    Serial.println("═══════════════════════════════════════");
-                    Serial.println("  help, ?       - Show this menu");
-                    Serial.println("  wifi          - Reconfigure Wi-Fi");
-                    Serial.println("  mqtt          - Reconfigure MQTT");
-                    Serial.println("  status        - Show system status");
-                    Serial.println("  pair          - Start pairing mode (60s)");
-                    Serial.println("  reboot        - Restart coordinator");
-                    Serial.println("═══════════════════════════════════════");
-                    Serial.println();
-                    
-                } else if (commandBuffer == "wifi") {
-                    if (wifi) {
-                        Serial.println();
-                        wifi->reconfigureWifi();
-                    } else {
-                        Serial.println("✗ WiFi manager not available");
-                    }
-                    
-                } else if (commandBuffer == "mqtt") {
-                    if (mqtt) {
-                        Serial.println();
-                        mqtt->runProvisioningWizard();
-                    } else {
-                        Serial.println("✗ MQTT not available");
-                    }
-                    
-                } else if (commandBuffer == "status") {
-                    Serial.println();
-                    printSerialTelemetry();
-                    
-                } else if (commandBuffer == "pair") {
-                    Serial.println();
-                    startPairingWindow(60000, "serial command");
-                    Serial.println("✓ Pairing mode activated for 60 seconds");
-                    
-                } else if (commandBuffer == "reboot") {
-                    Serial.println();
-                    Serial.println("Rebooting coordinator...");
-                    delay(500);
-                    ESP.restart();
-                    
-                } else if (commandBuffer.length() > 0) {
-                    Serial.printf("✗ Unknown command: '%s' (type 'help' for menu)\n", commandBuffer.c_str());
-                }
-                
-                commandBuffer = "";
-            }
-        } else {
-            commandBuffer += c;
-            // Limit buffer size to prevent overflow
-            if (commandBuffer.length() > 64) {
-                commandBuffer = "";
-                Serial.println("✗ Command too long, cleared");
-            }
-        }
-    }
-}

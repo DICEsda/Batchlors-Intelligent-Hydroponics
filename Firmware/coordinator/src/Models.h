@@ -4,13 +4,13 @@
 #include <vector>
 #include <map>
 
-struct NodeInfo {
-    String nodeId;
+struct TowerInfo {
+    String towerId;
     String lightId;
     uint8_t lastDuty;
     uint32_t lastSeenMs;
     float temperature;      // Current temperature in Celsius
-    bool isDerated;         // Whether the node is currently derated
+    bool isDerated;         // Whether the tower is currently derated
     uint8_t derationLevel; // Current deration level (100 = no deration)
 };
 
@@ -41,7 +41,7 @@ struct MmWaveEvent {
 };
 
 struct ThermalEvent {
-    String nodeId;
+    String towerId;
     float temperature;
     bool isDerated;
     uint8_t derationLevel;
@@ -49,12 +49,12 @@ struct ThermalEvent {
 };
 
 struct SensorData {
-    String nodeId;
+    String towerId;
     float temperature;
     uint32_t timestampMs;
 };
 
-struct CoordinatorSensorSnapshot {
+struct ReservoirSensorSnapshot {
     float lightLux = 0.0f;
     float tempC = 0.0f;
     bool mmWavePresence = false;
@@ -65,6 +65,5 @@ struct CoordinatorSensorSnapshot {
     uint32_t timestampMs = 0;
 };
 
-
-
-
+// Backward compatibility alias
+using CoordinatorSensorSnapshot = ReservoirSensorSnapshot;

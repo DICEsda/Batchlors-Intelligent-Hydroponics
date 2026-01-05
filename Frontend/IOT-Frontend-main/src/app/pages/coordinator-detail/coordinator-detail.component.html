@@ -12,18 +12,23 @@
           <h1 class="page-title">{{ coordinator()?.name || 'Coordinator' }}</h1>
           <p class="page-description">
             @if (coordinator()) {
-              <span hlmBadge [variant]="getStatusBadgeVariant(coordinator()!.status)">
-                <ng-icon hlmIcon [name]="coordinator()!.status === 'online' ? 'lucideWifi' : 'lucideWifiOff'" size="xs" />
-                {{ coordinator()!.status }}
+              <span hlmBadge [variant]="getStatusBadgeVariant(coordinatorStatus())">
+                <ng-icon hlmIcon [name]="coordinatorStatus() === 'online' ? 'lucideWifi' : 'lucideWifiOff'" size="xs" />
+                {{ coordinatorStatus() }}
               </span>
-              <span class="separator">•</span>
-              <span>{{ coordinator()!.towerCount || 0 }} towers connected</span>
+              <span class="separator">|</span>
+              <span>{{ onlineNodeCount() }}/{{ totalNodeCount() }} nodes online</span>
             }
           </p>
         }
       </div>
     </div>
     <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="secondary" class="mock-badge">
+          Mock Data
+        </span>
+      }
       <span
         hlmBadge
         [variant]="wsConnected() ? 'outline' : 'destructive'"
@@ -32,6 +37,32 @@
         <span class="live-dot" [class.active]="wsConnected()"></span>
         {{ wsConnected() ? 'Live' : 'Offline' }}
       </span>
+      
+      <!-- Pairing Button -->
+      @if (isPairing()) {
+        <button 
+          hlmBtn 
+          variant="secondary" 
+          size="sm" 
+          class="pairing-active-btn"
+          (click)="cancelPairing()"
+        >
+          <ng-icon hlmIcon name="lucideLoader2" size="sm" class="animate-spin" />
+          Pairing {{ formatPairingCountdown() }}
+        </button>
+      } @else {
+        <button 
+          hlmBtn 
+          variant="default" 
+          size="sm"
+          (click)="startPairing()"
+          [disabled]="!coordinator()"
+        >
+          <ng-icon hlmIcon name="lucideRadio" size="sm" />
+          Start Pairing
+        </button>
+      }
+      
       <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
         <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
         Refresh
@@ -52,6 +83,122 @@
     </div>
   }
 
+  <!-- Pairing Error -->
+  @if (pairingError()) {
+    <div class="error-banner pairing-error">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>Pairing failed: {{ pairingError() }}</span>
+      <button hlmBtn variant="ghost" size="sm" (click)="pairingError.set(null)">Dismiss</button>
+    </div>
+  }
+
+  <!-- Pairing Mode Banner -->
+  @if (isPairing()) {
+    <div class="pairing-banner">
+      <div class="pairing-banner-content">
+        <ng-icon hlmIcon name="lucideRadio" size="lg" class="pairing-icon animate-pulse" />
+        <div class="pairing-info">
+          <h3>Pairing Mode Active</h3>
+          <p>Put new nodes into pairing mode to connect them to this coordinator.</p>
+        </div>
+      </div>
+      <div class="pairing-timer">
+        <span class="timer-value">{{ formatPairingCountdown() }}</span>
+        <span class="timer-label">remaining</span>
+      </div>
+      <button hlmBtn variant="outline" size="sm" (click)="cancelPairing()">
+        Cancel
+      </button>
+    </div>
+  }
+
+  <!-- Discovered Nodes Section (visible during pairing or when nodes are discovered) -->
+  @if (isPairing() || discoveredNodes().length > 0) {
+    <section class="discovered-nodes-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <ng-icon hlmIcon name="lucideRadio" size="sm" class="section-icon" />
+          Discovered Nodes
+        </h2>
+        @if (discoveredNodes().length > 0) {
+          <span hlmBadge variant="secondary">{{ discoveredNodes().length }} found</span>
+        }
+      </div>
+
+      @if (discoveredNodes().length === 0) {
+        <div class="empty-discovered">
+          <ng-icon hlmIcon name="lucideRadar" size="xl" class="animate-pulse" />
+          <h3>Scanning for nodes...</h3>
+          <p>Put new nodes into pairing mode. They will appear here when discovered.</p>
+        </div>
+      } @else {
+        <div class="discovered-nodes-grid">
+          @for (node of discoveredNodes(); track trackByDiscoveredNodeId($index, node)) {
+            <div hlmCard class="discovered-node-card" [class.paired]="node.status === 'paired'" [class.error]="node.status === 'error'" [class.rejected]="node.status === 'rejected'">
+              <div hlmCardHeader class="discovered-node-header">
+                <div class="node-info">
+                  <span hlmCardTitle class="node-id">{{ node.nodeId }}</span>
+                  <span hlmCardDescription class="mac-address">{{ node.macAddress }}</span>
+                </div>
+                <span hlmBadge [variant]="getDiscoveredNodeBadgeVariant(node.status)" size="sm">
+                  @if (node.status === 'pairing') {
+                    <ng-icon hlmIcon name="lucideLoader2" size="xs" class="animate-spin" />
+                  }
+                  {{ node.status }}
+                </span>
+              </div>
+              <div hlmCardContent class="discovered-node-content">
+                <div class="node-details">
+                  <div class="detail">
+                    <ng-icon hlmIcon name="lucideWifi" size="xs" />
+                    <span>RSSI: {{ node.rssi }} dBm</span>
+                  </div>
+                  @if (node.firmwareVersion) {
+                    <div class="detail">
+                      <ng-icon hlmIcon name="lucideCpu" size="xs" />
+                      <span>FW: {{ node.firmwareVersion }}</span>
+                    </div>
+                  }
+                  <div class="detail">
+                    <ng-icon hlmIcon name="lucideClock" size="xs" />
+                    <span>{{ formatTimeAgo(node.discoveredAt) }}</span>
+                  </div>
+                </div>
+                
+                @if (node.error) {
+                  <div class="node-error">
+                    <ng-icon hlmIcon name="lucideAlertTriangle" size="xs" />
+                    <span>{{ node.error }}</span>
+                  </div>
+                }
+              </div>
+              
+              <!-- Action buttons - only show for discovered status -->
+              @if (node.status === 'discovered') {
+                <div class="discovered-node-actions">
+                  <button hlmBtn variant="default" size="sm" (click)="approveNode(node)">
+                    <ng-icon hlmIcon name="lucideRadio" size="sm" />
+                    Approve
+                  </button>
+                  <button hlmBtn variant="ghost" size="sm" (click)="rejectNode(node)">
+                    Reject
+                  </button>
+                </div>
+              }
+              
+              @if (node.status === 'paired') {
+                <div class="discovered-node-success">
+                  <ng-icon hlmIcon name="lucideRadio" size="sm" />
+                  <span>Successfully paired!</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+
   <!-- Loading State -->
   @if (loading()) {
     <div class="loading-grid">
@@ -62,193 +209,195 @@
       }
     </div>
   } @else if (coordinator()) {
-    <!-- Reservoir Metrics Section -->
-    <section class="reservoir-section">
-      <h2 class="section-title">Reservoir Metrics</h2>
-      @if (reservoirMetrics(); as metrics) {
-        <div class="metrics-grid">
-          <!-- pH Gauge -->
-          <div hlmCard class="metric-card" [class]="'status-' + phStatus().color">
-            <div hlmCardHeader class="metric-header">
-              <ng-icon hlmIcon name="lucideDroplet" size="lg" class="metric-icon ph" />
-              <div class="metric-info">
-                <span hlmCardDescription>pH Level</span>
-                <span hlmCardTitle class="metric-value">{{ metrics.ph | number:'1.2-2' }}</span>
-              </div>
-            </div>
-            <div hlmCardContent class="metric-content">
-              <div class="gauge-container">
-                <div class="gauge-bar">
-                  <div
-                    class="gauge-fill"
-                    [style.width.%]="(metrics.ph / 14) * 100"
-                    [class]="'fill-' + phStatus().color"
-                  ></div>
-                  <div class="gauge-optimal" style="left: 39.3%; width: 7.1%"></div>
-                </div>
-                <div class="gauge-labels">
-                  <span>0</span>
-                  <span>Optimal: 5.5-6.5</span>
-                  <span>14</span>
-                </div>
-              </div>
-              <span class="metric-status" [class]="'status-' + phStatus().color">
-                {{ phStatus().status }}
-              </span>
+    <!-- Coordinator Info Section -->
+    <section class="coordinator-info-section">
+      <h2 class="section-title">Coordinator Information</h2>
+      <div class="info-grid">
+        <!-- Coordinator ID -->
+        <div hlmCard class="info-card">
+          <div hlmCardHeader class="info-header">
+            <ng-icon hlmIcon name="lucideServer" size="lg" class="info-icon" />
+            <div class="info-content">
+              <span hlmCardDescription>Coordinator ID</span>
+              <span hlmCardTitle class="info-value">{{ coordinator()!.coord_id }}</span>
             </div>
           </div>
+        </div>
 
-          <!-- EC Gauge -->
-          <div hlmCard class="metric-card" [class]="'status-' + ecStatus().color">
-            <div hlmCardHeader class="metric-header">
-              <ng-icon hlmIcon name="lucideActivity" size="lg" class="metric-icon ec" />
-              <div class="metric-info">
-                <span hlmCardDescription>EC (mS/cm)</span>
-                <span hlmCardTitle class="metric-value">{{ metrics.ec | number:'1.2-2' }}</span>
-              </div>
-            </div>
-            <div hlmCardContent class="metric-content">
-              <div class="gauge-container">
-                <div class="gauge-bar">
-                  <div
-                    class="gauge-fill"
-                    [style.width.%]="(metrics.ec / 4) * 100"
-                    [class]="'fill-' + ecStatus().color"
-                  ></div>
-                  <div class="gauge-optimal" style="left: 30%; width: 20%"></div>
-                </div>
-                <div class="gauge-labels">
-                  <span>0</span>
-                  <span>Optimal: 1.2-2.0</span>
-                  <span>4</span>
-                </div>
-              </div>
-              <span class="metric-status" [class]="'status-' + ecStatus().color">
-                {{ ecStatus().status }}
-              </span>
+        <!-- Firmware Version -->
+        <div hlmCard class="info-card">
+          <div hlmCardHeader class="info-header">
+            <ng-icon hlmIcon name="lucideCpu" size="lg" class="info-icon" />
+            <div class="info-content">
+              <span hlmCardDescription>Firmware</span>
+              <span hlmCardTitle class="info-value">{{ coordinator()!.fw_version || 'Unknown' }}</span>
             </div>
           </div>
+        </div>
 
-          <!-- Temperature Gauge -->
-          <div hlmCard class="metric-card" [class]="'status-' + tempStatus().color">
-            <div hlmCardHeader class="metric-header">
-              <ng-icon hlmIcon name="lucideThermometer" size="lg" class="metric-icon temp" />
-              <div class="metric-info">
-                <span hlmCardDescription>Temperature</span>
-                <span hlmCardTitle class="metric-value">{{ metrics.temperature | number:'1.1-1' }}°C</span>
+        <!-- IP Address -->
+        @if (coordinator()!.ip_address) {
+          <div hlmCard class="info-card">
+            <div hlmCardHeader class="info-header">
+              <ng-icon hlmIcon name="lucideWifi" size="lg" class="info-icon" />
+              <div class="info-content">
+                <span hlmCardDescription>IP Address</span>
+                <span hlmCardTitle class="info-value">{{ coordinator()!.ip_address }}</span>
               </div>
-            </div>
-            <div hlmCardContent class="metric-content">
-              <div class="gauge-container">
-                <div class="gauge-bar">
-                  <div
-                    class="gauge-fill"
-                    [style.width.%]="((metrics.temperature - 10) / 30) * 100"
-                    [class]="'fill-' + tempStatus().color"
-                  ></div>
-                  <div class="gauge-optimal" style="left: 26.7%; width: 20%"></div>
-                </div>
-                <div class="gauge-labels">
-                  <span>10°C</span>
-                  <span>Optimal: 18-24°C</span>
-                  <span>40°C</span>
-                </div>
-              </div>
-              <span class="metric-status" [class]="'status-' + tempStatus().color">
-                {{ tempStatus().status }}
-              </span>
             </div>
           </div>
+        }
 
-          <!-- Water Level Gauge -->
-          <div hlmCard class="metric-card" [class]="'status-' + levelStatus().color">
-            <div hlmCardHeader class="metric-header">
-              <ng-icon hlmIcon name="lucideGauge" size="lg" class="metric-icon level" />
-              <div class="metric-info">
-                <span hlmCardDescription>Water Level</span>
-                <span hlmCardTitle class="metric-value">{{ metrics.waterLevel | number:'1.0-0' }}%</span>
+        <!-- MAC Address -->
+        @if (coordinator()!.mac_address) {
+          <div hlmCard class="info-card">
+            <div hlmCardHeader class="info-header">
+              <ng-icon hlmIcon name="lucideActivity" size="lg" class="info-icon" />
+              <div class="info-content">
+                <span hlmCardDescription>MAC Address</span>
+                <span hlmCardTitle class="info-value">{{ coordinator()!.mac_address }}</span>
               </div>
             </div>
-            <div hlmCardContent class="metric-content">
-              <div class="gauge-container">
-                <div class="gauge-bar vertical">
-                  <div
-                    class="gauge-fill"
-                    [style.width.%]="metrics.waterLevel"
-                    [class]="'fill-' + levelStatus().color"
-                  ></div>
-                </div>
-                <div class="gauge-labels">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-                </div>
-              </div>
-              <span class="metric-status" [class]="'status-' + levelStatus().color">
-                {{ levelStatus().status }}
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Sensor Metrics Section -->
+    <section class="metrics-section">
+      <h2 class="section-title">Sensor Readings</h2>
+      <div class="metrics-grid">
+        <!-- Temperature -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon name="lucideThermometer" size="lg" class="metric-icon temp" />
+            <div class="metric-info">
+              <span hlmCardDescription>Temperature</span>
+              <span hlmCardTitle class="metric-value">
+                {{ coordinator()!.temp_c !== undefined ? coordinator()!.temp_c.toFixed(1) : '--' }}°C
               </span>
             </div>
           </div>
         </div>
 
-        <!-- Last update timestamp -->
-        <div class="last-update">
-          <ng-icon hlmIcon name="lucideClock" size="xs" />
-          <span>Last updated: {{ formatTimeAgo(metrics.lastUpdate) }}</span>
-          @if (liveTelemetry()) {
-            <span hlmBadge variant="outline" class="live-indicator">
-              <ng-icon hlmIcon name="lucideZap" size="xs" />
-              Real-time
+        <!-- Light Level -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon name="lucideSun" size="lg" class="metric-icon light" />
+            <div class="metric-info">
+              <span hlmCardDescription>Ambient Light</span>
+              <span hlmCardTitle class="metric-value">
+                {{ coordinator()!.light_lux !== undefined ? coordinator()!.light_lux.toFixed(0) : '--' }} lux
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- WiFi Signal -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon name="lucideWifi" size="lg" class="metric-icon signal" />
+            <div class="metric-info">
+              <span hlmCardDescription>WiFi Signal</span>
+              <span hlmCardTitle class="metric-value">
+                {{ coordinator()!.wifi_rssi || '--' }} dBm
+              </span>
+            </div>
+          </div>
+          <div hlmCardContent class="metric-content">
+            <span class="signal-strength" [class]="'strength-' + signalStrength()">
+              {{ signalStrength() }}
+            </span>
+          </div>
+        </div>
+
+        <!-- mmWave Radar -->
+        <div hlmCard class="metric-card">
+          <div hlmCardHeader class="metric-header">
+            <ng-icon hlmIcon name="lucideRadar" size="lg" class="metric-icon radar" />
+            <div class="metric-info">
+              <span hlmCardDescription>mmWave Events</span>
+              <span hlmCardTitle class="metric-value">
+                {{ coordinator()!.mmwave_event_rate !== undefined ? coordinator()!.mmwave_event_rate.toFixed(1) : '--' }}/s
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Last update timestamp -->
+      <div class="last-update">
+        <ng-icon hlmIcon name="lucideClock" size="xs" />
+        <span>Last seen: {{ formatTimeAgo(coordinator()!.last_seen) }}</span>
+        @if (wsConnected()) {
+          <span hlmBadge variant="outline" class="live-indicator">
+            <ng-icon hlmIcon name="lucideZap" size="xs" />
+            Real-time
+          </span>
+        }
+      </div>
+    </section>
+
+    <!-- Connected Nodes Section -->
+    <section class="nodes-section">
+      <div class="section-header">
+        <h2 class="section-title">Connected Nodes</h2>
+        <div class="node-counts">
+          <span hlmBadge variant="default">{{ onlineNodeCount() }} online</span>
+          @if (pairingNodeCount() > 0) {
+            <span hlmBadge variant="secondary">{{ pairingNodeCount() }} pairing</span>
+          }
+          @if (errorNodeCount() > 0) {
+            <span hlmBadge variant="destructive">{{ errorNodeCount() }} error</span>
+          }
+        </div>
+      </div>
+
+      @if (connectedNodes().length === 0) {
+        <div class="empty-state">
+          <ng-icon hlmIcon name="lucideLightbulb" size="xl" />
+          <h3>No Nodes Connected</h3>
+          <p>Put nodes into pairing mode to connect them to this coordinator.</p>
+          @if (!isPairing()) {
+            <button hlmBtn variant="default" (click)="startPairing()">
+              <ng-icon hlmIcon name="lucideRadio" size="sm" />
+              Start Pairing Mode
+            </button>
+          } @else {
+            <span hlmBadge variant="secondary" class="pairing-badge">
+              <ng-icon hlmIcon name="lucideLoader2" size="xs" class="animate-spin" />
+              Pairing active - {{ formatPairingCountdown() }} remaining
             </span>
           }
         </div>
       } @else {
-        <div class="no-data">
-          <ng-icon hlmIcon name="lucideAlertTriangle" size="lg" />
-          <p>No reservoir data available</p>
-        </div>
-      }
-    </section>
-
-    <!-- Connected Towers Section -->
-    <section class="towers-section">
-      <div class="section-header">
-        <h2 class="section-title">Connected Towers</h2>
-        <span class="tower-count">{{ connectedTowers().length }} towers</span>
-      </div>
-
-      @if (connectedTowers().length === 0) {
-        <div class="empty-state">
-          <ng-icon hlmIcon name="lucideFlower2" size="xl" />
-          <h3>No Towers Connected</h3>
-          <p>Connect towers to this coordinator to start monitoring.</p>
-        </div>
-      } @else {
-        <div class="towers-grid">
-          @for (tower of connectedTowers(); track trackByTowerId($index, tower)) {
-            <a [routerLink]="['/towers', tower.towerId]" class="card-link">
-              <div hlmCard class="tower-card" [class.offline]="tower.status === 'offline'">
+        <div class="nodes-grid">
+          @for (node of connectedNodes(); track trackByNodeId($index, node)) {
+            <a [routerLink]="['/nodes', node._id]" class="card-link">
+              <div hlmCard class="node-card" [class.offline]="node.status_mode === 'error'">
                 <div hlmCardHeader>
                   <div class="card-header-row">
-                    <span hlmCardTitle>{{ tower.name }}</span>
-                    <span hlmBadge [variant]="getStatusBadgeVariant(tower.status)" size="sm">
-                      {{ tower.status }}
+                    <span hlmCardTitle>{{ node.name || node.light_id }}</span>
+                    <span hlmBadge [variant]="getNodeStatusBadgeVariant(node.status_mode)" size="sm">
+                      {{ node.status_mode }}
                     </span>
                   </div>
-                  <span hlmCardDescription>{{ tower.occupiedSlots }}/{{ tower.slotCount }} slots</span>
+                  <span hlmCardDescription>ID: {{ node.light_id }}</span>
                 </div>
-                <div hlmCardContent class="tower-metrics">
+                <div hlmCardContent class="node-metrics">
                   <div class="metric">
-                    <span class="metric-label">Temperature</span>
-                    <span class="metric-value">{{ tower.sensors.ambientTemp | number:'1.1-1' }}°C</span>
+                    <ng-icon hlmIcon name="lucideThermometer" size="xs" />
+                    <span class="metric-value">{{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C</span>
                   </div>
                   <div class="metric">
-                    <span class="metric-label">Humidity</span>
-                    <span class="metric-value">{{ tower.sensors.humidity | number:'1.0-0' }}%</span>
+                    <ng-icon hlmIcon name="lucideBattery" size="xs" />
+                    <span class="metric-value" [class]="'battery-' + getBatteryStatus(node.vbat_mv)">
+                      {{ getBatteryPercent(node.vbat_mv) }}%
+                    </span>
                   </div>
                 </div>
                 <div class="card-footer">
-                  <span>View details</span>
+                  <span class="last-seen">{{ formatTimeAgo(node.last_seen) }}</span>
                   <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
                 </div>
               </div>

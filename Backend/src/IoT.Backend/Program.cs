@@ -63,15 +63,35 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
 
 builder.Services.AddSingleton<IRepository, MongoRepository>();
 
+// Entity-specific repository interfaces (all backed by MongoRepository singleton)
+builder.Services.AddSingleton<ICoordinatorRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+builder.Services.AddSingleton<ITowerRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+builder.Services.AddSingleton<IOtaJobRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+builder.Services.AddSingleton<ISettingsRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+builder.Services.AddSingleton<IZoneRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+builder.Services.AddSingleton<ITelemetryRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+
+// Digital Twin services
+builder.Services.AddSingleton<ITwinRepository, TwinRepository>();
+builder.Services.AddSingleton<ITwinService, TwinService>();
+builder.Services.AddHostedService<TwinSyncBackgroundService>();
+
 // MQTT
 builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection(MqttOptions.Section));
 builder.Services.AddSingleton<IMqttService, MqttService>();
 
+// WebSocket broadcaster (broadcasts telemetry to all connected clients)
+builder.Services.AddSingleton<IWsBroadcaster, WsBroadcaster>();
+
+// Pairing service (manages coordinator-tower pairing workflow)
+builder.Services.AddSingleton<IPairingService, PairingService>();
+builder.Services.AddHostedService<PairingBackgroundService>();
+
 // Telemetry handler (processes incoming MQTT and persists to DB)
 builder.Services.AddHostedService<TelemetryHandler>();
 
-// WebSocket handler
-builder.Services.AddSingleton<MqttBridgeHandler>();
+// WebSocket handler (handles individual client connections and subscriptions)
+builder.Services.AddSingleton<IMqttBridgeHandler, MqttBridgeHandler>();
 
 // Health checks
 builder.Services.AddHealthChecks()
@@ -100,11 +120,48 @@ app.UseWebSockets(new WebSocketOptions
 
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path == "/ws" && context.WebSockets.IsWebSocketRequest)
+    if (context.WebSockets.IsWebSocketRequest)
     {
-        var handler = context.RequestServices.GetRequiredService<MqttBridgeHandler>();
-        var ws = await context.WebSockets.AcceptWebSocketAsync();
-        await handler.HandleAsync(ws, context.RequestAborted);
+        if (context.Request.Path == "/ws")
+        {
+            // Subscription-based WebSocket - clients can subscribe to specific topics
+            var handler = context.RequestServices.GetRequiredService<IMqttBridgeHandler>();
+            var ws = await context.WebSockets.AcceptWebSocketAsync();
+            await handler.HandleAsync(ws, context.RequestAborted);
+        }
+        else if (context.Request.Path == "/ws/broadcast")
+        {
+            // Broadcast-only WebSocket - receives all telemetry automatically
+            var broadcaster = context.RequestServices.GetRequiredService<IWsBroadcaster>();
+            var ws = await context.WebSockets.AcceptWebSocketAsync();
+            var clientId = broadcaster.RegisterClient(ws);
+            
+            try
+            {
+                // Keep connection alive and listen for close
+                var buffer = new byte[1024];
+                while (ws.State == System.Net.WebSockets.WebSocketState.Open)
+                {
+                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), context.RequestAborted);
+                    if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close)
+                    {
+                        await ws.CloseAsync(
+                            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+                            "Closing",
+                            CancellationToken.None);
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                broadcaster.UnregisterClient(clientId);
+            }
+        }
+        else
+        {
+            await next();
+        }
     }
     else
     {

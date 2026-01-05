@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>IoT.Backend</RootNamespace>
@@ -26,6 +26,9 @@
     
     <!-- Health Checks -->
     <PackageReference Include="AspNetCore.HealthChecks.MongoDb" Version="8.1.0" />
+    
+    <!-- Image Generation for Radar -->
+    <PackageReference Include="SkiaSharp" Version="3.116.1" />
   </ItemGroup>
 
 </Project>

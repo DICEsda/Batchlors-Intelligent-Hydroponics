@@ -1,48 +1,504 @@
-<div class="placeholder-page">
+<div class="alerts-page">
+  <!-- Header -->
   <header class="page-header">
-    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
-      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
-    </a>
-    <div class="header-content">
-      <h1 class="page-title">Alerts</h1>
-      <p class="page-description">System alerts and notifications</p>
+    <div class="header-left">
+      <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
+        <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
+      </a>
+      <div class="header-content">
+        <div class="title-row">
+          <h1 class="page-title">Alerts</h1>
+          @if (activeCount() > 0) {
+            <span hlmBadge variant="destructive" class="count-badge">
+              {{ activeCount() }} Active
+            </span>
+          }
+          @if (criticalCount() > 0) {
+            <span hlmBadge variant="destructive" class="count-badge critical">
+              {{ criticalCount() }} Critical
+            </span>
+          }
+        </div>
+        <p class="page-description">Monitor and manage system alerts and notifications</p>
+      </div>
     </div>
-    <span hlmBadge variant="secondary">Coming Soon</span>
+    <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="outline" class="mock-badge">Mock Data</span>
+      }
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        (click)="refreshData()"
+        [disabled]="isLoading()"
+      >
+        <ng-icon
+          hlmIcon
+          name="lucideRefreshCw"
+          size="sm"
+          [class.animate-spin]="isLoading()"
+        />
+        <span>Refresh</span>
+      </button>
+    </div>
   </header>
 
-  <div class="placeholder-content">
-    <div class="placeholder-card" hlmCard>
-      <div hlmCardHeader>
-        <ng-icon hlmIcon name="lucideBell" class="placeholder-icon" />
-        <span hlmCardTitle>Alerts Center</span>
-        <span hlmCardDescription>
-          Monitor and manage system alerts
-        </span>
-      </div>
-      <div hlmCardContent>
-        <ul class="feature-list">
-          <li>
-            <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
-            <span>Real-time alert notifications</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideHistory" size="sm" />
-            <span>Alert history and logs</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideFilter" size="sm" />
-            <span>Filter by severity and type</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideCheckCircle" size="sm" />
-            <span>Acknowledge and resolve alerts</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideMail" size="sm" />
-            <span>Email/SMS notification configuration</span>
-          </li>
-        </ul>
-      </div>
+  <!-- Error Banner -->
+  @if (error()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>{{ error() }}</span>
+      <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
     </div>
-  </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading() && alerts().length === 0) {
+    <div class="loading-grid">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div hlmCard class="stat-card">
+          <hlm-skeleton class="stat-skeleton" />
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Main Content -->
+  @if (!isLoading() || alerts().length > 0) {
+    <!-- Statistics Section -->
+    <section class="stats-section">
+      <div class="stats-grid">
+        <!-- Critical Alerts -->
+        <div hlmCard class="stat-card stat-critical">
+          <div class="stat-header">
+            <ng-icon hlmIcon name="lucideAlertCircle" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardTitle class="stat-value">{{ alertStats().bySeverity.critical }}</span>
+              <span hlmCardDescription>Critical</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning Alerts -->
+        <div hlmCard class="stat-card stat-warning">
+          <div class="stat-header">
+            <ng-icon hlmIcon name="lucideAlertTriangle" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardTitle class="stat-value">{{ alertStats().bySeverity.warning }}</span>
+              <span hlmCardDescription>Warning</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Alerts -->
+        <div hlmCard class="stat-card stat-info">
+          <div class="stat-header">
+            <ng-icon hlmIcon name="lucideInfo" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardTitle class="stat-value">{{ alertStats().bySeverity.info }}</span>
+              <span hlmCardDescription>Info</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resolved -->
+        <div hlmCard class="stat-card stat-success">
+          <div class="stat-header">
+            <ng-icon hlmIcon name="lucideCheckCircle" size="lg" class="stat-icon" />
+            <div class="stat-content">
+              <span hlmCardTitle class="stat-value">{{ alertStats().byStatus.resolved }}</span>
+              <span hlmCardDescription>Resolved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters Section -->
+    <section class="filters-section">
+      <div class="filters-header">
+        <button
+          hlmBtn
+          variant="ghost"
+          size="sm"
+          class="filter-toggle"
+          (click)="toggleFilters()"
+        >
+          <ng-icon hlmIcon name="lucideFilter" size="sm" />
+          <span>Filters</span>
+          <ng-icon
+            hlmIcon
+            [name]="showFilters() ? 'lucideChevronUp' : 'lucideChevronDown'"
+            size="sm"
+          />
+        </button>
+        @if (hasActiveFilters()) {
+          <button hlmBtn variant="ghost" size="sm" (click)="clearFilters()">
+            <ng-icon hlmIcon name="lucideX" size="sm" />
+            <span>Clear Filters</span>
+          </button>
+        }
+      </div>
+
+      @if (showFilters()) {
+        <div class="filters-bar">
+          <!-- Search -->
+          <div class="search-container">
+            <ng-icon hlmIcon name="lucideSearch" size="sm" class="search-icon" />
+            <input
+              hlmInput
+              type="text"
+              placeholder="Search alerts..."
+              class="search-input"
+              [value]="searchTerm()"
+              (input)="onSearchChange($event)"
+            />
+          </div>
+
+          <!-- Severity Filter -->
+          <div class="filter-group">
+            <label class="filter-label">Severity</label>
+            <div class="filter-buttons">
+              <button
+                hlmBtn
+                [variant]="filterSeverity() === 'all' ? 'default' : 'outline'"
+                size="sm"
+                (click)="setSeverityFilter('all')"
+              >
+                All
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterSeverity() === 'critical' ? 'destructive' : 'outline'"
+                size="sm"
+                (click)="setSeverityFilter('critical')"
+              >
+                Critical
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterSeverity() === 'warning' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setSeverityFilter('warning')"
+              >
+                Warning
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterSeverity() === 'info' ? 'outline' : 'outline'"
+                size="sm"
+                [class.active-filter]="filterSeverity() === 'info'"
+                (click)="setSeverityFilter('info')"
+              >
+                Info
+              </button>
+            </div>
+          </div>
+
+          <!-- Status Filter -->
+          <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <div class="filter-buttons">
+              <button
+                hlmBtn
+                [variant]="filterStatus() === 'all' ? 'default' : 'outline'"
+                size="sm"
+                (click)="setStatusFilter('all')"
+              >
+                All
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterStatus() === 'active' ? 'destructive' : 'outline'"
+                size="sm"
+                (click)="setStatusFilter('active')"
+              >
+                Active
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterStatus() === 'acknowledged' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setStatusFilter('acknowledged')"
+              >
+                Acknowledged
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterStatus() === 'resolved' ? 'default' : 'outline'"
+                size="sm"
+                (click)="setStatusFilter('resolved')"
+              >
+                Resolved
+              </button>
+            </div>
+          </div>
+
+          <!-- Category Filter -->
+          <div class="filter-group">
+            <label class="filter-label">Category</label>
+            <div class="filter-buttons">
+              <button
+                hlmBtn
+                [variant]="filterCategory() === 'all' ? 'default' : 'outline'"
+                size="sm"
+                (click)="setCategoryFilter('all')"
+              >
+                All
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterCategory() === 'sensor' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setCategoryFilter('sensor')"
+              >
+                <ng-icon hlmIcon name="lucideCpu" size="xs" />
+                Sensor
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterCategory() === 'system' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setCategoryFilter('system')"
+              >
+                <ng-icon hlmIcon name="lucideServer" size="xs" />
+                System
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterCategory() === 'network' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setCategoryFilter('network')"
+              >
+                <ng-icon hlmIcon name="lucideWifi" size="xs" />
+                Network
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterCategory() === 'maintenance' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setCategoryFilter('maintenance')"
+              >
+                <ng-icon hlmIcon name="lucideWrench" size="xs" />
+                Maintenance
+              </button>
+              <button
+                hlmBtn
+                [variant]="filterCategory() === 'security' ? 'secondary' : 'outline'"
+                size="sm"
+                (click)="setCategoryFilter('security')"
+              >
+                <ng-icon hlmIcon name="lucideShield" size="xs" />
+                Security
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </section>
+
+    <!-- Bulk Actions -->
+    @if (activeAlerts().length > 0 || acknowledgedAlerts().length > 0) {
+      <section class="bulk-actions-section">
+        <div class="bulk-actions">
+          @if (activeAlerts().length > 0) {
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              (click)="acknowledgeAllActive()"
+            >
+              <ng-icon hlmIcon name="lucideEye" size="sm" />
+              <span>Acknowledge All Active ({{ activeAlerts().length }})</span>
+            </button>
+          }
+          @if (acknowledgedAlerts().length > 0) {
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              (click)="resolveAllAcknowledged()"
+            >
+              <ng-icon hlmIcon name="lucideCheckCheck" size="sm" />
+              <span>Resolve All Acknowledged ({{ acknowledgedAlerts().length }})</span>
+            </button>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Alerts List -->
+    <section class="alerts-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <ng-icon hlmIcon name="lucideBell" size="sm" class="section-icon" />
+          Alerts
+          <span class="alert-count">({{ filteredAlerts().length }})</span>
+        </h2>
+      </div>
+
+      @if (sortedAlerts().length === 0) {
+        <div class="empty-state">
+          <ng-icon hlmIcon name="lucideBellOff" size="lg" />
+          <h3>No Alerts Found</h3>
+          @if (hasActiveFilters()) {
+            <p>No alerts match your current filters. Try adjusting your search criteria.</p>
+            <button hlmBtn variant="outline" size="sm" (click)="clearFilters()">
+              Clear Filters
+            </button>
+          } @else {
+            <p>All systems are running smoothly. No alerts to display.</p>
+          }
+        </div>
+      } @else {
+        <div class="alerts-list">
+          @for (alert of sortedAlerts(); track trackByAlertId($index, alert)) {
+            <div
+              hlmCard
+              class="alert-card"
+              [class.alert-critical]="alert.severity === 'critical'"
+              [class.alert-warning]="alert.severity === 'warning'"
+              [class.alert-info]="alert.severity === 'info'"
+              [class.alert-resolved]="alert.status === 'resolved'"
+              [class.alert-acknowledged]="alert.status === 'acknowledged'"
+              [class.expanded]="isExpanded(alert._id)"
+              (click)="toggleAlertExpand(alert._id)"
+            >
+              <div class="alert-main">
+                <div class="alert-icon-container">
+                  <ng-icon
+                    hlmIcon
+                    [name]="getSeverityIcon(alert.severity)"
+                    size="default"
+                    class="alert-severity-icon"
+                  />
+                </div>
+
+                <div class="alert-content">
+                  <div class="alert-header">
+                    <div class="alert-title-row">
+                      <h3 class="alert-title">{{ alert.title }}</h3>
+                      <div class="alert-badges">
+                        <span hlmBadge [variant]="getSeverityBadgeVariant(alert.severity)" class="severity-badge">
+                          {{ capitalizeFirst(alert.severity) }}
+                        </span>
+                        <span hlmBadge [variant]="getStatusBadgeVariant(alert.status)" class="status-badge">
+                          {{ capitalizeFirst(alert.status) }}
+                        </span>
+                      </div>
+                    </div>
+                    <p class="alert-message">{{ alert.message }}</p>
+                  </div>
+
+                  <div class="alert-meta">
+                    <div class="meta-item">
+                      <ng-icon hlmIcon [name]="getSourceIcon(alert.source.type)" size="xs" />
+                      <span>{{ alert.source.name }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <ng-icon hlmIcon [name]="getCategoryIcon(alert.category)" size="xs" />
+                      <span>{{ capitalizeFirst(alert.category) }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <ng-icon hlmIcon name="lucideClock" size="xs" />
+                      <span>{{ formatTimeAgo(alert.createdAt) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="alert-actions">
+                  @if (alert.status === 'active') {
+                    <button
+                      hlmBtn
+                      variant="outline"
+                      size="sm"
+                      (click)="acknowledgeAlert(alert._id, $event)"
+                      title="Acknowledge"
+                    >
+                      <ng-icon hlmIcon name="lucideEye" size="sm" />
+                    </button>
+                  }
+                  @if (alert.status === 'active' || alert.status === 'acknowledged') {
+                    <button
+                      hlmBtn
+                      variant="outline"
+                      size="sm"
+                      (click)="resolveAlert(alert._id, $event)"
+                      title="Resolve"
+                    >
+                      <ng-icon hlmIcon name="lucideCheck" size="sm" />
+                    </button>
+                  }
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="sm"
+                    (click)="dismissAlert(alert._id, $event)"
+                    title="Dismiss"
+                  >
+                    <ng-icon hlmIcon name="lucideTrash2" size="sm" />
+                  </button>
+                  <ng-icon
+                    hlmIcon
+                    [name]="isExpanded(alert._id) ? 'lucideChevronUp' : 'lucideChevronDown'"
+                    size="sm"
+                    class="expand-icon"
+                  />
+                </div>
+              </div>
+
+              <!-- Expanded Details -->
+              @if (isExpanded(alert._id)) {
+                <div class="alert-details">
+                  <div class="details-grid">
+                    <div class="detail-item">
+                      <span class="detail-label">Created</span>
+                      <span class="detail-value">{{ formatDate(alert.createdAt) }}</span>
+                    </div>
+                    @if (alert.acknowledgedAt) {
+                      <div class="detail-item">
+                        <span class="detail-label">Acknowledged</span>
+                        <span class="detail-value">
+                          {{ formatDate(alert.acknowledgedAt) }}
+                          @if (alert.acknowledgedBy) {
+                            <span class="detail-by">by {{ alert.acknowledgedBy }}</span>
+                          }
+                        </span>
+                      </div>
+                    }
+                    @if (alert.resolvedAt) {
+                      <div class="detail-item">
+                        <span class="detail-label">Resolved</span>
+                        <span class="detail-value">
+                          {{ formatDate(alert.resolvedAt) }}
+                          @if (alert.resolvedBy) {
+                            <span class="detail-by">by {{ alert.resolvedBy }}</span>
+                          }
+                        </span>
+                      </div>
+                    }
+                    <div class="detail-item">
+                      <span class="detail-label">Source ID</span>
+                      <span class="detail-value monospace">{{ alert.source.id }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label">Alert ID</span>
+                      <span class="detail-value monospace">{{ alert._id }}</span>
+                    </div>
+                  </div>
+                  @if (alert.metadata) {
+                    <div class="metadata-section">
+                      <span class="detail-label">Additional Data</span>
+                      <pre class="metadata-content">{{ alert.metadata | json }}</pre>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
 </div>

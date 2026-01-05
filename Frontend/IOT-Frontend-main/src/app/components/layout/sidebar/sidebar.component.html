@@ -6,8 +6,8 @@
         <ng-icon name="lucideCommand" size="20" />
       </div>
       <div class="logo-text">
-        <span class="company-name">HydroFarm</span>
-        <span class="company-tier">Enterprise</span>
+        <span class="company-name">SmartTile</span>
+        <span class="company-tier">IoT System</span>
       </div>
     </div>
   </div>
@@ -115,7 +115,7 @@
         <div class="status-indicator" [class.online]="onlineCoordinators() > 0" [class.offline]="onlineCoordinators() === 0">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideServer" size="16" />
+        <ng-icon name="lucideCpu" size="16" />
         <span class="status-label">Coordinators</span>
         <span class="status-value" [class.online]="onlineCoordinators() > 0">
           {{ onlineCoordinators() }}/{{ totalCoordinators() }}
@@ -127,7 +127,7 @@
         <div class="status-indicator" [class.online]="onlineNodes() > 0" [class.offline]="onlineNodes() === 0">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideFlower2" size="16" />
+        <ng-icon name="lucideLightbulb" size="16" />
         <span class="status-label">Nodes</span>
         <span class="status-value" [class.online]="onlineNodes() > 0">
           {{ onlineNodes() }}/{{ totalNodes() }}

@@ -20,7 +20,7 @@ public class WsMessage
 /// Manages WebSocket connections and bridges MQTT messages to connected clients.
 /// Clients can subscribe to MQTT topics via WebSocket messages.
 /// </summary>
-public class MqttBridgeHandler
+public class MqttBridgeHandler : IMqttBridgeHandler
 {
     private readonly IMqttService _mqtt;
     private readonly ILogger<MqttBridgeHandler> _logger;

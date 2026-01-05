@@ -4,37 +4,37 @@ namespace IoT.Backend.Repositories;
 
 /// <summary>
 /// Repository interface for IoT data access operations.
-/// Matches the Go backend contract exactly.
+/// Supports both legacy smart tile system and new hydroponic system.
 /// </summary>
 public interface IRepository
 {
-    // Coordinator operations
+    /// <summary>
+    /// Checks if the database connection is healthy.
+    /// </summary>
+    Task<bool> CheckConnectionAsync(CancellationToken ct = default);
+
+    // Coordinator operations (also serves as reservoir in hydroponic system)
     Task<Coordinator?> GetCoordinatorByIdAsync(string id, CancellationToken ct = default);
     Task<Coordinator?> GetCoordinatorBySiteAndIdAsync(string siteId, string coordId, CancellationToken ct = default);
+    Task<Coordinator?> GetCoordinatorByFarmAndIdAsync(string farmId, string coordId, CancellationToken ct = default);
+    Task<IReadOnlyList<Coordinator>> GetCoordinatorsByFarmAsync(string farmId, CancellationToken ct = default);
     Task UpsertCoordinatorAsync(Coordinator coordinator, CancellationToken ct = default);
 
-    // Node operations
-    Task<Node?> GetNodeByIdAsync(string id, CancellationToken ct = default);
-    Task<IReadOnlyList<Node>> GetNodesByCoordinatorAsync(string siteId, string coordId, CancellationToken ct = default);
-    Task UpsertNodeAsync(Node node, CancellationToken ct = default);
-    Task DeleteNodeAsync(string siteId, string coordId, string nodeId, CancellationToken ct = default);
-    Task UpdateNodeZoneAsync(string siteId, string coordId, string nodeId, string zoneId, CancellationToken ct = default);
-    Task UpdateNodeNameAsync(string siteId, string coordId, string nodeId, string name, CancellationToken ct = default);
-
-    // mmWave operations
-    Task InsertMmwaveFrameAsync(MmwaveFrame frame, CancellationToken ct = default);
-    Task<IReadOnlyList<MmwaveFrame>> GetMmwaveFramesAsync(string siteId, string coordinatorId, int limit, CancellationToken ct = default);
+    // Tower operations (hydroponic system)
+    Task<Tower?> GetTowerByIdAsync(string towerId, CancellationToken ct = default);
+    Task<Tower?> GetTowerByFarmCoordAndIdAsync(string farmId, string coordId, string towerId, CancellationToken ct = default);
+    Task<IReadOnlyList<Tower>> GetTowersByCoordinatorAsync(string farmId, string coordId, CancellationToken ct = default);
+    Task<IReadOnlyList<Tower>> GetTowersByFarmAsync(string farmId, CancellationToken ct = default);
+    Task UpsertTowerAsync(Tower tower, CancellationToken ct = default);
+    Task DeleteTowerAsync(string farmId, string coordId, string towerId, CancellationToken ct = default);
+    Task UpdateTowerNameAsync(string farmId, string coordId, string towerId, string name, CancellationToken ct = default);
 
     // OTA operations
     Task<OtaJob?> GetOtaJobByIdAsync(string id, CancellationToken ct = default);
+    Task<IReadOnlyList<OtaJob>> GetOtaJobsAsync(string? farmId = null, int limit = 50, CancellationToken ct = default);
     Task CreateOtaJobAsync(OtaJob job, CancellationToken ct = default);
+    Task UpdateOtaJobAsync(OtaJob job, CancellationToken ct = default);
     Task UpdateOtaJobStatusAsync(string id, string status, CancellationToken ct = default);
-
-    // Site operations
-    Task<IReadOnlyList<Site>> GetSitesAsync(CancellationToken ct = default);
-    Task<Site?> GetSiteByIdAsync(string id, CancellationToken ct = default);
-    Task CreateSiteAsync(Site site, CancellationToken ct = default);
-    Task UpsertSiteAsync(Site site, CancellationToken ct = default);
 
     // Settings operations
     Task<Settings?> GetSettingsAsync(string siteId, CancellationToken ct = default);
@@ -47,4 +47,19 @@ public interface IRepository
     Task<Zone?> GetZoneByCoordinatorAsync(string siteId, string coordinatorId, CancellationToken ct = default);
     Task DeleteZoneAsync(string zoneId, CancellationToken ct = default);
     Task UpdateZoneAsync(Zone zone, CancellationToken ct = default);
+
+    // Reservoir telemetry operations (hydroponic system)
+    Task InsertReservoirTelemetryAsync(ReservoirTelemetry telemetry, CancellationToken ct = default);
+    Task<IReadOnlyList<ReservoirTelemetry>> GetReservoirTelemetryAsync(string farmId, string coordId, DateTime from, DateTime to, int limit = 1000, CancellationToken ct = default);
+    Task<ReservoirTelemetry?> GetLatestReservoirTelemetryAsync(string farmId, string coordId, CancellationToken ct = default);
+
+    // Tower telemetry operations (hydroponic system)
+    Task InsertTowerTelemetryAsync(TowerTelemetry telemetry, CancellationToken ct = default);
+    Task<IReadOnlyList<TowerTelemetry>> GetTowerTelemetryAsync(string farmId, string coordId, string towerId, DateTime from, DateTime to, int limit = 1000, CancellationToken ct = default);
+    Task<TowerTelemetry?> GetLatestTowerTelemetryAsync(string farmId, string coordId, string towerId, CancellationToken ct = default);
+
+    // Height measurement operations (hydroponic system)
+    Task InsertHeightMeasurementAsync(HeightMeasurement measurement, CancellationToken ct = default);
+    Task<IReadOnlyList<HeightMeasurement>> GetHeightMeasurementsAsync(string farmId, string towerId, int? slotIndex = null, DateTime? from = null, DateTime? to = null, int limit = 500, CancellationToken ct = default);
+    Task<IReadOnlyList<HeightMeasurement>> GetLatestHeightMeasurementsByTowerAsync(string farmId, string towerId, CancellationToken ct = default);
 }

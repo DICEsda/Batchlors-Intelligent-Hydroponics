@@ -2,7 +2,7 @@
   <!-- Dashboard Cards - Top Row (3 cards) -->
   <section class="dashboard-grid">
     <div class="top-row">
-      <!-- Card 1 -->
+      <!-- Card 1: Reservoirs -->
       <div class="dashboard-card">
         <div class="card-inner">
           @if (loading()) {
@@ -13,21 +13,27 @@
                 <div class="stat-icon coordinators">
                   <ng-icon hlmIcon name="lucideServer" size="lg" />
                 </div>
-                <span hlmBadge variant="outline" class="status-badge">Live</span>
+                <span hlmBadge variant="outline" class="status-badge">
+                  @if (usingMockData()) {
+                    Mock
+                  } @else {
+                    Live
+                  }
+                </span>
               </div>
               <div class="stat-info">
-                <span class="stat-label">Coordinators</span>
+                <span class="stat-label">Reservoirs</span>
                 <span class="stat-value">
-                  {{ farmStats().coordinators.online }} / {{ farmStats().coordinators.total }}
+                  {{ systemStats().coordinators.online }} / {{ systemStats().coordinators.total }}
                 </span>
-                <span class="stat-description">Active systems</span>
+                <span class="stat-description">Active controllers</span>
               </div>
             </div>
           }
         </div>
       </div>
 
-      <!-- Card 2 -->
+      <!-- Card 2: Towers -->
       <div class="dashboard-card">
         <div class="card-inner">
           @if (loading()) {
@@ -36,34 +42,42 @@
             <div class="card-content">
               <div class="card-header-section">
                 <div class="stat-icon towers">
-                  <ng-icon hlmIcon name="lucideFlower2" size="lg" />
+                  <ng-icon hlmIcon name="lucideLayoutGrid" size="lg" />
                 </div>
                 <span hlmBadge variant="outline" class="status-badge">Active</span>
               </div>
               <div class="stat-info">
                 <span class="stat-label">Towers</span>
                 <span class="stat-value">
-                  {{ farmStats().towers.online }} / {{ farmStats().towers.total }}
+                  {{ systemStats().nodes.online }} / {{ systemStats().nodes.total }}
                 </span>
-                <span class="stat-description">Connected towers</span>
+                <span class="stat-description">
+                  @if (systemStats().nodes.pairing > 0) {
+                    {{ systemStats().nodes.pairing }} pairing
+                  } @else if (systemStats().nodes.lowBattery > 0) {
+                    {{ systemStats().nodes.lowBattery }} low battery
+                  } @else {
+                    Connected towers
+                  }
+                </span>
               </div>
             </div>
           }
         </div>
       </div>
 
-      <!-- Card 3 -->
-      <div class="dashboard-card" [class.has-alerts]="farmStats().alerts.critical > 0">
+      <!-- Card 3: Alerts -->
+      <div class="dashboard-card" [class.has-alerts]="systemStats().alerts.critical > 0">
         <div class="card-inner">
           @if (loading()) {
             <hlm-skeleton class="full-skeleton" />
           } @else {
             <div class="card-content">
               <div class="card-header-section">
-                <div class="stat-icon alerts" [class.critical]="farmStats().alerts.critical > 0">
+                <div class="stat-icon alerts" [class.critical]="systemStats().alerts.critical > 0">
                   <ng-icon hlmIcon name="lucideAlertTriangle" size="lg" />
                 </div>
-                @if (farmStats().alerts.critical > 0) {
+                @if (systemStats().alerts.critical > 0) {
                   <span hlmBadge variant="destructive" class="status-badge">Critical</span>
                 } @else {
                   <span hlmBadge variant="outline" class="status-badge">OK</span>
@@ -71,10 +85,10 @@
               </div>
               <div class="stat-info">
                 <span class="stat-label">Alerts</span>
-                <span class="stat-value">{{ farmStats().alerts.total }}</span>
+                <span class="stat-value">{{ systemStats().alerts.total }}</span>
                 <span class="stat-description">
-                  @if (farmStats().alerts.critical > 0) {
-                    {{ farmStats().alerts.critical }} critical
+                  @if (systemStats().alerts.critical > 0) {
+                    {{ systemStats().alerts.critical }} critical
                   } @else {
                     All systems normal
                   }
@@ -94,10 +108,16 @@
             <hlm-skeleton class="full-skeleton" />
           } @else {
             <div class="large-card-content">
-              <!-- Coordinators Section -->
+              <!-- Header Section -->
               <div class="section-header">
-                <h3 class="section-title">Farm Overview</h3>
+                <h3 class="section-title">Smart Tile System Overview</h3>
                 <div class="section-actions">
+                  @if (usingMockData()) {
+                    <span hlmBadge variant="secondary" class="connection-badge">
+                      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+                      Demo Mode
+                    </span>
+                  }
                   <span
                     hlmBadge
                     [variant]="wsConnected() ? 'default' : 'destructive'"
@@ -125,11 +145,11 @@
                 </div>
               }
 
-              @if (coordinators().length === 0 && towers().length === 0) {
+              @if (coordinators().length === 0 && nodes().length === 0) {
                 <div class="empty-state">
                   <ng-icon hlmIcon name="lucideServer" size="xl" />
                   <h3>No Devices Found</h3>
-                  <p>Add coordinators and towers to start monitoring your hydroponic system.</p>
+                  <p>Add reservoirs and towers to start monitoring your hydroponic system.</p>
                   <button hlmBtn variant="default">
                     <ng-icon hlmIcon name="lucidePlus" size="sm" />
                     Add Device
@@ -137,16 +157,20 @@
                 </div>
               } @else {
                 <div class="devices-overview">
-                  <!-- Coordinators List -->
+                  <!-- Reservoirs List -->
                   @if (coordinators().length > 0) {
                     <div class="device-section">
-                      <h4 class="device-section-title">Coordinators</h4>
+                      <h4 class="device-section-title">Reservoirs</h4>
                       <div class="device-list">
                         @for (coord of coordinators(); track trackByCoordinatorId($index, coord)) {
-                          <a [routerLink]="['/coordinators', coord.coordId]" class="device-item">
+                          <a [routerLink]="['/reservoirs', coord.coord_id]" class="device-item">
                             <div class="device-info">
-                              <span class="device-name">{{ coord.name }}</span>
-                              <span class="device-meta">{{ coord.towerCount }} towers</span>
+                              <span class="device-name">{{ coord.name || coord.coord_id }}</span>
+                              <span class="device-meta">
+                                {{ coord.nodes_online || 0 }} nodes |
+                                {{ coord.light_lux || 0 }} lux |
+                                {{ coord.temp_c !== undefined ? coord.temp_c.toFixed(1) : '--' }}°C
+                              </span>
                             </div>
                             <span hlmBadge [variant]="getStatusBadgeVariant(coord.status)" size="sm">
                               {{ coord.status }}
@@ -158,24 +182,55 @@
                   }
 
                   <!-- Towers List -->
-                  @if (towers().length > 0) {
+                  @if (nodes().length > 0) {
                     <div class="device-section">
                       <h4 class="device-section-title">Towers</h4>
                       <div class="device-list">
-                        @for (tower of towers().slice(0, 6); track trackByTowerId($index, tower)) {
-                          <a [routerLink]="['/towers', tower.towerId]" class="device-item">
+                        @for (node of nodes().slice(0, 6); track trackByNodeId($index, node)) {
+                          <a [routerLink]="['/towers', node._id]" class="device-item">
                             <div class="device-info">
-                              <span class="device-name">{{ tower.name }}</span>
-                              <span class="device-meta">{{ tower.occupiedSlots }}/{{ tower.slotCount }} slots</span>
+                              <span class="device-name">{{ node.name || node.light_id }}</span>
+                              <span class="device-meta">
+                                {{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C |
+                                {{ node.vbat_mv || '--' }} mV |
+                                {{ formatLastSeen(node.last_seen) }}
+                              </span>
                             </div>
-                            <span hlmBadge [variant]="getStatusBadgeVariant(tower.status)" size="sm">
-                              {{ tower.status }}
+                            <span hlmBadge [variant]="getStatusBadgeVariant(node.status_mode)" size="sm">
+                              {{ getNodeStatusDisplay(node.status_mode) }}
                             </span>
                           </a>
                         }
-                        @if (towers().length > 6) {
-                          <a routerLink="/overview" class="view-all-link">
-                            View all {{ towers().length }} towers
+                        @if (nodes().length > 6) {
+                          <a routerLink="/towers" class="view-all-link">
+                            View all {{ nodes().length }} towers
+                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+                          </a>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Zones Summary -->
+                  @if (zones().length > 0) {
+                    <div class="device-section">
+                      <h4 class="device-section-title">Zones</h4>
+                      <div class="device-list">
+                        @for (zone of zones().slice(0, 4); track zone._id) {
+                          <a [routerLink]="['/zones', zone._id]" class="device-item">
+                            <div class="device-info">
+                              <span class="device-name">{{ zone.name }}</span>
+                              <span class="device-meta">
+                                <ng-icon hlmIcon name="lucideMapPin" size="sm" />
+                                {{ zone.site_id ? 'Site configured' : 'No site' }}
+                              </span>
+                            </div>
+                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+                          </a>
+                        }
+                        @if (zones().length > 4) {
+                          <a routerLink="/zones" class="view-all-link">
+                            View all {{ zones().length }} zones
                             <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
                           </a>
                         }
@@ -195,7 +250,7 @@
                         <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
                         <div class="alert-info">
                           <span class="alert-message">{{ alert.message }}</span>
-                          <span class="alert-meta">{{ alert.deviceName }} - {{ formatTimestamp(alert.createdAt) }}</span>
+                          <span class="alert-meta">{{ alert.source.name }} - {{ formatTimestamp(alert.createdAt) }}</span>
                         </div>
                         <span hlmBadge [variant]="getAlertBadgeVariant(alert.severity)" size="sm">
                           {{ alert.severity }}

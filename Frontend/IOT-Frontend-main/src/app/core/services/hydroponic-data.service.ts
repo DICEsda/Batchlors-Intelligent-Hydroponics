@@ -1,401 +1,212 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { interval, switchMap, tap, catchError, of, Subject, takeUntil } from 'rxjs';
-import { ApiService } from './api.service';
+import { Subject } from 'rxjs';
+import { IoTDataService } from './iot-data.service';
 import {
   Coordinator,
   CoordinatorSummary,
-  Tower,
-  TowerSummary,
-  ReservoirTelemetry,
-  TowerTelemetry,
-  FarmMetrics,
+  Node,
+  NodeSummary,
+  NodeTelemetry,
+  Zone,
   Alert,
   HealthStatus,
 } from '../models';
 
 /**
  * Hydroponic Data Service
- * Centralized state management using Angular signals
- * Provides reactive data access and automatic refresh
+ * @deprecated Use IoTDataService instead. This service is kept for backward compatibility.
+ * 
+ * This is a thin wrapper around IoTDataService that provides the old API
+ * for components that haven't been migrated yet.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class HydroponicDataService {
-  private readonly api = inject(ApiService);
+  private readonly iotService = inject(IoTDataService);
   private readonly destroy$ = new Subject<void>();
 
   // ============================================================================
-  // State Signals
+  // State Signals - Delegated to IoTDataService
   // ============================================================================
 
   // Loading states
-  readonly isLoading = signal(false);
-  readonly error = signal<string | null>(null);
+  readonly isLoading = this.iotService.isLoading;
+  readonly error = this.iotService.error;
 
   // Health
-  readonly healthStatus = signal<HealthStatus | null>(null);
-  
-  // Farm metrics
-  readonly farmMetrics = signal<FarmMetrics | null>(null);
+  readonly healthStatus = this.iotService.healthStatus;
 
-  // Coordinators
-  readonly coordinators = signal<CoordinatorSummary[]>([]);
-  readonly selectedCoordinator = signal<Coordinator | null>(null);
-  readonly coordinatorTelemetry = signal<Map<string, ReservoirTelemetry>>(new Map());
+  // Coordinators - mapped from IoTDataService
+  readonly coordinators = this.iotService.coordinators;
+  readonly selectedCoordinator = this.iotService.selectedCoordinator;
 
-  // Towers
-  readonly towers = signal<TowerSummary[]>([]);
-  readonly selectedTower = signal<Tower | null>(null);
-  readonly towerTelemetry = signal<Map<string, TowerTelemetry>>(new Map());
+  // Towers/Nodes - mapped for backward compatibility
+  /** @deprecated Use nodes from IoTDataService */
+  readonly towers = this.iotService.nodes;
+  /** @deprecated Use selectedNode from IoTDataService */
+  readonly selectedTower = this.iotService.selectedNode;
+
+  // For legacy code expecting TowerSummary with certain fields
+  readonly towerSummaries = computed(() => {
+    return this.iotService.nodes().map(n => ({
+      _id: n._id,
+      towerId: n.light_id,
+      name: n.name || `Node ${n.light_id}`,
+      coordId: n.coordinator_id,
+      status: this.mapNodeStatusToTowerStatus(n.status_mode),
+      occupiedSlots: 0,
+      slotCount: 0,
+      sensors: {
+        ambientTemp: n.temp_c ?? 0,
+        humidity: 0,
+        lightLevel: 0,
+      }
+    }));
+  });
+
+  // Telemetry - simplified versions for backward compat
+  readonly coordinatorTelemetry = signal<Map<string, any>>(new Map());
+  readonly towerTelemetry = signal<Map<string, any>>(new Map());
 
   // Alerts
-  readonly alerts = signal<Alert[]>([]);
-  readonly unacknowledgedAlertCount = computed(() => 
-    this.alerts().filter(a => !a.acknowledged).length
-  );
-  readonly criticalAlertCount = computed(() =>
-    this.alerts().filter(a => a.severity === 'critical' && !a.acknowledged).length
-  );
-  
-  // Active alerts (unacknowledged) - alias for backward compatibility
-  readonly activeAlerts = computed(() =>
-    this.alerts().filter(a => !a.acknowledged)
-  );
-  
-  // Loading alias for backward compatibility
+  readonly alerts = this.iotService.alerts;
+  readonly unacknowledgedAlertCount = this.iotService.unacknowledgedAlertCount;
+  readonly criticalAlertCount = this.iotService.criticalAlertCount;
+  readonly activeAlerts = this.iotService.activeAlerts;
+
+  // Loading alias
   readonly loading = this.isLoading;
+
+  // Farm metrics (stub for backward compat)
+  readonly farmMetrics = signal<any>(null);
 
   // ============================================================================
   // Computed Signals
   // ============================================================================
 
-  readonly onlineCoordinatorCount = computed(() => 
-    this.coordinators().filter(c => c.status === 'online').length
-  );
+  readonly onlineCoordinatorCount = this.iotService.onlineCoordinatorCount;
+  readonly totalCoordinatorCount = this.iotService.totalCoordinatorCount;
+  readonly onlineTowerCount = this.iotService.onlineNodeCount;
+  readonly totalTowerCount = this.iotService.totalNodeCount;
 
-  readonly totalCoordinatorCount = computed(() => 
-    this.coordinators().length
-  );
+  readonly totalOccupiedSlots = computed(() => 0);
+  readonly totalSlots = computed(() => 0);
 
-  readonly onlineTowerCount = computed(() => 
-    this.towers().filter(t => t.status === 'online').length
-  );
-
-  readonly totalTowerCount = computed(() => 
-    this.towers().length
-  );
-
-  readonly totalOccupiedSlots = computed(() =>
-    this.towers().reduce((sum, t) => sum + t.occupiedSlots, 0)
-  );
-
-  readonly totalSlots = computed(() =>
-    this.towers().reduce((sum, t) => sum + t.slotCount, 0)
-  );
-
-  readonly averagePh = computed(() => {
-    const coords = this.coordinators();
-    if (coords.length === 0) return 0;
-    return coords.reduce((sum, c) => sum + c.reservoir.ph, 0) / coords.length;
-  });
-
-  readonly averageEc = computed(() => {
-    const coords = this.coordinators();
-    if (coords.length === 0) return 0;
-    return coords.reduce((sum, c) => sum + c.reservoir.ec, 0) / coords.length;
-  });
+  readonly averagePh = computed(() => 0);
+  readonly averageEc = computed(() => 0);
 
   // ============================================================================
-  // Data Loading Methods
+  // Data Loading Methods - Delegated to IoTDataService
   // ============================================================================
 
-  /**
-   * Load initial data for the dashboard
-   */
   async loadDashboardData(): Promise<void> {
-    this.isLoading.set(true);
-    this.error.set(null);
-
-    try {
-      await Promise.all([
-        this.loadCoordinators(),
-        this.loadTowers(),
-        this.loadFarmMetrics(),
-        this.loadAlerts(),
-      ]);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load dashboard data');
-    } finally {
-      this.isLoading.set(false);
-    }
+    return this.iotService.loadDashboardData();
   }
 
-  /**
-   * Load all coordinators
-   */
   loadCoordinators(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.api.getCoordinators().subscribe({
-        next: (data) => {
-          this.coordinators.set(data);
-          resolve();
-        },
-        error: (err) => {
-          console.error('Failed to load coordinators:', err);
-          reject(err);
-        }
-      });
-    });
+    return this.iotService.loadCoordinators();
   }
 
-  /**
-   * Load coordinator details
-   */
   loadCoordinator(coordId: string): Promise<Coordinator> {
-    return new Promise((resolve, reject) => {
-      this.api.getCoordinator(coordId).subscribe({
-        next: (data) => {
-          this.selectedCoordinator.set(data);
-          resolve(data);
-        },
-        error: (err) => {
-          console.error('Failed to load coordinator:', err);
-          reject(err);
-        }
-      });
-    });
+    return this.iotService.loadCoordinatorById(coordId);
   }
 
-  /**
-   * Load coordinator details by ID (alias for loadCoordinator)
-   */
   loadCoordinatorById(coordId: string): Promise<Coordinator> {
-    return this.loadCoordinator(coordId);
+    return this.iotService.loadCoordinatorById(coordId);
   }
 
-  /**
-   * Clear selected coordinator
-   */
   clearSelectedCoordinator(): void {
-    this.selectedCoordinator.set(null);
+    this.iotService.clearSelectedCoordinator();
   }
 
-  /**
-   * Load all towers
-   */
+  /** @deprecated Use loadNodes from IoTDataService */
   loadTowers(coordId?: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.api.getTowers(coordId).subscribe({
-        next: (data) => {
-          this.towers.set(data);
-          resolve();
-        },
-        error: (err) => {
-          console.error('Failed to load towers:', err);
-          reject(err);
-        }
-      });
-    });
+    return this.iotService.loadTowers(coordId);
   }
 
-  /**
-   * Load tower details
-   */
-  loadTower(towerId: string): Promise<Tower> {
-    return new Promise((resolve, reject) => {
-      this.api.getTower(towerId).subscribe({
-        next: (data) => {
-          this.selectedTower.set(data);
-          resolve(data);
-        },
-        error: (err) => {
-          console.error('Failed to load tower:', err);
-          reject(err);
-        }
-      });
-    });
+  /** @deprecated Use loadNode from IoTDataService */
+  loadTower(towerId: string): Promise<Node> {
+    return this.iotService.loadTower(towerId);
   }
 
-  /**
-   * Load farm-wide metrics
-   */
   loadFarmMetrics(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.api.getFarmMetrics().subscribe({
-        next: (data) => {
-          this.farmMetrics.set(data);
-          resolve();
-        },
-        error: (err) => {
-          console.error('Failed to load farm metrics:', err);
-          reject(err);
-        }
-      });
-    });
+    // No-op for backward compat - Smart Tile system doesn't have farm metrics
+    return Promise.resolve();
   }
 
-  /**
-   * Load alerts
-   */
   loadAlerts(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.api.getAlerts({ page: 1, pageSize: 50 }).subscribe({
-        next: (data) => {
-          this.alerts.set(data.items);
-          resolve();
-        },
-        error: (err) => {
-          console.error('Failed to load alerts:', err);
-          reject(err);
-        }
-      });
-    });
+    return this.iotService.loadAlerts();
   }
 
-  /**
-   * Load active (unacknowledged) alerts - alias for loadAlerts
-   */
   loadActiveAlerts(): Promise<void> {
-    return this.loadAlerts();
+    return this.iotService.loadActiveAlerts();
   }
 
-  /**
-   * Check backend health
-   */
   checkHealth(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.api.getHealth().subscribe({
-        next: (data) => {
-          this.healthStatus.set(data);
-          resolve();
-        },
-        error: (err) => {
-          this.healthStatus.set(null);
-          reject(err);
-        }
-      });
-    });
+    return this.iotService.checkHealth();
   }
 
   // ============================================================================
-  // Auto-Refresh
+  // Auto-Refresh - Delegated
   // ============================================================================
 
-  private refreshInterval$ = interval(30000); // 30 seconds
-
-  /**
-   * Start auto-refresh of dashboard data
-   */
   startAutoRefresh(): void {
-    this.refreshInterval$.pipe(
-      takeUntil(this.destroy$),
-      switchMap(() => this.api.getCoordinators()),
-      tap(data => this.coordinators.set(data)),
-      switchMap(() => this.api.getTowers()),
-      tap(data => this.towers.set(data)),
-      switchMap(() => this.api.getAlerts({ page: 1, pageSize: 50 })),
-      tap(data => this.alerts.set(data.items)),
-      catchError(err => {
-        console.error('Auto-refresh failed:', err);
-        return of(null);
-      })
-    ).subscribe();
+    this.iotService.startAutoRefresh();
   }
 
-  /**
-   * Stop auto-refresh
-   */
   stopAutoRefresh(): void {
-    this.destroy$.next();
+    this.iotService.stopAutoRefresh();
   }
 
   // ============================================================================
-  // Telemetry Updates (called from WebSocket service)
+  // Telemetry Updates - Adapted for legacy interfaces
   // ============================================================================
 
-  /**
-   * Update coordinator telemetry from WebSocket
-   */
-  updateCoordinatorTelemetry(telemetry: ReservoirTelemetry): void {
-    const current = this.coordinatorTelemetry();
-    const updated = new Map(current);
-    updated.set(telemetry.coordId, telemetry);
-    this.coordinatorTelemetry.set(updated);
-
-    // Update coordinator summary if exists
-    const coords = this.coordinators();
-    const idx = coords.findIndex(c => c.coordId === telemetry.coordId);
-    if (idx !== -1) {
-      const updated = [...coords];
-      updated[idx] = {
-        ...updated[idx],
-        reservoir: {
-          ph: telemetry.ph,
-          ec: telemetry.ec,
-          temperature: telemetry.temperature,
-          waterLevel: telemetry.waterLevel,
-        }
-      };
-      this.coordinators.set(updated);
+  updateCoordinatorTelemetry(telemetry: any): void {
+    const coordId = telemetry.coordId || telemetry.coord_id;
+    if (coordId) {
+      this.iotService.updateCoordinatorTelemetry(coordId, telemetry);
     }
   }
 
-  /**
-   * Update tower telemetry from WebSocket
-   */
-  updateTowerTelemetry(telemetry: TowerTelemetry): void {
-    const current = this.towerTelemetry();
-    const updated = new Map(current);
-    updated.set(telemetry.towerId, telemetry);
-    this.towerTelemetry.set(updated);
-
-    // Update tower summary if exists
-    const twrs = this.towers();
-    const idx = twrs.findIndex(t => t.towerId === telemetry.towerId);
-    if (idx !== -1) {
-      const updated = [...twrs];
-      updated[idx] = {
-        ...updated[idx],
-        sensors: {
-          ambientTemp: telemetry.ambientTemp,
-          humidity: telemetry.humidity,
-          lightLevel: telemetry.lightLevel,
-        }
-      };
-      this.towers.set(updated);
+  updateTowerTelemetry(telemetry: any): void {
+    const nodeId = telemetry.towerId || telemetry.node_id;
+    if (nodeId) {
+      this.iotService.updateNodeTelemetry({
+        node_id: nodeId,
+        light_id: nodeId,
+        temp_c: telemetry.ambientTemp ?? telemetry.temp_c ?? 0,
+        vbat_mv: telemetry.vbat_mv ?? 0,
+        avg_r: telemetry.rssi_dbm ?? telemetry.avg_r ?? 0,
+        rssi_dbm: telemetry.rssi_dbm ?? 0,
+        light_lux: telemetry.lightLevel ?? telemetry.light_lux ?? 0,
+        timestamp: telemetry.timestamp || new Date(),
+        status_mode: telemetry.status_mode || 'operational',
+      });
     }
   }
 
-  /**
-   * Add new alert from WebSocket
-   */
   addAlert(alert: Alert): void {
-    const current = this.alerts();
-    this.alerts.set([alert, ...current]);
+    this.iotService.addAlert(alert);
   }
 
-  /**
-   * Update device status from WebSocket
-   */
   updateDeviceStatus(deviceType: 'coordinator' | 'tower', deviceId: string, status: string): void {
-    if (deviceType === 'coordinator') {
-      const coords = this.coordinators();
-      const idx = coords.findIndex(c => c.coordId === deviceId);
-      if (idx !== -1) {
-        const updated = [...coords];
-        updated[idx] = { ...updated[idx], status: status as any };
-        this.coordinators.set(updated);
-      }
-    } else {
-      const twrs = this.towers();
-      const idx = twrs.findIndex(t => t.towerId === deviceId);
-      if (idx !== -1) {
-        const updated = [...twrs];
-        updated[idx] = { ...updated[idx], status: status as any };
-        this.towers.set(updated);
-      }
+    const mappedType = deviceType === 'tower' ? 'node' : deviceType;
+    this.iotService.updateDeviceStatus(mappedType, deviceId, status);
+  }
+
+  // ============================================================================
+  // Helper Methods
+  // ============================================================================
+
+  private mapNodeStatusToTowerStatus(nodeStatus: string): string {
+    switch (nodeStatus) {
+      case 'operational': return 'online';
+      case 'pairing': return 'pairing';
+      case 'error': return 'error';
+      case 'offline': return 'offline';
+      default: return 'unknown';
     }
   }
 

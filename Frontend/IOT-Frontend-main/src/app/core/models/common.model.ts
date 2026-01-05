@@ -57,6 +57,8 @@ export interface HealthStatus {
 export type WSMessageType = 
   | 'reservoir_telemetry'
   | 'tower_telemetry'
+  | 'node_telemetry'
+  | 'coord_telemetry'
   | 'device_status'
   | 'alert'
   | 'ota_progress'
@@ -67,7 +69,13 @@ export type WSMessageType =
   | 'unsubscribed'
   | 'heartbeat'
   | 'digital_twin_update'
-  | 'pong';
+  | 'pong'
+  // Pairing events
+  | 'pairing_started'
+  | 'pairing_stopped'
+  | 'node_discovered'
+  | 'node_paired'
+  | 'pairing_timeout';
 
 export interface WSMessage<T = unknown> {
   type: WSMessageType;
@@ -94,6 +102,77 @@ export interface WSOtaProgressPayload {
 export interface WSCommandAckPayload {
   commandId: string;
   success: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// Pairing WebSocket Message Payloads
+// ============================================================================
+
+/**
+ * Payload for pairing_started event - sent when coordinator enters pairing mode
+ */
+export interface WSPairingStartedPayload {
+  coordinatorId: string;
+  siteId: string;
+  durationMs: number;
+  startedAt: string;
+}
+
+/**
+ * Payload for pairing_stopped event - sent when pairing mode ends
+ */
+export interface WSPairingStoppedPayload {
+  coordinatorId: string;
+  siteId: string;
+  reason: 'timeout' | 'cancelled' | 'completed';
+  nodesDiscovered: number;
+  nodesPaired: number;
+}
+
+/**
+ * Payload for node_discovered event - sent when a new node is found during pairing
+ */
+export interface WSNodeDiscoveredPayload {
+  coordinatorId: string;
+  nodeId: string;
+  macAddress: string;
+  rssi: number;
+  discoveredAt: string;
+  firmwareVersion?: string;
+}
+
+/**
+ * Payload for node_paired event - sent when a discovered node is approved and paired
+ */
+export interface WSNodePairedPayload {
+  coordinatorId: string;
+  nodeId: string;
+  macAddress: string;
+  assignedName?: string;
+  pairedAt: string;
+}
+
+/**
+ * Payload for pairing_timeout event - sent when pairing times out
+ */
+export interface WSPairingTimeoutPayload {
+  coordinatorId: string;
+  siteId: string;
+  nodesDiscovered: number;
+  nodesPaired: number;
+}
+
+/**
+ * Discovered node during pairing (for UI state)
+ */
+export interface DiscoveredNode {
+  nodeId: string;
+  macAddress: string;
+  rssi: number;
+  discoveredAt: Date;
+  firmwareVersion?: string;
+  status: 'discovered' | 'pairing' | 'paired' | 'rejected' | 'error';
   error?: string;
 }
 

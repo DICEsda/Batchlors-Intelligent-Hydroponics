@@ -11,6 +11,9 @@
 #include "../input/ButtonControl.h"
 #include "../sensors/ThermalControl.h"
 #include "../utils/StatusLed.h"
+#include "BootManager.h"
+#include "SerialConsole.h"
+#include "LedController.h"
 
 class WifiManager;
 class AmbientLightSensor;
@@ -36,12 +39,15 @@ private:
     AmbientLightSensor* ambientLight;
     // Onboard status LED helper
     StatusLed statusLed;
-    struct BootStatusEntry {
-        String name;
-        bool ok;
-        String detail;
-    };
-    std::vector<BootStatusEntry> bootStatus;
+    
+    // Boot status tracking (extracted to BootManager)
+    BootManager bootManager;
+    
+    // Serial command handler (extracted to SerialConsole)
+    SerialConsole serialConsole;
+    
+    // LED visualization (extracted to LedController)
+    LedController* ledController;
 
     struct NodeTelemetrySnapshot {
         uint8_t avgR = 0;
@@ -54,24 +60,17 @@ private:
     };
     std::map<String, NodeTelemetrySnapshot> nodeTelemetry;
     CoordinatorSensorSnapshot coordinatorSensors;
+    
+    // Tower ID to MAC address mapping for ESP-NOW command routing
+    // Key: tower_id (e.g., "TCCDDEEFF"), Value: MAC string (e.g., "AA:BB:CC:DD:EE:FF")
+    std::map<String, String> towerIdToMac;
     MmWaveEvent lastMmWaveEvent;
     bool haveMmWaveSample = false;
     bool zoneOccupiedState = false;
     uint32_t lastSensorSampleMs = 0;
     uint32_t lastSerialPrintMs = 0;
 
-    // Per-node LED group mapping (4 pixels per group)
-    std::map<String, int> nodeToGroup;         // nodeId -> group index (0..groups-1)
-    std::vector<String> groupToNode;           // size = NUM_PIXELS/4
-    std::vector<bool> groupConnected;          // true if connected
-    std::vector<uint32_t> groupFlashUntilMs;   // activity flash until ts
-
-    // Helpers for LED mapping and updates
-    void rebuildLedMappingFromRegistry();
-    int getGroupIndexForNode(const String& nodeId);
-    int assignGroupForNode(const String& nodeId);
-    void updateLeds();
-    void flashLedForNode(const String& nodeId, uint32_t durationMs);
+    // Helpers for node connection status
     void logConnectedNodes();
     void checkStaleConnections();
     void sendHealthPings();
@@ -86,13 +85,6 @@ private:
     bool flashOn = false;
     uint32_t lastFlashTick = 0;
     uint32_t buttonPressedAt = 0;
-    
-    // Manual LED control
-    bool manualLedMode = false;
-    uint8_t manualR = 0;
-    uint8_t manualG = 0;
-    uint8_t manualB = 0;
-    uint32_t manualLedTimeoutMs = 0;
     
     // Zone presence mode
     bool zonePresenceMode = true;  // When enabled, nodes glow green when presence detected
@@ -116,7 +108,4 @@ private:
     void updateNodeTelemetryCache(const String& nodeId, const NodeStatusMessage& statusMsg);
     void refreshCoordinatorSensors();
     void printSerialTelemetry();
-    void recordBootStatus(const char* name, bool ok, const String& detail);
-    void printBootSummary();
-    void handleSerialCommands();
 };

@@ -1,16 +1,28 @@
 /**
- * Core Services Barrel Export - Hydroponic Farm System
+ * Core Services Barrel Export - Smart Tile IoT System
  * Import services from a single location
  */
 
 // Environment configuration
 export * from './environment.service';
 
-// REST API service for hydroponic farm
+// REST API service for Smart Tile IoT
 export * from './api.service';
+
+// Mock data service for development
+export * from './mock-data.service';
 
 // WebSocket service for real-time updates
 export * from './websocket.service';
 
-// State management with Angular signals
+// Main IoT state management service (primary)
+export * from './iot-data.service';
+
+// Legacy hydroponic data service (deprecated - kept for backward compatibility)
 export * from './hydroponic-data.service';
+
+// OTA firmware update management service
+export * from './ota.service';
+
+// Alert and notification management service
+export * from './alert.service';

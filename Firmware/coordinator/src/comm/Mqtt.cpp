@@ -97,8 +97,8 @@ bool Mqtt::begin() {
         if (brokerHost.isEmpty()) {
             brokerHost = "192.168.1.100";
         }
-        if (siteId.isEmpty()) {
-            siteId = "site001";
+        if (farmId.isEmpty()) {
+            farmId = "farm001";
         }
         Logger::warn("Using fallback MQTT endpoint %s:%u (update via provisioning)", brokerHost.c_str(), brokerPort);
     }
@@ -181,7 +181,7 @@ void Mqtt::publishLightState(const String& lightId, uint8_t brightness) {
     mqttClient.publish(topic.c_str(), payload.c_str());
 }
 
-// PRD-compliant: site/{siteId}/node/{nodeId}/telemetry
+// PRD-compliant: farm/{farmId}/node/{nodeId}/telemetry (legacy smart tile)
 void Mqtt::publishThermalEvent(const String& nodeId, const NodeThermalData& data) {
     if (!mqttClient.connected()) return;
     
@@ -201,14 +201,14 @@ void Mqtt::publishThermalEvent(const String& nodeId, const NodeThermalData& data
     Logger::info("Published thermal event for node %s", nodeId.c_str());
 }
 
-// PRD-compliant: site/{siteId}/coord/{coordId}/mmwave
+// Hydroponic: farm/{farmId}/coord/{coordId}/mmwave
 void Mqtt::publishMmWaveEvent(const MmWaveEvent& event) {
     if (!mqttClient.connected()) return;
     // Build rich target payload (backward compatible: includes legacy "events" array)
     StaticJsonDocument<1024> doc;
     doc["ts"] = event.timestampMs / 1000;
     String coord = coordId.length() ? coordId : WiFi.macAddress();
-    doc["site_id"] = siteId;
+    doc["farm_id"] = farmId;
     doc["coord_id"] = coord;
     doc["sensor_id"] = event.sensorId;
     doc["presence"] = event.presence;
@@ -347,13 +347,18 @@ bool Mqtt::connectMqtt() {
     MqttLogger::logConnect(brokerHost, brokerPort, clientId, connected);
     
     if (connected) {
-        // Subscribe to coordinator commands (PRD-compliant)
+        // Subscribe to coordinator commands (Hydroponic topics)
         String cmdTopic = coordinatorCmdTopic();
         bool subSuccess = mqttClient.subscribe(cmdTopic.c_str());
         MqttLogger::logSubscribe(cmdTopic, subSuccess);
         
-        // Subscribe to node commands (wildcard) for light control forwarding
-        String nodeCmd = "site/" + siteId + "/node/+/cmd";
+        // Subscribe to tower commands (wildcard) for forwarding to tower nodes
+        String towerCmd = "farm/" + farmId + "/coord/" + coordId + "/tower/+/cmd";
+        bool towerSubSuccess = mqttClient.subscribe(towerCmd.c_str());
+        MqttLogger::logSubscribe(towerCmd, towerSubSuccess);
+        
+        // Subscribe to node commands (wildcard) for light control forwarding (legacy)
+        String nodeCmd = "farm/" + farmId + "/node/+/cmd";
         bool nodeSubSuccess = mqttClient.subscribe(nodeCmd.c_str());
         MqttLogger::logSubscribe(nodeCmd, nodeSubSuccess);
         
@@ -385,8 +390,8 @@ bool Mqtt::ensureConfigLoaded() {
 
     if (!discoveryAttempted && autoDiscoverBroker()) {
         Logger::info("Discovered MQTT broker at %s", brokerHost.c_str());
-        if (siteId.isEmpty()) {
-            siteId = "site001";
+        if (farmId.isEmpty()) {
+            farmId = "farm001";
         }
         persistConfig();
         configLoaded = true;
@@ -421,12 +426,16 @@ bool Mqtt::loadConfigFromStore() {
     }
     brokerUsername = config.getString("broker_user", "user1");
     brokerPassword = config.getString("broker_pass", "user1");
-    siteId = config.getString("site_id", "site001");
-    siteId.trim();
+    // Support both new 'farm_id' and legacy 'site_id' keys
+    farmId = config.getString("farm_id", "");
+    if (farmId.isEmpty()) {
+        farmId = config.getString("site_id", "farm001");
+    }
+    farmId.trim();
     coordId = config.getString("coord_id", "");
     coordId.trim();
 
-    bool ready = !brokerHost.isEmpty() && !siteId.isEmpty();
+    bool ready = !brokerHost.isEmpty() && !farmId.isEmpty();
     return ready;
 }
 
@@ -438,7 +447,7 @@ bool Mqtt::runProvisioningWizard() {
 
     flushSerialInput();
     Serial.println();
-    Serial.println("=== MQTT Broker Setup ===");
+    Serial.println("=== MQTT Broker Setup (Hydroponic System) ===");
     Serial.println("Enter the IP of the machine running docker-compose (ex. 10.0.0.42).");
     Serial.println("Do NOT enter 'localhost' because the coordinator is on Wi-Fi.");
 
@@ -461,14 +470,14 @@ bool Mqtt::runProvisioningWizard() {
     String user = promptLine("Username (leave empty for anonymous)", true, brokerUsername);
     String pass = promptLine("Password", true, brokerPassword);
 
-    String site = promptLine("Site ID", false, siteId.isEmpty() ? "site001" : siteId);
+    String farm = promptLine("Farm ID", false, farmId.isEmpty() ? "farm001" : farmId);
     String coord = promptLine("Coordinator ID (blank = use MAC)", true, coordId);
 
     brokerHost = host;
     brokerPort = portCandidate;
     brokerUsername = user;
     brokerPassword = pass;
-    siteId = site;
+    farmId = farm;
     coordId = coord;
 
     loopbackHintPrinted = false;
@@ -485,7 +494,9 @@ void Mqtt::persistConfig() {
     config.setInt("broker_port", brokerPort);
     config.setString("broker_user", brokerUsername);
     config.setString("broker_pass", brokerPassword);
-    config.setString("site_id", siteId);
+    config.setString("farm_id", farmId);
+    // Also persist as site_id for backward compatibility
+    config.setString("site_id", farmId);
     if (!coordId.isEmpty()) {
         config.setString("coord_id", coordId);
     } else {
@@ -692,7 +703,7 @@ void Mqtt::publishCoordinatorTelemetry(const CoordinatorSensorSnapshot& snapshot
     StaticJsonDocument<256> doc;
     uint32_t ts = snapshot.timestampMs ? snapshot.timestampMs : millis();
     doc["ts"] = ts / 1000;
-    doc["site_id"] = siteId;
+    doc["farm_id"] = farmId;
     doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
     doc["light_lux"] = snapshot.lightLux;
     doc["temp_c"] = snapshot.tempC;
@@ -720,26 +731,183 @@ void Mqtt::publishSerialLog(const String& message, const String& level, const St
     mqttClient.publish(coordinatorSerialTopic().c_str(), payload.c_str());
 }
 
+// ============================================================================
+// Hydroponic System Publishing Methods
+// ============================================================================
+
+void Mqtt::publishTowerTelemetry(const TowerTelemetryMessage& telemetry) {
+    if (!mqttClient.connected()) {
+        MqttLogger::logPublish("tower_telemetry", "", false, 0);
+        return;
+    }
+    
+    uint32_t startMs = millis();
+    
+    StaticJsonDocument<512> doc;
+    doc["ts"] = telemetry.ts / 1000;
+    doc["farm_id"] = farmId;
+    doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
+    doc["tower_id"] = telemetry.tower_id;
+    
+    // Environmental sensors
+    doc["air_temp_c"] = telemetry.air_temp_c;
+    doc["humidity_pct"] = telemetry.humidity_pct;
+    doc["light_lux"] = telemetry.light_lux;
+    
+    // Actuator states
+    doc["pump_on"] = telemetry.pump_on;
+    doc["light_on"] = telemetry.light_on;
+    doc["light_brightness"] = telemetry.light_brightness;
+    
+    // System status
+    doc["status_mode"] = telemetry.status_mode.length() > 0 ? telemetry.status_mode : "idle";
+    doc["vbat_mv"] = telemetry.vbat_mv;
+    doc["fw"] = telemetry.fw.length() > 0 ? telemetry.fw : "";
+    doc["uptime_s"] = telemetry.uptime_s;
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = towerTelemetryTopic(telemetry.tower_id);
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str());
+    
+    MqttLogger::logPublish(topic, payload, success, payload.length());
+    MqttLogger::logLatency("TowerTelemetry", startMs);
+    
+    if (success) {
+        Logger::debug("Published tower telemetry for %s", telemetry.tower_id.c_str());
+    }
+}
+
+void Mqtt::publishReservoirTelemetry(const ReservoirTelemetryMessage& telemetry) {
+    if (!mqttClient.connected()) {
+        MqttLogger::logPublish("reservoir_telemetry", "", false, 0);
+        return;
+    }
+    
+    uint32_t startMs = millis();
+    
+    StaticJsonDocument<512> doc;
+    doc["ts"] = telemetry.ts / 1000;
+    doc["farm_id"] = farmId;
+    doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
+    
+    // Water quality sensors
+    doc["ph"] = telemetry.ph;
+    doc["ec_ms_cm"] = telemetry.ec_ms_cm;
+    doc["tds_ppm"] = telemetry.tds_ppm;
+    doc["water_temp_c"] = telemetry.water_temp_c;
+    
+    // Water level
+    doc["water_level_pct"] = telemetry.water_level_pct;
+    doc["water_level_cm"] = telemetry.water_level_cm;
+    doc["low_water_alert"] = telemetry.low_water_alert;
+    
+    // Actuator states
+    doc["main_pump_on"] = telemetry.main_pump_on;
+    doc["dosing_pump_ph_on"] = telemetry.dosing_pump_ph_on;
+    doc["dosing_pump_nutrient_on"] = telemetry.dosing_pump_nutrient_on;
+    
+    // System status
+    doc["status_mode"] = telemetry.status_mode.length() > 0 ? telemetry.status_mode : "operational";
+    doc["uptime_s"] = telemetry.uptime_s;
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = reservoirTelemetryTopic();
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str());
+    
+    MqttLogger::logPublish(topic, payload, success, payload.length());
+    MqttLogger::logLatency("ReservoirTelemetry", startMs);
+    
+    if (success) {
+        Logger::debug("Published reservoir telemetry");
+    }
+}
+
+// ============================================================================
+// Topic Builders - Hydroponic structure: farm/{farmId}/coord/{coordId}/...
+// ============================================================================
+
 String Mqtt::nodeTelemetryTopic(const String& nodeId) const {
-    return "site/" + siteId + "/node/" + nodeId + "/telemetry";
+    // Legacy smart tile topic (backward compatibility)
+    return "farm/" + farmId + "/node/" + nodeId + "/telemetry";
 }
 
 String Mqtt::coordinatorTelemetryTopic() const {
     String id = coordId.length() ? coordId : WiFi.macAddress();
-    return "site/" + siteId + "/coord/" + id + "/telemetry";
+    return "farm/" + farmId + "/coord/" + id + "/telemetry";
 }
 
 String Mqtt::coordinatorSerialTopic() const {
     String id = coordId.length() ? coordId : WiFi.macAddress();
-    return "site/" + siteId + "/coord/" + id + "/serial";
+    return "farm/" + farmId + "/coord/" + id + "/serial";
 }
 
 String Mqtt::coordinatorCmdTopic() const {
     String id = coordId.length() ? coordId : WiFi.macAddress();
-    return "site/" + siteId + "/coord/" + id + "/cmd";
+    return "farm/" + farmId + "/coord/" + id + "/cmd";
 }
 
 String Mqtt::coordinatorMmwaveTopic() const {
     String id = coordId.length() ? coordId : WiFi.macAddress();
-    return "site/" + siteId + "/coord/" + id + "/mmwave";
+    return "farm/" + farmId + "/coord/" + id + "/mmwave";
+}
+
+// Hydroponic-specific topic builders
+String Mqtt::towerTelemetryTopic(const String& towerId) const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/tower/" + towerId + "/telemetry";
+}
+
+String Mqtt::reservoirTelemetryTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/reservoir/telemetry";
+}
+
+String Mqtt::towerCmdTopic(const String& towerId) const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/tower/" + towerId + "/cmd";
+}
+
+String Mqtt::coordinatorOtaStatusTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/ota/status";
+}
+
+// ============================================================================
+// OTA Status Publishing
+// ============================================================================
+
+void Mqtt::publishOtaStatus(const String& status, int progress, const String& message, const String& error) {
+    if (!mqttClient.connected()) {
+        Logger::warn("Cannot publish OTA status: MQTT not connected");
+        return;
+    }
+    
+    StaticJsonDocument<256> doc;
+    doc["status"] = status;
+    doc["progress"] = progress;
+    doc["message"] = message;
+    if (error.length() > 0) {
+        doc["error"] = error;
+    }
+    doc["timestamp"] = millis();
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = coordinatorOtaStatusTopic();
+    
+    uint32_t startMs = millis();
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str());
+    MqttLogger::logPublish(topic, payload, success, payload.length());
+    MqttLogger::logLatency("OtaStatus", startMs);
+    
+    if (success) {
+        Logger::debug("Published OTA status: %s %d%%", status.c_str(), progress);
+    } else {
+        Logger::warn("Failed to publish OTA status");
+    }
 }

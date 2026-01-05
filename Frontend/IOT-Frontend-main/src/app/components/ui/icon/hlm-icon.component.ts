@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, Directive, computed, input } from '@angular/core';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { hlm } from '../utils';
 
@@ -55,13 +55,15 @@ export class HlmIconComponent {
 }
 
 /**
- * Directive version for direct usage on lucide icons
- * Usage: <lucide-icon hlmIcon size="lg" name="check" />
+ * Directive version for direct usage on ng-icons
+ * Usage: <ng-icon hlmIcon size="lg" name="lucideCheck" />
+ * 
+ * Note: This is a directive (not a component) that adds styling classes
+ * to ng-icon elements without conflicting with NgIcon component.
  */
-@Component({
-  selector: '[hlmIcon]',
+@Directive({
+  selector: 'ng-icon[hlmIcon]',
   standalone: true,
-  template: `<ng-content />`,
   host: {
     '[class]': '_computedClass()',
   },

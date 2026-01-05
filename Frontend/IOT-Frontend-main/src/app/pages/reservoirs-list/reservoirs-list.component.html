@@ -1,0 +1,114 @@
+<div class="list-page">
+  <header class="page-header">
+    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
+      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
+    </a>
+    <div class="header-content">
+      <h1 class="page-title">Reservoirs</h1>
+      <p class="page-description">Manage your hydroponic reservoir controllers</p>
+    </div>
+    <div class="header-actions">
+      <span hlmBadge [variant]="wsConnected() ? 'default' : 'destructive'">
+        <ng-icon hlmIcon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="sm" />
+        {{ wsConnected() ? 'Connected' : 'Disconnected' }}
+      </span>
+      <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- Stats Summary -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <ng-icon hlmIcon name="lucideServer" class="stat-icon" />
+      <div class="stat-info">
+        <span class="stat-value">{{ onlineCount() }} / {{ totalCount() }}</span>
+        <span class="stat-label">Online Reservoirs</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="device-grid">
+      @for (i of [1, 2, 3]; track i) {
+        <div hlmCard class="device-card">
+          <hlm-skeleton class="card-skeleton" />
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+      <span>{{ error() }}</span>
+      <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!loading() && coordinators().length === 0) {
+    <div class="empty-state" hlmCard>
+      <ng-icon hlmIcon name="lucideServer" class="empty-icon" />
+      <h3>No Reservoirs Found</h3>
+      <p>Add your first reservoir controller to start monitoring your hydroponic system.</p>
+      <button hlmBtn variant="default">
+        <ng-icon hlmIcon name="lucidePlus" size="sm" />
+        Add Reservoir
+      </button>
+    </div>
+  }
+
+  <!-- Reservoirs Grid -->
+  @if (!loading() && coordinators().length > 0) {
+    <div class="device-grid">
+      @for (coord of coordinators(); track trackByCoordinatorId($index, coord)) {
+        <a [routerLink]="['/reservoirs', coord.coord_id]" hlmCard class="device-card clickable">
+          <div hlmCardHeader>
+            <div class="card-header-row">
+              <ng-icon hlmIcon name="lucideServer" class="device-icon" />
+              <span hlmBadge [variant]="getStatusBadgeVariant(coord.status)" size="sm">
+                {{ coord.status }}
+              </span>
+            </div>
+            <span hlmCardTitle>{{ coord.name || coord.coord_id }}</span>
+            <span hlmCardDescription>{{ coord.coord_id }}</span>
+          </div>
+          <div hlmCardContent>
+            <div class="metric-grid">
+              <div class="metric">
+                <ng-icon hlmIcon name="lucideThermometer" size="sm" />
+                <span>{{ coord.temp_c !== undefined ? coord.temp_c.toFixed(1) : '--' }}°C</span>
+              </div>
+              <div class="metric">
+                <ng-icon hlmIcon name="lucideDroplet" size="sm" />
+                <span>{{ coord.light_lux || '--' }} lux</span>
+              </div>
+              <div class="metric">
+                <ng-icon hlmIcon name="lucideActivity" size="sm" />
+                <span>{{ coord.nodes_online || 0 }} towers</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="view-link">
+              View Details
+              <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+            </span>
+          </div>
+        </a>
+      }
+    </div>
+  }
+
+  @if (usingMockData()) {
+    <div class="mock-banner">
+      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+      <span>Displaying mock data - Backend unavailable</span>
+    </div>
+  }
+</div>

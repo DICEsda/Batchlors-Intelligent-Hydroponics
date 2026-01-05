@@ -62,3 +62,17 @@ coverage/
 sdkconfig
 sdkconfig.old
 build/
+
+# .NET SDK (local installation)
+..dotnet/
+.dotnet/
+
+# .NET build outputs
+**/bin/
+**/obj/
+
+# Windows artifacts
+nul
+
+# OpenCode configuration (contains API keys)
+opencode.json

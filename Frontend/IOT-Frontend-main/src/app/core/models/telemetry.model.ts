@@ -1,17 +1,47 @@
 /**
- * Telemetry Models for Hydroponic Farm System
- * Real-time sensor data from coordinators and towers
+ * Telemetry Models for Smart Tile IoT System
+ * Real-time sensor data from coordinators and nodes
  */
 
 // ============================================================================
 // Coordinator Telemetry
 // ============================================================================
 
+export interface CoordinatorTelemetryData {
+  coord_id: string;
+  site_id: string;
+  timestamp: Date;
+  nodes_online: number;
+  wifi_rssi: number;
+  mmwave_event_rate: number;
+  light_lux: number;
+  temp_c: number;
+}
+
+// ============================================================================
+// Node Telemetry
+// ============================================================================
+
+export interface NodeTelemetryData {
+  node_id: string;
+  light_id: string;
+  coordinator_id: string;
+  timestamp: Date;
+  temp_c: number;
+  vbat_mv: number;
+  avg_r: number;
+  status_mode: string;
+}
+
+// ============================================================================
+// Legacy Hydroponic Telemetry (kept for compatibility)
+// ============================================================================
+
 export interface ReservoirTelemetry {
   coordId: string;
   timestamp: Date;
   
-  // Reservoir readings
+  // Reservoir readings (legacy - not used in Smart Tile system)
   ph: number;
   ec: number;
   temperature: number;
@@ -36,16 +66,12 @@ export interface DosingStatus {
   lastDosingTime?: Date;
 }
 
-// ============================================================================
-// Tower Telemetry
-// ============================================================================
-
 export interface TowerTelemetry {
   towerId: string;
   coordId: string;
   timestamp: Date;
   
-  // Environmental readings
+  // Environmental readings (legacy)
   ambientTemp: number;
   humidity: number;
   lightLevel: number;
@@ -72,6 +98,26 @@ export interface TelemetryDataPoint {
   value: number;
 }
 
+export interface CoordinatorHistory {
+  coord_id: string;
+  site_id: string;
+  timeRange: TimeRange;
+  temp_c: TelemetryDataPoint[];
+  light_lux: TelemetryDataPoint[];
+  wifi_rssi: TelemetryDataPoint[];
+  nodes_online: TelemetryDataPoint[];
+}
+
+export interface NodeHistory {
+  node_id: string;
+  coordinator_id: string;
+  timeRange: TimeRange;
+  temp_c: TelemetryDataPoint[];
+  vbat_mv: TelemetryDataPoint[];
+  avg_r: TelemetryDataPoint[];
+}
+
+// Legacy history types (kept for compatibility)
 export interface ReservoirHistory {
   coordId: string;
   timeRange: TimeRange;
@@ -99,24 +145,50 @@ export interface TimeRange {
 // Aggregated Metrics
 // ============================================================================
 
-export interface FarmMetrics {
+export interface SystemMetrics {
   timestamp: Date;
+  
+  // Site aggregates
+  totalSites: number;
   
   // Coordinator aggregates
   totalCoordinators: number;
   onlineCoordinators: number;
-  averagePh: number;
-  averageEc: number;
-  averageReservoirTemp: number;
-  lowWaterLevelCount: number;
+  averageTemp: number;
+  averageLightLux: number;
   
-  // Tower aggregates
-  totalTowers: number;
-  onlineTowers: number;
-  totalPlantSlots: number;
-  occupiedSlots: number;
-  averageAmbientTemp: number;
-  averageHumidity: number;
+  // Node aggregates
+  totalNodes: number;
+  onlineNodes: number;
+  nodesInPairing: number;
+  nodesInError: number;
+  averageNodeTemp: number;
+  lowBatteryNodes: number;
+  
+  // Alerts
+  activeAlerts: number;
+  criticalAlerts: number;
+}
+
+// Legacy FarmMetrics (kept for compatibility)
+export interface FarmMetrics {
+  timestamp: Date;
+  
+  // Coordinator aggregates (mapped from Smart Tile data)
+  totalCoordinators: number;
+  onlineCoordinators: number;
+  averagePh: number;           // Not used in Smart Tile - kept for compatibility
+  averageEc: number;           // Not used in Smart Tile - kept for compatibility
+  averageReservoirTemp: number; // Maps to averageTemp
+  lowWaterLevelCount: number;  // Not used in Smart Tile
+  
+  // Tower aggregates (mapped from Node data)
+  totalTowers: number;          // Maps to totalNodes
+  onlineTowers: number;         // Maps to onlineNodes
+  totalPlantSlots: number;      // Not used in Smart Tile
+  occupiedSlots: number;        // Not used in Smart Tile
+  averageAmbientTemp: number;   // Maps to averageNodeTemp
+  averageHumidity: number;      // Not used in Smart Tile
   
   // Alerts
   activeAlerts: number;
@@ -124,32 +196,7 @@ export interface FarmMetrics {
 }
 
 // ============================================================================
-// Alerts
+// Alerts - MOVED TO alert.model.ts
 // ============================================================================
-
-export type AlertSeverity = 'info' | 'warning' | 'critical';
-export type AlertType = 
-  | 'ph_high' | 'ph_low'
-  | 'ec_high' | 'ec_low'
-  | 'temp_high' | 'temp_low'
-  | 'water_low'
-  | 'device_offline'
-  | 'pump_error'
-  | 'sensor_error';
-
-export interface Alert {
-  _id: string;
-  type: AlertType;
-  severity: AlertSeverity;
-  deviceType: 'coordinator' | 'tower';
-  deviceId: string;
-  deviceName: string;
-  message: string;
-  value?: number;
-  threshold?: number;
-  acknowledged: boolean;
-  acknowledgedBy?: string;
-  acknowledgedAt?: Date;
-  createdAt: Date;
-  resolvedAt?: Date;
-}
+// Alert, AlertSeverity, AlertStatus, AlertCategory, and related types
+// are now defined in ./alert.model.ts for a more comprehensive alert system.

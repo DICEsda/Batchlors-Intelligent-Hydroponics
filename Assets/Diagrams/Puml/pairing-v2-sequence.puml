@@ -1,0 +1,164 @@
+@startuml Pairing V2 - Frontend Approved Discovery Model
+!theme plain
+
+title Zigbee-like Permit Join Pairing Flow\n(Frontend-Approved Discovery Model)
+
+skinparam ParticipantPadding 20
+skinparam BoxPadding 15
+skinparam sequenceMessageAlign center
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowFontSize 11
+skinparam NoteFontSize 10
+skinparam TitleFontSize 16
+skinparam ParticipantFontSize 12
+
+actor "Operator" as User
+participant "Angular\nFrontend" as FE
+participant "Go Backend\n+ WebSocket" as BE
+participant "MQTT\nBroker" as MQ
+participant "Coordinator\n(ESP32-S3)" as Coord
+participant "Node\n(ESP32-C3)" as Node
+
+== Node Powers On (Unpaired) ==
+
+User -> Node : Power on new node
+activate Node
+Node -> Node : Boot sequence\nCheck NVS for credentials
+Node -> Node : No credentials found\n**State: UNPAIRED**
+Node -> Node : Button press or auto-start
+Node -> Node : **State: PAIRING_ADVERTISE**\nLED: Fast blink blue
+
+loop Every 100ms (±20ms jitter)
+    Node -> Coord : **[BROADCAST]**\nPAIRING_ADVERTISEMENT\n{mac, type, fw_ver, caps, nonce, seq}
+    note right of Node
+        Advertisement contains:
+        • MAC address
+        • Device type (TOWER)
+        • Firmware version
+        • Capabilities flags
+        • Random nonce
+        • Sequence number
+    end note
+end
+deactivate Node
+
+== Coordinator Ignores (Permit Join Disabled) ==
+
+Coord -> Coord : **State: OPERATIONAL**\nPermit join disabled
+note right of Coord
+    Advertisements are
+    silently ignored
+end note
+
+== User Enables Permit Join ==
+
+User -> FE : Click "Enable Pairing"\nduration = 60s
+FE -> BE : POST /api/coordinators/{id}/pairing\n{"duration_ms": 60000}
+activate BE
+BE -> MQ : PUBLISH\nsite/{siteId}/coord/{coordId}/pairing/permit_join\n{"enable": true, "duration_ms": 60000}
+deactivate BE
+
+MQ --> Coord : DELIVER permit_join command
+activate Coord
+Coord -> Coord : **State: DISCOVERY_ACTIVE**\nStart 60s timer
+Coord -> Coord : Clear discovered nodes table
+Coord -> MQ : PUBLISH (retained)\n.../pairing/status\n{"state": "discovery_active", "remaining_ms": 60000}
+deactivate Coord
+
+MQ --> BE : Status update
+BE --> FE : WebSocket: pairing/status
+FE -> FE : Show discovery UI\nwith countdown timer
+FE -> User : "Pairing mode active: 60s"
+
+== Coordinator Discovers Node ==
+
+Node -> Coord : **[BROADCAST]**\nPAIRING_ADVERTISEMENT
+activate Coord
+Coord -> Coord : Permit join enabled?\n**YES**
+Coord -> Coord : Add to discovered table:\n{mac, type, rssi, first_seen, last_seen}
+Coord -> MQ : PUBLISH\n.../pairing/discovered\n{"mac": "AA:BB:CC:DD:EE:FF",\n "type": "tower", "rssi": -45,\n "fw": "1.2.3", "caps": ["led","pump"]}
+deactivate Coord
+
+MQ --> BE : Discovered event
+BE --> FE : WebSocket: pairing/discovered
+FE -> FE : Add node to discovered list
+FE -> User : Show discovered node\nwith signal strength
+
+note over Node, Coord
+    Node continues advertising.
+    Coordinator updates last_seen & RSSI.
+    Multiple nodes can be discovered.
+end note
+
+== User Approves Node ==
+
+User -> FE : Select node AA:BB:CC\nClick "Approve"
+FE -> BE : POST /api/coordinators/{id}/pairing/approve\n{"mac": "AA:BB:CC:DD:EE:FF"}
+activate BE
+BE -> MQ : PUBLISH\n.../pairing/approve\n{"mac": "AA:BB:CC:DD:EE:FF"}
+deactivate BE
+
+MQ --> Coord : DELIVER approve command
+activate Coord
+Coord -> Coord : **State: BINDING**\nGenerate offer_token
+Coord -> Coord : Look up node in discovered table
+Coord -> MQ : PUBLISH\n.../pairing/binding_started\n{"mac": "AA:BB:CC", "tower_id": 5}
+Coord -> Node : **[UNICAST]**\nPAIRING_OFFER\n{coord_mac, coord_id, farm_id,\n tower_id=5, nonce_echo, offer_token}
+Coord -> Coord : Start binding timeout (10s)
+deactivate Coord
+
+== Node Receives Offer ==
+
+activate Node
+Node -> Node : Receive PAIRING_OFFER
+Node -> Node : Validate nonce_echo matches\nour advertisement nonce
+Node -> Node : **State: PAIRING_WAIT**\nLED: Solid blue
+Node -> Node : Stop advertising
+Node -> Node : Store pending offer
+Node -> Coord : **[UNICAST]**\nPAIRING_ACCEPT\n{node_mac, offer_token, tower_id=5}
+Node -> Node : Start confirm timeout (5s)
+deactivate Node
+
+== Coordinator Confirms Binding ==
+
+activate Coord
+Coord -> Coord : Receive PAIRING_ACCEPT
+Coord -> Coord : Validate offer_token matches
+Coord -> Coord : Register node in TowerRegistry\nPersist to NVS
+Coord -> Coord : Add ESP-NOW peer
+Coord -> MQ : PUBLISH\n.../pairing/binding_progress\n{"mac": "AA:BB:CC", "step": "accept_received"}
+Coord -> Node : **[UNICAST]**\nPAIRING_CONFIRM\n{coord_mac, tower_id=5, encryption_key}
+Coord -> Coord : Mark node as BOUND in table
+Coord -> MQ : PUBLISH\n.../pairing/bound\n{"mac": "AA:BB:CC", "tower_id": 5}
+Coord -> Coord : **State: DISCOVERY_ACTIVE**\n(can continue discovering)
+deactivate Coord
+
+MQ --> BE : Bound event
+BE --> FE : WebSocket: pairing/bound
+FE -> User : "✓ Node paired as Tower 5"
+
+== Node Completes Binding ==
+
+activate Node
+Node -> Node : Receive PAIRING_CONFIRM
+Node -> Node : Validate coord_mac
+Node -> Node : **State: BOUND**\nLED: Flash green 3x
+Node -> Node : Persist credentials to NVS:\n• coordinator_mac\n• tower_id\n• farm_id\n• encryption_key
+Node -> Node : **State: OPERATIONAL**\nLED: Off
+Node -> Coord : Begin normal telemetry\nTOWER_TELEMETRY
+deactivate Node
+
+== Permit Join Window Closes ==
+
+... After 60 seconds or manual close ...
+
+Coord -> Coord : Timer expired\n**State: OPERATIONAL**
+Coord -> Coord : Clear discovered table\n(except BOUND entries)
+Coord -> MQ : PUBLISH (retained)\n.../pairing/status\n{"state": "operational",\n "permit_join_enabled": false}
+
+MQ --> BE : Status update
+BE --> FE : WebSocket: pairing/status
+FE -> User : "Pairing window closed"
+
+@enduml

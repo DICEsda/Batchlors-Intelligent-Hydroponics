@@ -1,0 +1,132 @@
+<div class="list-page">
+  <header class="page-header">
+    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
+      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
+    </a>
+    <div class="header-content">
+      <h1 class="page-title">Towers</h1>
+      <p class="page-description">Manage your hydroponic tower units</p>
+    </div>
+    <div class="header-actions">
+      <span hlmBadge [variant]="wsConnected() ? 'default' : 'destructive'">
+        <ng-icon hlmIcon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="sm" />
+        {{ wsConnected() ? 'Connected' : 'Disconnected' }}
+      </span>
+      <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- Stats Summary -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <ng-icon hlmIcon name="lucideFlower2" class="stat-icon" />
+      <div class="stat-info">
+        <span class="stat-value">{{ onlineCount() }} / {{ totalCount() }}</span>
+        <span class="stat-label">Online Towers</span>
+      </div>
+    </div>
+    @if (pairingCount() > 0) {
+      <div class="stat-card warning">
+        <ng-icon hlmIcon name="lucideActivity" class="stat-icon" />
+        <div class="stat-info">
+          <span class="stat-value">{{ pairingCount() }}</span>
+          <span class="stat-label">Pairing</span>
+        </div>
+      </div>
+    }
+    @if (lowBatteryCount() > 0) {
+      <div class="stat-card warning">
+        <ng-icon hlmIcon name="lucideBattery" class="stat-icon" />
+        <div class="stat-info">
+          <span class="stat-value">{{ lowBatteryCount() }}</span>
+          <span class="stat-label">Low Battery</span>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="device-grid">
+      @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+        <div hlmCard class="device-card">
+          <hlm-skeleton class="card-skeleton" />
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+      <span>{{ error() }}</span>
+      <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!loading() && nodes().length === 0) {
+    <div class="empty-state" hlmCard>
+      <ng-icon hlmIcon name="lucideFlower2" class="empty-icon" />
+      <h3>No Towers Found</h3>
+      <p>Connect tower units to your reservoirs to start monitoring plant growth.</p>
+      <button hlmBtn variant="default">
+        <ng-icon hlmIcon name="lucidePlus" size="sm" />
+        Add Tower
+      </button>
+    </div>
+  }
+
+  <!-- Towers Grid -->
+  @if (!loading() && nodes().length > 0) {
+    <div class="device-grid">
+      @for (node of nodes(); track trackByNodeId($index, node)) {
+        <a [routerLink]="['/towers', node._id]" hlmCard class="device-card clickable">
+          <div hlmCardHeader>
+            <div class="card-header-row">
+              <ng-icon hlmIcon name="lucideFlower2" class="device-icon" />
+              <span hlmBadge [variant]="getStatusBadgeVariant(node.status_mode)" size="sm">
+                {{ getStatusDisplay(node.status_mode) }}
+              </span>
+            </div>
+            <span hlmCardTitle>{{ node.name || node.light_id }}</span>
+            <span hlmCardDescription>Last seen: {{ formatLastSeen(node.last_seen) }}</span>
+          </div>
+          <div hlmCardContent>
+            <div class="metric-grid">
+              <div class="metric">
+                <ng-icon hlmIcon name="lucideThermometer" size="sm" />
+                <span>{{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C</span>
+              </div>
+              <div class="metric">
+                <ng-icon hlmIcon name="lucideBattery" size="sm" />
+                <span>{{ node.vbat_mv || '--' }} mV</span>
+              </div>
+              <div class="metric">
+                <ng-icon hlmIcon name="lucideWifi" size="sm" />
+                <span>{{ node.avg_r || '--' }} dBm</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="view-link">
+              View Details
+              <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+            </span>
+          </div>
+        </a>
+      }
+    </div>
+  }
+
+  @if (usingMockData()) {
+    <div class="mock-banner">
+      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+      <span>Displaying mock data - Backend unavailable</span>
+    </div>
+  }
+</div>

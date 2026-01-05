@@ -188,6 +188,62 @@ void ConfigManager::loadDefaults() {
     if (!exists(ConfigKeys::CMD_TTL_MS)) {
         setInt(ConfigKeys::CMD_TTL_MS, Defaults::CMD_TTL_MS);
     }
+    
+    // ============================================================
+    // HYDROPONIC SYSTEM DEFAULTS
+    // ============================================================
+    
+    // Water Quality Thresholds (optimal ranges for leafy greens)
+    if (!exists(ConfigKeys::PH_MIN)) {
+        setFloat(ConfigKeys::PH_MIN, Defaults::PH_MIN);
+    }
+    if (!exists(ConfigKeys::PH_MAX)) {
+        setFloat(ConfigKeys::PH_MAX, Defaults::PH_MAX);
+    }
+    if (!exists(ConfigKeys::EC_MIN_MS_CM)) {
+        setFloat(ConfigKeys::EC_MIN_MS_CM, Defaults::EC_MIN_MS_CM);
+    }
+    if (!exists(ConfigKeys::EC_MAX_MS_CM)) {
+        setFloat(ConfigKeys::EC_MAX_MS_CM, Defaults::EC_MAX_MS_CM);
+    }
+    if (!exists(ConfigKeys::WATER_TEMP_MIN_C)) {
+        setFloat(ConfigKeys::WATER_TEMP_MIN_C, Defaults::WATER_TEMP_MIN_C);
+    }
+    if (!exists(ConfigKeys::WATER_TEMP_MAX_C)) {
+        setFloat(ConfigKeys::WATER_TEMP_MAX_C, Defaults::WATER_TEMP_MAX_C);
+    }
+    
+    // Water Level
+    if (!exists(ConfigKeys::WATER_LEVEL_MIN_PCT)) {
+        setFloat(ConfigKeys::WATER_LEVEL_MIN_PCT, Defaults::WATER_LEVEL_MIN_PCT);
+    }
+    if (!exists(ConfigKeys::WATER_LEVEL_MAX_CM)) {
+        setFloat(ConfigKeys::WATER_LEVEL_MAX_CM, Defaults::WATER_LEVEL_MAX_CM);
+    }
+    
+    // Pump Control
+    if (!exists(ConfigKeys::PUMP_MAX_DURATION_S)) {
+        setInt(ConfigKeys::PUMP_MAX_DURATION_S, Defaults::PUMP_MAX_DURATION_S);
+    }
+    if (!exists(ConfigKeys::PUMP_COOLDOWN_S)) {
+        setInt(ConfigKeys::PUMP_COOLDOWN_S, Defaults::PUMP_COOLDOWN_S);
+    }
+    
+    // Telemetry
+    if (!exists(ConfigKeys::TELEMETRY_INTERVAL_MS)) {
+        setInt(ConfigKeys::TELEMETRY_INTERVAL_MS, Defaults::TELEMETRY_INTERVAL_MS);
+    }
+    
+    // Grow Light Schedule
+    if (!exists(ConfigKeys::LIGHT_ON_HOUR)) {
+        setInt(ConfigKeys::LIGHT_ON_HOUR, Defaults::LIGHT_ON_HOUR);
+    }
+    if (!exists(ConfigKeys::LIGHT_OFF_HOUR)) {
+        setInt(ConfigKeys::LIGHT_OFF_HOUR, Defaults::LIGHT_OFF_HOUR);
+    }
+    if (!exists(ConfigKeys::LIGHT_INTENSITY_PCT)) {
+        setInt(ConfigKeys::LIGHT_INTENSITY_PCT, Defaults::LIGHT_INTENSITY_PCT);
+    }
 }
 
 
