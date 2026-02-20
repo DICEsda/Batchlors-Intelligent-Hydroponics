@@ -1,1367 +1,559 @@
 #include "Coordinator.h"
 #include "../utils/Logger.h"
-#include "../utils/OtaUpdater.h"
+#include "../utils/LogStreamer.h"
+#include "../utils/SystemWatchdog.h"
 #include "../../shared/src/EspNowMessage.h"
-#include "../../shared/src/ConfigManager.h"
-#include "../comm/WifiManager.h"
-#include "../sensors/AmbientLightSensor.h"
-#include <algorithm>
+#include "../../shared/src/ConfigStore.h"
+#include <WiFi.h>
 #include <ArduinoJson.h>
-#if defined(ARDUINO_ARCH_ESP32)
-#include <esp32-hal.h>
-#include <esp_wifi.h>
-#endif
 
 Coordinator::Coordinator()
     : espNow(nullptr)
-    , mqtt(nullptr)
-    , mmWave(nullptr)
-    , nodes(nullptr)
-    , zones(nullptr)
-    , buttons(nullptr)
-    , thermal(nullptr)
     , wifi(nullptr)
-    , ambientLight(nullptr)
-    , manualLedMode(false)
-    , manualR(0)
-    , manualG(0)
-    , manualB(0)
-    , manualLedTimeoutMs(0) {}
-
+    , mqtt(nullptr)
+    , nodes(nullptr)
+    , lastHealthPingMs(0)
+    , lastStatusLogMs(0)
+    , lastMqttPublishMs(0)
+    , pairingActive(false)
+    , pairingEndTime(0) {}
 
 Coordinator::~Coordinator() {
-    // Clean up in reverse order of initialization
-    if (thermal) { delete thermal; thermal = nullptr; }
-    if (buttons) { delete buttons; buttons = nullptr; }
-    if (zones) { delete zones; zones = nullptr; }
     if (nodes) { delete nodes; nodes = nullptr; }
-    if (mmWave) { delete mmWave; mmWave = nullptr; }
-    if (ambientLight) { delete ambientLight; ambientLight = nullptr; }
     if (mqtt) { delete mqtt; mqtt = nullptr; }
     if (wifi) { delete wifi; wifi = nullptr; }
     if (espNow) { delete espNow; espNow = nullptr; }
 }
 
 bool Coordinator::begin() {
-    // Don't call Logger::begin here - it's already called in main.cpp
-    Logger::setMinLevel(Logger::INFO); // Reduce noise: default to INFO
-    delay(500);
-    bootManager.clear();
+    Logger::info("=== COORDINATOR WITH PAIRING INIT ===");
+    Logger::info("Using unified ConfigStore for all settings");
     
-    Logger::info("Smart Tile Coordinator starting...");
-    publishLog("Smart Tile Coordinator starting...", "INFO", "setup");
-
-    espNow = new EspNow();
-    mqtt = new Mqtt();
-    mmWave = new MmWave();
+    // Initialize Watchdog Timer (30 second timeout)
+    if (SystemWatchdog::init(30, true)) {
+        SystemWatchdog::addCurrentTask();
+        Logger::info("✓ Watchdog enabled for coordinator task");
+    } else {
+        Logger::warn("Watchdog initialization failed - continuing without protection");
+    }
+    
+    // Load configuration
+    Config config = ConfigStore::load();
+    if (config.isFirstBoot()) {
+        Logger::warn("First boot detected - WiFi not configured");
+        Logger::info("Please configure via serial or MQTT after boot");
+    }
+    
+    // Initialize Node Registry first
+    Logger::info("Initializing Node Registry...");
     nodes = new NodeRegistry();
-    zones = new ZoneControl();
-    buttons = new ButtonControl();
-    thermal = new ThermalControl();
+    nodes->begin();
+    nodes->loadFromStorage();
+    Logger::info("Node Registry initialized - %d nodes loaded", nodes->getAllNodes().size());
+    
+    // STEP 1: Initialize WiFi Manager (discovers channel)
+    Logger::info("STEP 1/4: Initializing WiFi...");
     wifi = new WifiManager();
-    ambientLight = new AmbientLightSensor();
-
-    Logger::info("Objects created, starting initialization...");
-
-    // Initialize ESP-NOW first (before WiFi connects)
-    Logger::info("Initializing ESP-NOW...");
-    bool espNowOk = espNow->begin();
-    bootManager.record("ESP-NOW", espNowOk, espNowOk ? "Radio ready" : "init failed");
-    if (!espNowOk) {
-        Logger::error("Failed to initialize ESP-NOW");
+    
+    // ⭐ NEW: Wire up WiFi connection status callback
+    wifi->setConnectionStatusCallback([this](const String& event, const String& detail) {
+        this->handleConnectionStatusChange(event, detail);
+    });
+    
+    if (!wifi->begin()) {
+        Logger::error("WiFi initialization failed!");
         return false;
     }
-    Logger::info("ESP-NOW initialized successfully");
-    publishLog("ESP-NOW initialized successfully", "INFO", "setup");
-
-    // Link EspNow to WiFi so channels sync on connection
-    wifi->setEspNow(espNow);
-
-    bool wifiReady = wifi && wifi->begin();
-    WifiManager::Status wifiState;
+    
+    // Give WiFi time to connect
+    delay(2000);
+    
+    if (wifi->isConnected()) {
+        Logger::info("✓ WiFi connected: %s (RSSI: %d dBm)", 
+            wifi->getStatus().ssid.c_str(), 
+            wifi->getStatus().rssi);
+        Logger::info("  IP Address: %s", wifi->getStatus().ip.toString().c_str());
+        Logger::info("  WiFi Channel: %d", WiFi.channel());
+    } else {
+        Logger::warn("WiFi not connected - running in offline mode");
+    }
+    
+    // STEP 2: Initialize ESP-NOW (will briefly disconnect WiFi to set channel)
+    Logger::info("STEP 2/4: Initializing ESP-NOW...");
+    espNow = new EspNow();
+    if (!espNow->begin()) {
+        Logger::error("ESP-NOW initialization failed!");
+        return false;
+    }
+    Logger::info("✓ ESP-NOW initialized on channel %d", WiFi.channel());
+    
+    // Link WiFi manager with ESP-NOW
     if (wifi) {
-        wifiState = wifi->getStatus();
+        wifi->setEspNow(espNow);
     }
-    String wifiDetail;
-    if (wifiReady && wifiState.connected) {
-        wifiDetail = wifiState.ssid + " @ " + wifiState.ip.toString();
-    } else if (wifiState.offlineMode) {
-        wifiDetail = "Offline mode";
-    } else {
-        wifiDetail = "Needs setup";
-    }
-    bootManager.record("Wi-Fi", wifiReady, wifiDetail);
-    if (!wifiReady) {
-        Logger::warn("Wi-Fi not connected at boot; continuing with offline fallback");
-    }
-
-    // Register message callback for regular node messages
-    espNow->setMessageCallback([this](const String& nodeId, const uint8_t* data, size_t len) {
-        if (data && len > 0) {
-            this->handleNodeMessage(nodeId, data, len);
-        }
-    });
-
-    // Register send error callback for visual feedback
-    espNow->setSendErrorCallback([this](const String& nodeId) {
-        // Flash red on all LEDs to indicate send failure
-        statusLed.pulse(180, 0, 0, 200); // Red flash for 200ms
-        Logger::warn("ESP-NOW send failed to node %s - showing red flash", nodeId.c_str());
-    });
     
-    // Register pairing callback to handle join requests coming from nodes
-    espNow->setPairingCallback([this](const uint8_t* mac, const uint8_t* data, size_t len) {
-        if (!mac || !data || len == 0) {
-            Logger::warn("Invalid pairing callback parameters");
-            return;
-        }
-        String payload((const char*)data, len);
-        MessageType mt = MessageFactory::getMessageType(payload);
-        if (mt != MessageType::JOIN_REQUEST) {
-            Logger::warn("Pairing callback: unexpected message type");
-            return;
-        }
-
-        // Format MAC string
-        char macStr[18];
-        snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        String nodeId(macStr);
-
-        if (!nodes->isPairingActive()) {
-            Logger::warn("Rejecting pairing from %s: pairing not active", macStr);
-            return;
-        }
-
-        bool regOk = nodes->processPairingRequest(mac, nodeId);
-        if (!regOk) {
-            Logger::warn("Failed to register node %s during pairing", macStr);
-            return;
-        }
-
-        // Add as ESP-NOW peer (unencrypted) - this now handles duplicates gracefully
-        espNow->addPeer(mac);
-
-        // Get current WiFi channel
-        uint8_t currentChannel = 1;
-        wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
-        esp_wifi_get_channel(&currentChannel, &second);
-        
-        JoinAcceptMessage accept;
-        accept.node_id = nodeId;
-        accept.light_id = nodes->getLightForNode(nodeId);
-        accept.lmk = ""; // Unencrypted for now
-        accept.wifi_channel = currentChannel; // Tell node which channel to use
-        accept.cfg.pwm_freq = 0; // Not used but set explicitly
-        accept.cfg.rx_window_ms = 20;
-        accept.cfg.rx_period_ms = 100;
-        String json = accept.toJson();
-        
-        // Debug: log the message we're sending
-        Logger::info("JOIN_ACCEPT message (%d bytes): %s", json.length(), json.c_str());
-
-        // send back to node mac (will auto-add peer if missing)
-        if (!espNow->sendToMac(mac, json)) {
-            Logger::warn("Failed to send join_accept to %s", macStr);
-        } else {
-            Logger::info("Sent join_accept to %s", macStr);
-        }
-
-        // Assign LED and give brief green flash for connection feedback
-        int idx = assignGroupForNode(nodeId);
-        if (idx >= 0) {
-            groupConnected[idx] = true; // mark active connection
-            flashLedForNode(nodeId, 400); // Longer flash for pairing success
-        }
-        
-        // Show "OK" confirmation: all LEDs green pulse for 300ms
-        statusLed.pulse(0, 150, 0, 300); // Green confirmation flash
-        Logger::info("Pairing successful - OK confirmation shown");
-    });
-
-    if (mqtt && wifi) {
-        mqtt->setWifiManager(wifi);
-    }
-
-    Logger::info("Initializing MQTT...");
-    bool mqttInitOk = mqtt->begin();
-    bool mqttConnected = mqtt->isConnected();
-    String brokerLabel = mqtt->getBrokerHost().isEmpty() ? String("auto") : mqtt->getBrokerHost();
-    bootManager.record("MQTT", mqttConnected, mqttConnected ? String("Connected ") + brokerLabel : String("Waiting on ") + brokerLabel);
-    if (!mqttInitOk) {
-        Logger::error("Failed to initialize MQTT");
-        return false;
-    }
-    Logger::info("MQTT initialized successfully");
-    mqtt->setCommandCallback([this](const String& topic, const String& payload) {
-        this->handleMqttCommand(topic, payload);
-    });
-
-    Logger::info("Initializing mmWave sensor...");
-    bool mmWaveOk = mmWave->begin();
-    bool mmWaveOnline = mmWave->isOnline();
-    bootManager.record("mmWave", mmWaveOnline, mmWaveOnline ? "LD2450 streaming" : "will retry");
-    if (!mmWaveOk) {
-        Logger::warn("Failed to initialize mmWave sensor - continuing without it");
-    } else if (!mmWaveOnline) {
-        Logger::warn("mmWave sensor initialized but no stream detected - will retry in background");
-    } else {
-        Logger::info("mmWave initialized successfully");
-    }
-
-    Logger::info("Initializing node registry...");
-    bool nodesOk = nodes->begin();
-    bootManager.record("Nodes", nodesOk, nodesOk ? "registry ready" : "init failed");
-    if (!nodesOk) {
-        Logger::error("Failed to initialize node registry");
-        return false;
-    }
-    Logger::info("Node registry initialized successfully");
-    publishLog("Node registry initialized successfully", "INFO", "setup");
+    // STEP 3: Wait for WiFi to stabilize after ESP-NOW channel change
+    Logger::info("STEP 3/4: Waiting for WiFi to stabilize after ESP-NOW init...");
+    uint32_t wifiWaitStart = millis();
+    bool wifiRestored = false;
     
-    // Auto-pair all stored nodes with ESP-NOW on boot
-    auto storedNodes = nodes->getAllNodeMacs();
-    if (storedNodes.size() > 0) {
-        Logger::info("Auto-pairing %d stored node(s) with ESP-NOW...", storedNodes.size());
-        for (const auto& macStr : storedNodes) {
-            uint8_t mac[6];
-            if (EspNow::macStringToBytes(macStr, mac)) {
-                if (espNow->addPeer(mac)) {
-                    Logger::info("  ✓ Re-paired node: %s", macStr.c_str());
-                } else {
-                    Logger::warn("  ✗ Failed to re-pair node: %s", macStr.c_str());
-                }
-            } else {
-                Logger::error("  ✗ Invalid MAC format: %s", macStr.c_str());
+    while (millis() - wifiWaitStart < 10000) {  // 10 second timeout
+        if (WiFi.status() == WL_CONNECTED) {
+            wifiRestored = true;
+            break;
+        }
+        delay(100);
+    }
+    
+    if (wifiRestored) {
+        Logger::info("✓ WiFi reconnected and stable on channel %d", WiFi.channel());
+        Logger::info("  IP Address: %s", WiFi.localIP().toString().c_str());
+    } else {
+        Logger::warn("WiFi did not reconnect after ESP-NOW init");
+        Logger::warn("MQTT will retry connection in background");
+    }
+    
+    // STEP 4: Initialize MQTT (now that WiFi is stable)
+    Logger::info("STEP 4/4: Initializing MQTT...");
+    mqtt = new Mqtt();
+    mqtt->setWifiManager(wifi);
+    if (!mqtt->begin()) {
+        Logger::warn("MQTT initialization failed - will retry in background");
+    } else {
+        Logger::info("✓ MQTT initialized");
+        Logger::info("  Broker: %s:%d", mqtt->getBrokerHost().c_str(), mqtt->getBrokerPort());
+        Logger::info("  Farm ID: %s", mqtt->getFarmId().c_str());
+        Logger::info("  Coordinator ID: %s", mqtt->getCoordinatorId().c_str());
+        
+        // Set MQTT command callback
+        mqtt->setCommandCallback([this](const String& topic, const String& payload) {
+            this->handleMqttCommand(topic, payload);
+        });
+        
+        // Initialize log streaming to MQTT
+        gLogStreamer.setEnabled(true);
+        gLogStreamer.setMinLevel(Logger::INFO);  // Stream INFO and above (not DEBUG)
+        gLogStreamer.setRateLimit(5);  // Max 5 messages per second
+        gLogStreamer.setPublishCallback([this](const String& level, const String& message, unsigned long timestamp) {
+            if (mqtt && mqtt->isConnected()) {
+                mqtt->publishSerialLog(message, level);
             }
-        }
-        Logger::info("Auto-pairing complete: %d/%d nodes paired", storedNodes.size(), storedNodes.size());
-    } else {
-        Logger::info("No stored nodes to auto-pair");
+        });
+        Logger::info("✓ Log streaming enabled (INFO level, 5 msg/sec)");
     }
     
-    nodes->setNodeRegisteredCallback([this](const String& nodeId, const String& lightId) {
-        Logger::info("Node %s paired to light %s", nodeId.c_str(), lightId.c_str());
-        if (espNow) {
-            espNow->disablePairingMode();
-        }
-        if (nodes && nodes->isPairingActive()) {
-            nodes->stopPairing();
-        }
-        statusLed.pulse(0, 150, 0, 400);
-    });
-
-    // Initialize onboard status LED
-    statusLed.begin();
-    delay(50);  // Give RMT driver time to initialize
-    
-    // Test pattern: cycle through all pixels briefly to verify SK6812B strip is working
-    // Temporarily disabled due to ESP32-S3 RMT/WiFi conflict
-    // Logger::info("Testing SK6812B strip (%d pixels)...", Pins::RgbLed::NUM_PIXELS);
-    // for (uint8_t i = 0; i < Pins::RgbLed::NUM_PIXELS; ++i) {
-    //     statusLed.clear();
-    //     statusLed.setPixel(i, 0, 100, 0); // green
-    //     statusLed.show();
-    //     delay(100);
-    // }
-    // statusLed.clear();
-    Logger::info("SK6812B strip initialized (test pattern skipped)");;
-    
-    // Initialize LED group mapping containers (4 pixels per group)
-    int groupCount = Pins::RgbLed::NUM_PIXELS / 4;
-    groupToNode.assign(groupCount, String());
-    groupConnected.assign(groupCount, false);
-    groupFlashUntilMs.assign(groupCount, 0);
-    rebuildLedMappingFromRegistry();
-
-    bool zonesOk = zones->begin();
-    bootManager.record("Zones", zonesOk, zonesOk ? "control ready" : "init failed");
-    if (!zonesOk) {
-        Logger::error("Failed to initialize zone control");
-        return false;
-    }
-
-    // Disable idle breathing; LEDs indicate node connections per requirements
-    statusLed.setIdleBreathing(false);
-
-    bool buttonsOk = buttons->begin();
-    bootManager.record("Button", buttonsOk, buttonsOk ? "GPIO ready" : "init failed");
-    if (!buttonsOk) {
-        Logger::error("Failed to initialize button control");
-        return false;
-    }
-
-    bool thermalOk = thermal->begin();
-    bootManager.record("Thermal", thermalOk, thermalOk ? "monitoring" : "init failed");
-    if (!thermalOk) {
-        Logger::error("Failed to initialize thermal control");
-        return false;
-    }
-
-    bool ambientOk = true;
-    if (ambientLight && !ambientLight->begin()) {
-        Logger::warn("TSL2561 ambient light sensor init failed (continuing)");
-        ambientOk = false;
-    }
-    bootManager.record("Ambient", ambientOk, ambientOk ? "TSL2561 ready" : "sensor offline");
-
-    // Register event handlers
-    mmWave->setEventCallback([this](const MmWaveEvent& event) {
-        this->onMmWaveEvent(event);
-    });
-
-    thermal->registerThermalAlertCallback([this](const String& nodeId, const NodeThermalData& data) {
-        this->onThermalEvent(nodeId, data);
-    });
-
-    buttons->setEventCallback([this](const String& buttonId, bool pressed) {
-        this->onButtonEvent(buttonId, pressed);
+    // Set up ESP-NOW callbacks
+    espNow->setMessageCallback([this](const String& nodeId, const uint8_t* data, size_t len) {
+        this->handleNodeMessage(nodeId, data, len);
     });
     
-    buttons->setLongPressCallback([this]() {
-        // Long press: flash all connected nodes on white channel while held
-        this->longPressActive = true;
-        this->startFlashAll();
+    espNow->setPairingCallback([this](const uint8_t* mac, const uint8_t* data, size_t len) {
+        this->handlePairingRequest(mac, data, len);
     });
     
-    buttons->setVeryLongPressCallback([this]() {
-        // Very long press (10s): clear all known nodes
-        Logger::info("===========================================");
-        Logger::info("CLEARING ALL NODES (10s hold detected)");
-        Logger::info("===========================================");
-        if (nodes) {
-            nodes->clearAllNodes();
-        }
-        if (espNow) {
-            espNow->clearAllPeers(); // Clear ESP-NOW peers
-        }
-        // Rebuild LED mapping to clear visual indicators
-        rebuildLedMappingFromRegistry();
-        updateLeds();
-        Logger::info("All nodes cleared. Release button to continue.");
-        Logger::info("===========================================");
+    espNow->setSendErrorCallback([this](const String& nodeId) {
+        this->handleSendError(nodeId);
     });
-
-bootManager.printSummary();
-
-// Configure serial console callbacks
-serialConsole.onWifiConfig([this]() {
-    if (wifi) {
-        wifi->reconfigureWifi();
-    } else {
-        Serial.println("✗ WiFi manager not available");
+    
+    // Start pairing mode for 5 minutes
+    startPairing(300000);
+    
+    Logger::info("=== COORDINATOR READY ===");
+    Logger::info("Pairing mode active for 5 minutes");
+    Logger::info("Waiting for pairing requests from frontend...");
+    
+    // Publish initial status to MQTT
+    if (mqtt && mqtt->isConnected()) {
+        publishPairingStatus();
+        publishNodeList();
     }
-});
-serialConsole.onMqttConfig([this]() {
-    if (mqtt) {
-        mqtt->runProvisioningWizard();
-    } else {
-        Serial.println("✗ MQTT not available");
-    }
-});
-serialConsole.onStatus([this]() {
-    printSerialTelemetry();
-});
-serialConsole.onPair([this]() {
-    startPairingWindow(60000, "serial command");
-});
-serialConsole.onReboot([]() {
-    ESP.restart();
-});
-
-Logger::info("Coordinator initialization complete");
-Logger::info("==============================================");
-Logger::info("System ready! Press BOOT button to pair nodes.");
-Logger::info("Hold 4s to run wave test on paired nodes.");
-logConnectedNodes();
-Logger::info("==============================================");
-return true;
+    
+    return true;
 }
 
 void Coordinator::loop() {
-    // Handle serial commands (must be before other loops to respond quickly)
-    serialConsole.process();
+    uint32_t now = millis();
     
+    // Feed the watchdog timer to prevent reset
+    SystemWatchdog::feed();
+    
+    // WiFi loop
     if (wifi) {
         wifi->loop();
     }
-    // Use guard checks to prevent null pointer crashes
-    if (espNow) espNow->loop();
-    if (mqtt) mqtt->loop();
-    if (mmWave) mmWave->loop();
-    if (nodes) nodes->loop();
-    if (zones) zones->loop();
-    if (buttons) buttons->loop();
-    if (thermal) thermal->loop();
     
-    // Update status LED pulse (pairing) if active
-    statusLed.loop();
-
-    // While flashing mode is active and button is held, tick the flash
-    if (flashAllActive && buttonDown) {
-        flashAllTick(millis());
+    // MQTT loop
+    if (mqtt) {
+        mqtt->loop();
     }
-
-    // Always update per-node LEDs (show connection state)
-    if (!statusLed.isPulsing()) {
-        updateLeds();
+    
+    // ESP-NOW loop
+    if (espNow) {
+        espNow->loop();
     }
-
-    // Periodically ping and check staleness
-    static uint32_t lastPing = 0;
-    static uint32_t lastStaleCheck = 0;
-    uint32_t now = millis();
-    if (now - lastPing > 2000) {
+    
+    // Check if pairing should end
+    if (pairingActive && now >= pairingEndTime) {
+        stopPairing();
+    }
+    
+    // Send health pings every 5 seconds
+    if (now - lastHealthPingMs >= 5000) {
+        lastHealthPingMs = now;
         sendHealthPings();
-        lastPing = now;
-    }
-    if (now - lastStaleCheck > 5000) {
-        checkStaleConnections();
-        lastStaleCheck = now;
-    }
-
-    refreshCoordinatorSensors();
-    printSerialTelemetry();
-}
-
-void Coordinator::onMmWaveEvent(const MmWaveEvent& event) {
-    lastMmWaveEvent = event;
-    haveMmWaveSample = true;
-    // Guard against null pointers
-    if (!zones || !nodes || !thermal || !espNow || !mqtt) {
-        Logger::error("Cannot process mmWave event: components not initialized");
-        return;
     }
     
-    // Publish raw mmWave frame to MQTT for backend/frontend consumption
-    mqtt->publishMmWaveEvent(event);
-
-    // Only send lighting commands when zone state CHANGES (not every frame)
-    // This prevents flickering and allows manual control when out of zone
-    if (event.zoneOccupied != zoneOccupiedState) {
-        zoneOccupiedState = event.zoneOccupied;
-        
-        auto allNodes = nodes->getAllNodes();
-        for (const auto& nodeInfo : allNodes) {
-            if (zoneOccupiedState) {
-                // Just entered zone: turn all node LEDs GREEN
-                espNow->sendColorCommand(nodeInfo.nodeId, 0, 255, 0, 0, 200); // Green, 200ms fade
-                Logger::info("ENTERED ZONE - sending GREEN to node %s", nodeInfo.nodeId.c_str());
-            } else {
-                // Just left zone: turn off LEDs (available for manual control)
-                espNow->sendColorCommand(nodeInfo.nodeId, 0, 0, 0, 0, 200); // Off, 200ms fade
-                Logger::info("LEFT ZONE - turning off node %s (manual control available)", nodeInfo.nodeId.c_str());
-            }
-            
-            // Publish state change to MQTT
-            mqtt->publishLightState(nodeInfo.lightId, zoneOccupiedState ? 255 : 0);
-        }
-    }
-}
-
-void Coordinator::onThermalEvent(const String& nodeId, const NodeThermalData& data) {
-    // Guard against null pointers
-    if (!mqtt || !nodes || !zones || !espNow) {
-        Logger::error("Cannot process thermal event: components not initialized");
-        return;
+    // Log status every 10 seconds
+    if (now - lastStatusLogMs >= 10000) {
+        lastStatusLogMs = now;
+        logConnectedNodes();
     }
     
-    // Handle thermal alerts
-    Logger::warning("Thermal alert for node %s: %.1f°C, deration: %d%%",
-                   nodeId.c_str(), data.temperature, data.derationLevel);
-                   
-    // Publish thermal event to MQTT
-    mqtt->publishThermalEvent(nodeId, data);
-    
-    // If node is currently active, update its brightness with deration
-    auto lightId = nodes->getLightForNode(nodeId);
-    if (!lightId.isEmpty() && zones->isLightActive(lightId)) {
-        espNow->sendLightCommand(nodeId, data.derationLevel);
+    // Publish status to MQTT every 30 seconds
+    if (mqtt && mqtt->isConnected() && now - lastMqttPublishMs >= 30000) {
+        lastMqttPublishMs = now;
+        publishNodeList();
     }
-}
-
-void Coordinator::onButtonEvent(const String& buttonId, bool pressed) {
-    // Guard against null pointers
-    if (!nodes || !espNow) {
-        Logger::error("Cannot process button event: components not initialized");
-        return;
-    }
-
-    if (pressed) {
-        // Begin press: track state, do not enter pairing yet
-        buttonDown = true;
-        buttonPressedAt = millis();
-        longPressActive = false;
-        return;
-    }
-
-    // On release
-    buttonDown = false;
-    if (longPressActive) {
-        // Stop flashing and suppress pairing
-        stopFlashAll();
-        longPressActive = false;
-        return;
-    }
-
-    const uint32_t windowMs = 60000; // 60s pairing window
-    startPairingWindow(windowMs, "button");
 }
 
 void Coordinator::handleNodeMessage(const String& nodeId, const uint8_t* data, size_t len) {
-    // Parse the JSON payload to detect message type
+    Logger::info("Message from node %s (%d bytes)", nodeId.c_str(), (int)len);
+    
+    // Update node registry
+    if (nodes) {
+        nodes->updateNodeStatus(nodeId, 100);
+    }
+    
+    // Parse message
     String payload((const char*)data, len);
-    MessageType mt = MessageFactory::getMessageType(payload);
+    EspNowMessage* msg = MessageFactory::createMessage(payload);
+    
+    if (msg) {
+        if (msg->type == MessageType::NODE_STATUS) {
+            NodeStatusMessage* status = static_cast<NodeStatusMessage*>(msg);
+            Logger::info("  Status: R=%d G=%d B=%d W=%d Temp=%.1fC Button=%s",
+                status->avg_r, status->avg_g, status->avg_b, status->avg_w,
+                status->temperature,
+                status->button_pressed ? "PRESSED" : "Released");
+                
+            // Publish to MQTT
+            if (mqtt && mqtt->isConnected()) {
+                mqtt->publishNodeStatus(*status);
+            }
+        }
+        delete msg;
+    }
+}
 
-    // Auto-accept any node JOIN_REQUEST (no formal pairing required)
-    if (mt == MessageType::JOIN_REQUEST && nodes) {
-        // nodeId is the MAC string - add as peer first
-        uint8_t mac[6];
-        if (EspNow::macStringToBytes(nodeId, mac)) {
-            espNow->addPeer(mac);
+void Coordinator::handlePairingRequest(const uint8_t* mac, const uint8_t* data, size_t len) {
+    char macStr[18];
+    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
+    Logger::info("Pairing request from %s", macStr);
+    
+    if (!pairingActive) {
+        Logger::warn("  Pairing not active - ignoring (start pairing via MQTT or wait for auto-enable)");
+        return;
+    }
+    
+    // Parse join request
+    String payload((const char*)data, len);
+    EspNowMessage* msg = MessageFactory::createMessage(payload);
+    
+    if (msg && msg->type == MessageType::JOIN_REQUEST) {
+        JoinRequestMessage* joinReq = static_cast<JoinRequestMessage*>(msg);
+        
+        Logger::info("  Join Request:");
+        Logger::info("    MAC: %s", joinReq->mac.c_str());
+        Logger::info("    FW: %s", joinReq->fw.c_str());
+        Logger::info("    RGBW: %s", joinReq->caps.rgbw ? "Yes" : "No");
+        Logger::info("    LEDs: %d", joinReq->caps.led_count);
+        
+        // Generate node ID and light ID
+        String nodeId = joinReq->mac;
+        nodeId.replace(":", "");
+        nodeId = "N" + nodeId.substring(nodeId.length() - 6);
+        
+        String lightId = "L" + nodeId.substring(1);
+        
+        // Notify via MQTT that a node wants to pair
+        if (mqtt && mqtt->isConnected()) {
+            StaticJsonDocument<512> doc;
+            doc["event"] = "pairing_request";
+            doc["mac"] = joinReq->mac;
+            doc["node_id"] = nodeId;
+            doc["light_id"] = lightId;
+            doc["firmware"] = joinReq->fw;
+            doc["rssi"] = espNow->getPeerRssi(joinReq->mac);
+            doc["capabilities"]["rgbw"] = joinReq->caps.rgbw;
+            doc["capabilities"]["led_count"] = joinReq->caps.led_count;
+            doc["capabilities"]["temp_sensor"] = joinReq->caps.temp_i2c;
+            doc["capabilities"]["button"] = joinReq->caps.button;
+            
+            String topicBase = mqtt->getFarmId() + "/" + mqtt->getCoordinatorId();
+            String topic = topicBase + "/pairing/events";
+            
+            String jsonStr;
+            serializeJson(doc, jsonStr);
+            // Note: We can't publish directly here without PubSubClient access
+            // The MQTT class would need a publishJson() method
+            Logger::info("  Pairing request detected - waiting for frontend approval via MQTT");
         }
         
-        // Auto-register if not already known
-        String existingLight = nodes->getLightForNode(nodeId);
-        if (existingLight.length() == 0) {
-            // Generate light ID from MAC last 3 bytes
-            char lightIdBuf[16];
-            snprintf(lightIdBuf, sizeof(lightIdBuf), "L%s", nodeId.substring(nodeId.length() - 8).c_str());
-            // Remove colons
-            String lightId = String(lightIdBuf);
-            lightId.replace(":", "");
+        // For now, auto-accept (frontend can control via MQTT commands)
+        Logger::info("  Auto-accepting pairing request...");
+        
+        // Add to registry
+        if (nodes) {
             nodes->registerNode(nodeId, lightId);
-            existingLight = lightId;
-            Logger::info("Auto-registered node %s as %s", nodeId.c_str(), lightId.c_str());
+            nodes->saveToStorage();
         }
         
-        // Always respond with join_accept
+        // Add peer
+        uint8_t macBytes[6];
+        if (EspNow::macStringToBytes(joinReq->mac, macBytes)) {
+            espNow->addPeer(macBytes);
+            espNow->savePeersToStorage();
+        }
+        
+        // Send acceptance
         JoinAcceptMessage accept;
         accept.node_id = nodeId;
-        accept.light_id = existingLight;
-        accept.lmk = "";
-        // CRITICAL: Include current WiFi channel so node can switch
-        uint8_t currentChannel = 1;
-        wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
-        esp_wifi_get_channel(&currentChannel, &second);
-        accept.wifi_channel = currentChannel;
-        accept.cfg.rx_window_ms = 20;
-        accept.cfg.rx_period_ms = 100;
-        String json = accept.toJson();
+        accept.light_id = lightId;
+        accept.wifi_channel = WiFi.channel();
+        accept.cfg.pwm_freq = 5000;
+        accept.cfg.rx_window_ms = 100;
+        accept.cfg.rx_period_ms = 1000;
         
-        uint8_t mac2[6];
-        if (EspNow::macStringToBytes(nodeId, mac2)) {
-            if (!espNow->sendToMac(mac2, json)) {
-                Logger::warn("Failed to send join_accept to %s", nodeId.c_str());
-            } else {
-                Logger::info("Sent join_accept to %s", nodeId.c_str());
-            }
+        String acceptJson = accept.toJson();
+        espNow->sendToMac(macBytes, acceptJson);
+        
+        Logger::info("  ✓ Paired: %s -> %s", nodeId.c_str(), lightId.c_str());
+        
+        // Publish updated node list
+        if (mqtt && mqtt->isConnected()) {
+            publishNodeList();
         }
+        
+        delete msg;
     }
+}
 
-    // Update last-seen for any message first
-    if (nodes) {
-        nodes->updateNodeStatus(nodeId, 0);
+void Coordinator::handleSendError(const String& nodeId) {
+    Logger::warn("Send error to node %s", nodeId.c_str());
+}
+
+void Coordinator::handleMqttCommand(const String& topic, const String& payload) {
+    Logger::info("MQTT command: %s", topic.c_str());
+    Logger::info("  Payload: %s", payload.c_str());
+    
+    // Parse command
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    
+    if (error) {
+        Logger::error("Failed to parse MQTT command: %s", error.c_str());
+        return;
     }
     
-    // Ensure we have a group assigned for this node
-    int idx = getGroupIndexForNode(nodeId);
-    if (idx < 0) {
-        idx = assignGroupForNode(nodeId);
-        Logger::info("Assigned group %d to node %s", idx + 1, nodeId.c_str());
-    }
-    if (idx >= 0) {
-        if (!groupConnected[idx]) {
-            Logger::info("[Node %d] %s CONNECTED", idx + 1, nodeId.c_str());
-        }
-        groupConnected[idx] = true; // mark as active connection
-        flashLedForNode(nodeId, 150); // brief activity flash on each message
-    }
-
-    // Improved logging per node index with MAC
-    Logger::info("[Node %d] %s %s | %d bytes", 
-                 idx >= 0 ? idx + 1 : 0,
-                 nodeId.c_str(),
-                 mt == MessageType::NODE_STATUS ? "STATUS" : "MESSAGE", 
-                 (int)len);
-
-    // Mark last seen on status and log sensor data
-    if (mt == MessageType::NODE_STATUS && nodes) {
-        nodes->updateNodeStatus(nodeId, 0);
-        
-        // Parse and log sensor data from telemetry
-        EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::NODE_STATUS) {
-            NodeStatusMessage* statusMsg = static_cast<NodeStatusMessage*>(msg);
-            updateNodeTelemetryCache(nodeId, *statusMsg);
-            
-            // Log temperature if available
-            if (statusMsg->temperature > -50.0f && statusMsg->temperature < 150.0f) {
-                Logger::info("  [Node %d] Temperature: %.2f°C", 
-                             idx >= 0 ? idx + 1 : 0, 
-                             statusMsg->temperature);
-            }
-            
-            // Log button state
-            Logger::info("  [Node %d] Button: %s, RGBW: (%d,%d,%d,%d)", 
-                         idx >= 0 ? idx + 1 : 0,
-                         statusMsg->button_pressed ? "PRESSED" : "Released",
-                         statusMsg->avg_r, statusMsg->avg_g, statusMsg->avg_b, statusMsg->avg_w);
-            
-            delete msg;
-        }
-        
-        // Send ACK back to node to keep connection alive
-        uint8_t mac[6];
-        if (EspNow::macStringToBytes(nodeId, mac)) {
-            AckMessage ack;
-            ack.cmd_id = "telemetry_ack";
-            String ackJson = ack.toJson();
-            if (!espNow->sendToMac(mac, ackJson)) {
-                Logger::debug("Failed to send telemetry ACK to %s", nodeId.c_str());
-            }
-        }
-    }
-
-    // ===== Hydroponic Tower Telemetry Forwarding =====
-    // Forward tower telemetry from ESP-NOW to MQTT for backend/dashboard consumption
-    if (mt == MessageType::TOWER_TELEMETRY && mqtt) {
-        EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::TOWER_TELEMETRY) {
-            TowerTelemetryMessage* telemetry = static_cast<TowerTelemetryMessage*>(msg);
-            
-            // Log tower environmental data
-            Logger::info("[Tower %s] Air: %.1f°C, Humidity: %.1f%%, Light: %.0f lux", 
-                         telemetry->tower_id.c_str(),
-                         telemetry->air_temp_c, 
-                         telemetry->humidity_pct,
-                         telemetry->light_lux);
-            Logger::info("[Tower %s] Pump: %s, Light: %s (brightness: %d)", 
-                         telemetry->tower_id.c_str(),
-                         telemetry->pump_on ? "ON" : "OFF",
-                         telemetry->light_on ? "ON" : "OFF",
-                         telemetry->light_brightness);
-            
-            // Forward to MQTT broker
-            mqtt->publishTowerTelemetry(*telemetry);
-            
-            // Send ACK back to tower node
-            uint8_t mac[6];
-            if (EspNow::macStringToBytes(nodeId, mac)) {
-                AckMessage ack;
-                ack.cmd_id = "tower_telemetry_ack";
-                String ackJson = ack.toJson();
-                if (!espNow->sendToMac(mac, ackJson)) {
-                    Logger::debug("Failed to send tower telemetry ACK to %s", nodeId.c_str());
-                }
-            }
-            
-            delete msg;
-        }
-    }
-
-    // ===== Hydroponic Tower Join Request =====
-    // Handle tower-specific join requests (different from legacy node join)
-    if (mt == MessageType::TOWER_JOIN_REQUEST && mqtt) {
-        EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::TOWER_JOIN_REQUEST) {
-            TowerJoinRequestMessage* joinReq = static_cast<TowerJoinRequestMessage*>(msg);
-            
-            // Add as ESP-NOW peer
-            uint8_t mac[6];
-            if (EspNow::macStringToBytes(nodeId, mac)) {
-                espNow->addPeer(mac);
-            }
-            
-            // Generate tower ID from MAC
-            char towerIdBuf[24];
-            snprintf(towerIdBuf, sizeof(towerIdBuf), "T%s", nodeId.substring(nodeId.length() - 8).c_str());
-            String towerId = String(towerIdBuf);
-            towerId.replace(":", "");
-            
-            Logger::info("Tower join request from %s (FW: %s), assigning ID: %s", 
-                         nodeId.c_str(), joinReq->fw.c_str(), towerId.c_str());
-            Logger::info("  Capabilities: DHT=%d, Light=%d, Pump=%d, GrowLight=%d, Slots=%d",
-                         joinReq->caps.dht_sensor, joinReq->caps.light_sensor,
-                         joinReq->caps.pump_relay, joinReq->caps.grow_light,
-                         joinReq->caps.slot_count);
-            
-            // Store tower ID to MAC mapping for command routing
-            towerIdToMac[towerId] = nodeId;
-            Logger::info("  Stored MAC mapping: %s -> %s", towerId.c_str(), nodeId.c_str());
-            
-            // Send join accept response
-            TowerJoinAcceptMessage accept;
-            accept.tower_id = towerId;
-            accept.coord_id = mqtt->getCoordinatorId();
-            accept.farm_id = mqtt->getFarmId();
-            accept.lmk = "";  // TODO: implement secure pairing with LMK
-            
-            // Get current WiFi channel
-            uint8_t currentChannel = 1;
-            wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
-            esp_wifi_get_channel(&currentChannel, &second);
-            accept.wifi_channel = currentChannel;
-            
-            // Default configuration
-            accept.cfg.telemetry_interval_ms = 30000;  // 30 seconds
-            accept.cfg.pump_max_duration_s = 300;      // 5 minutes max
-            
-            String json = accept.toJson();
-            if (EspNow::macStringToBytes(nodeId, mac)) {
-                if (!espNow->sendToMac(mac, json)) {
-                    Logger::warn("Failed to send tower_join_accept to %s", nodeId.c_str());
-                } else {
-                    Logger::info("Sent tower_join_accept to %s (tower_id: %s)", 
-                                 nodeId.c_str(), towerId.c_str());
-                }
-            }
-            
-            delete msg;
-        }
-    }
-}
-
-// ===== LED mapping helpers =====
-void Coordinator::rebuildLedMappingFromRegistry() {
-    nodeToGroup.clear();
-    std::fill(groupToNode.begin(), groupToNode.end(), String());
-    std::fill(groupConnected.begin(), groupConnected.end(), false);
-    std::fill(groupFlashUntilMs.begin(), groupFlashUntilMs.end(), 0);
-
-    if (!nodes) return;
-    // Assign deterministically by sorted nodeId up to available groups
-    auto list = nodes->getAllNodes();
-    std::sort(list.begin(), list.end(), [](const NodeInfo& a, const NodeInfo& b){ return a.nodeId < b.nodeId; });
-    int maxGroups = Pins::RgbLed::NUM_PIXELS / 4;
-    int idx = 0;
-    uint32_t now = millis();
-    for (const auto& n : list) {
-        if (idx >= maxGroups) break;
-        nodeToGroup[n.nodeId] = idx;
-        groupToNode[idx] = n.nodeId;
-        // Mark as connected if recently seen (within last 6 seconds)
-        groupConnected[idx] = (n.lastSeenMs > 0 && (now - n.lastSeenMs) <= 6000U);
-        idx++;
-    }
-}
-
-int Coordinator::getGroupIndexForNode(const String& nodeId) {
-    auto it = nodeToGroup.find(nodeId);
-    if (it != nodeToGroup.end()) return it->second;
-    return -1;
-}
-
-int Coordinator::assignGroupForNode(const String& nodeId) {
-    // Already assigned?
-    int cur = getGroupIndexForNode(nodeId);
-    if (cur >= 0) return cur;
-    // Find first free group slot
-    int groupCount = Pins::RgbLed::NUM_PIXELS / 4;
-    for (int i = 0; i < groupCount; ++i) {
-        if (groupToNode[i].length() == 0) {
-            groupToNode[i] = nodeId;
-            nodeToGroup[nodeId] = i;
-            return i;
-        }
-    }
-    Logger::warn("No free LED group available for node %s", nodeId.c_str());
-    return -1;
-}
-
-void Coordinator::flashLedForNode(const String& nodeId, uint32_t durationMs) {
-    int idx = getGroupIndexForNode(nodeId);
-    if (idx < 0) return;
-    groupFlashUntilMs[idx] = millis() + durationMs;
-}
-
-void Coordinator::updateLeds() {
-    uint32_t now = millis();
+    String cmd = doc["command"] | "";
     
-    // Check for manual LED override timeout
-    if (manualLedMode && manualLedTimeoutMs > 0 && now > manualLedTimeoutMs) {
-        manualLedMode = false;
-        Logger::info("Manual LED override timed out");
+    if (cmd == "start_pairing") {
+        uint32_t durationMs = doc["duration_ms"] | 60000;
+        startPairing(durationMs);
+        publishPairingStatus();
     }
-
-    int groupCount = Pins::RgbLed::NUM_PIXELS / 4;
-    for (int g = 0; g < groupCount; ++g) {
-        uint8_t r=0,gc=0,b=0;
+    else if (cmd == "stop_pairing") {
+        stopPairing();
+        publishPairingStatus();
+    }
+    else if (cmd == "list_nodes") {
+        publishNodeList();
+    }
+    else if (cmd == "unpair_node") {
+        String nodeId = doc["node_id"] | "";
+        if (!nodeId.isEmpty() && nodes) {
+            nodes->unregisterNode(nodeId);
+            nodes->saveToStorage();
+            Logger::info("Unpaired node: %s", nodeId.c_str());
+            publishNodeList();
+        }
+    }
+    else if (cmd == "send_light_command") {
+        String nodeId = doc["node_id"] | "";
+        uint8_t r = doc["r"] | 0;
+        uint8_t g = doc["g"] | 0;
+        uint8_t b = doc["b"] | 0;
+        uint8_t w = doc["w"] | 0;
+        uint16_t fadeMs = doc["fade_ms"] | 0;
         
-        if (manualLedMode) {
-            // Manual override active
-            r = manualR;
-            gc = manualG;
-            b = manualB;
-        } else if (groupFlashUntilMs[g] > now) {
-            // Bright green flash (activity) at 50%
-            r=0; gc=128; b=0;
-        } else if (groupToNode[g].length() > 0) {
-            if (groupConnected[g]) {
-                // Solid green (dim) at 50%
-                r=0; gc=45; b=0;
-            } else {
-                // Red for disconnected/stale node at 50%
-                r=90; gc=0; b=0;
-            }
-        } else {
-            r=0; gc=0; b=0;
-        }
-        // Paint the 4-pixel group
-        int base = g * 4;
-        for (int k=0;k<4;k++) {
-            statusLed.setPixel(base+k, r, gc, b);
+        if (!nodeId.isEmpty() && espNow) {
+            espNow->sendColorCommand(nodeId, r, g, b, w, fadeMs);
+            Logger::info("Sent color command to %s: R=%d G=%d B=%d W=%d", 
+                nodeId.c_str(), r, g, b, w);
         }
     }
-    statusLed.show();
 }
 
 void Coordinator::logConnectedNodes() {
     if (!nodes) return;
-    auto allNodes = nodes->getAllNodes();
-    if (allNodes.empty()) {
-        Logger::info("Connected nodes: 0");
-        return;
-    }
-
-    std::sort(allNodes.begin(), allNodes.end(), [](const NodeInfo& a, const NodeInfo& b) {
-        return a.nodeId < b.nodeId;
-    });
-
-    Logger::info("Connected nodes: %d", allNodes.size());
-    for (const auto& node : allNodes) {
-        int idx = getGroupIndexForNode(node.nodeId);
-        bool alive = (idx >= 0) ? groupConnected[idx] : false;
-        Logger::info("  [Node %d] %s -> %s [%s]",
-                     idx >= 0 ? idx + 1 : 0,
-                     node.nodeId.c_str(),
-                     node.lightId.c_str(),
-                     alive ? "ONLINE" : "OFFLINE");
-    }
-}
-
-void Coordinator::checkStaleConnections() {
-    if (!nodes) return;
+    
     auto allNodes = nodes->getAllNodes();
     uint32_t now = millis();
-
+    int onlineCount = 0;
+    
     for (const auto& node : allNodes) {
-        int idx = getGroupIndexForNode(node.nodeId);
-        if (idx >= 0 && groupConnected[idx]) {
-            // Mark disconnected if last seen > 6s
-            if (node.lastSeenMs > 0 && (now - node.lastSeenMs) > 6000U) {
-                groupConnected[idx] = false;
-                Logger::warn("[Node %d] DISCONNECTED (timeout)", idx + 1);
-            }
+        bool online = (node.lastSeenMs > 0 && (now - node.lastSeenMs) <= 10000);
+        if (online) onlineCount++;
+    }
+    
+    // Enhanced status log with more coordinator details
+    uint32_t uptimeSeconds = now / 1000;
+    uint32_t freeHeap = ESP.getFreeHeap();
+    uint32_t heapSize = ESP.getHeapSize();
+    int8_t rssi = wifi && wifi->isConnected() ? WiFi.RSSI() : 0;
+    String ipAddr = wifi && wifi->isConnected() ? WiFi.localIP().toString() : "0.0.0.0";
+    
+    Logger::info("📊 Coordinator Status: Nodes=%d/%d online | Uptime=%lus | Mem=%lu/%luKB free | WiFi=%ddBm (%s) | MQTT=%s | IP=%s", 
+        onlineCount, allNodes.size(),
+        uptimeSeconds,
+        freeHeap / 1024, heapSize / 1024,
+        rssi,
+        wifi && wifi->isConnected() ? "OK" : "Disconnected",
+        mqtt && mqtt->isConnected() ? "Connected" : "Disconnected",
+        ipAddr.c_str());
+    
+    if (allNodes.size() > 0) {
+        for (const auto& node : allNodes) {
+            bool online = (node.lastSeenMs > 0 && (now - node.lastSeenMs) <= 10000);
+            uint32_t ago = (node.lastSeenMs > 0) ? (now - node.lastSeenMs) / 1000 : 999;
+            Logger::info("  🌱 Tower %s -> Light %s [%s] (last seen %ds ago)",
+                node.towerId.c_str(),
+                node.lightId.c_str(),
+                online ? "ONLINE" : "OFFLINE",
+                ago);
         }
     }
 }
 
 void Coordinator::sendHealthPings() {
-    if (!espNow) return;
-    int groupCount = Pins::RgbLed::NUM_PIXELS / 4;
-    for (int g = 0; g < groupCount; ++g) {
-        // Only ping nodes that currently appear connected
-        if (groupToNode[g].length() == 0 || !groupConnected[g]) continue;
-        uint8_t mac[6];
-        if (!EspNow::macStringToBytes(groupToNode[g], mac)) continue;
-        const String ping = "{\"msg\":\"ping\"}";
-        espNow->sendToMac(mac, ping);
-    }
-}
-
-void Coordinator::startFlashAll() {
-    // Build list of connected nodes
     if (!nodes || !espNow) return;
-    auto all = nodes->getAllNodes();
-    bool any = false;
-    for (const auto& n : all) {
-        int gi = getGroupIndexForNode(n.nodeId);
-        if (gi >= 0 && groupConnected[gi]) { any = true; break; }
-    }
-    if (!any) {
-        Logger::info("No connected nodes - flash-all suppressed");
-        flashAllActive = false;
-        return;
-    }
-    flashAllActive = true;
-    flashOn = false; // will toggle to ON on first tick
-    lastFlashTick = 0;
-    Logger::info("Flash-all: ACTIVE (hold button to keep flashing)");
-    // trigger first tick immediately for instant feedback
-    flashAllTick(millis());
-}
-
-void Coordinator::stopFlashAll() {
-    flashAllActive = false;
-    flashOn = false;
-    lastFlashTick = 0;
-    Logger::info("Flash-all: STOPPED");
-}
-
-void Coordinator::flashAllTick(uint32_t now) {
-    const uint32_t intervalMs = 350; // toggle cadence
-    if (now - lastFlashTick < intervalMs) return;
-    lastFlashTick = now;
-    flashOn = !flashOn;
-
-    // Send white on/off to all connected nodes with short TTL and override_status
-    auto all = nodes->getAllNodes();
-    for (const auto& n : all) {
-        int gi = getGroupIndexForNode(n.nodeId);
-        if (gi < 0 || !groupConnected[gi]) continue;
-        uint8_t level = flashOn ? 128 : 0; // 50% brightness
-        // quick fade for nicer blink
-        espNow->sendLightCommand(n.nodeId, level, 60 /*fadeMs*/, true /*override*/, 500 /*ttl*/);
-    }
-}
-
-void Coordinator::triggerNodeWaveTest() {
-    if (!nodes || !espNow) {
-        Logger::warn("Cannot run node wave test: components not initialized");
-        return;
-    }
-
-    // Build list of currently connected nodes only
-    auto allNodes = nodes->getAllNodes();
-    std::vector<NodeInfo> connected;
-    connected.reserve(allNodes.size());
-    for (const auto& n : allNodes) {
-        int gi = getGroupIndexForNode(n.nodeId);
-        if (gi >= 0 && groupConnected[gi]) connected.push_back(n);
-    }
-    if (connected.empty()) {
-        Logger::info("No connected nodes - wave test skipped");
-        return;
-    }
-
-    Logger::info("Starting wave on %d connected node(s)...", connected.size());
-
-    // Deterministic order and synchronized start time across nodes
-    std::sort(connected.begin(), connected.end(), [](const NodeInfo& a, const NodeInfo& b) {
-        return a.nodeId < b.nodeId;
-    });
-
-    const uint32_t now = millis();
-    const uint32_t startAt = now + 300; // 300ms in the future to allow delivery jitter
-    const uint16_t periodMs = 1200;
-    const uint16_t durationMs = 4000;
-
-    for (const auto& node : connected) {
-        uint8_t mac[6];
-        if (!EspNow::macStringToBytes(node.nodeId, mac)) continue;
-        // Include start_at to coordinate across nodes
-        String wave = String("{\"msg\":\"wave\",\"period_ms\":") + String(periodMs) +
-                      ",\"duration_ms\":" + String(durationMs) +
-                      ",\"start_at\":" + String(startAt) + "}";
-        espNow->sendToMac(mac, wave);
-    }
-
-    Logger::info("Wave command sent");
-}
-
-void Coordinator::handleMqttCommand(const String& topic, const String& payload) {
-    StaticJsonDocument<256> doc;
-    DeserializationError err = deserializeJson(doc, payload);
-    if (err) {
-        Logger::warn("Failed to parse MQTT command (%s)", err.c_str());
-        return;
-    }
-
-    String cmd = doc["cmd"] | "";
-    cmd.toLowerCase();
     
-    // Extract nodeId from topic if it's a node command (site/{siteId}/node/{nodeId}/cmd)
-    String nodeId = "";
-    if (topic.indexOf("/node/") >= 0) {
-        int nodeStart = topic.indexOf("/node/") + 6;
-        int nodeEnd = topic.indexOf("/", nodeStart);
-        if (nodeEnd > nodeStart) {
-            nodeId = topic.substring(nodeStart, nodeEnd);
+    auto allNodes = nodes->getAllNodes();
+    for (const auto& node : allNodes) {
+        // Send a simple ping
+        String ping = "{\"msg\":\"ping\",\"ts\":" + String(millis()) + "}";
+        uint8_t mac[6];
+        if (EspNow::macStringToBytes(node.towerId, mac)) {
+            espNow->sendToMac(mac, ping);
         }
     }
+}
+
+void Coordinator::startPairing(uint32_t durationMs) {
+    pairingActive = true;
+    pairingEndTime = millis() + durationMs;
     
-    if (cmd == "pair" || cmd == "pairing.start" || cmd == "enter_pairing_mode") {
-        uint32_t windowMs = doc["duration_ms"] | 60000;
-        startPairingWindow(windowMs, "mqtt");
-    } else if (cmd == "pairing.stop") {
-        if (nodes) nodes->stopPairing();
-        if (espNow) espNow->disablePairingMode();
-        Logger::info("Pairing window closed via MQTT command");
-        Serial.println("Pairing window closed via MQTT command");
-    } else if (cmd == "set_light" && nodeId.length() > 0) {
-        // Forward set_light command to node via ESP-NOW
-        uint8_t r = doc["r"] | 0;
-        uint8_t g = doc["g"] | 0;
-        uint8_t b = doc["b"] | 0;
-        uint8_t w = doc["w"] | 0;
-        uint16_t fadeMs = doc["fade_ms"] | 200;
-        int8_t pixel = doc["pixel"] | -1;
-        bool overrideStatus = doc["override"] | false;
-        uint16_t ttlMs = doc["ttl_ms"] | 1500;
+    if (espNow) {
+        espNow->enablePairingMode(durationMs);
+    }
+    
+    Logger::info("Pairing mode enabled for %d seconds", durationMs / 1000);
+}
+
+void Coordinator::stopPairing() {
+    pairingActive = false;
+    
+    if (espNow) {
+        espNow->disablePairingMode();
+    }
+    
+    Logger::info("Pairing mode disabled");
+}
+
+void Coordinator::publishPairingStatus() {
+    if (!mqtt || !mqtt->isConnected()) return;
+    
+    StaticJsonDocument<256> doc;
+    doc["pairing_active"] = pairingActive;
+    if (pairingActive) {
+        doc["time_remaining_ms"] = pairingEndTime - millis();
+    } else {
+        doc["time_remaining_ms"] = 0;
+    }
+    
+    String topicBase = mqtt->getFarmId() + "/" + mqtt->getCoordinatorId();
+    String topic = topicBase + "/pairing/status";
+    
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+    
+    // We need to add a publishRaw() method to Mqtt class
+    // For now, log it
+    Logger::info("Pairing status: %s", jsonStr.c_str());
+}
+
+void Coordinator::publishNodeList() {
+    if (!mqtt || !mqtt->isConnected() || !nodes) return;
+    
+    auto allNodes = nodes->getAllNodes();
+    uint32_t now = millis();
+    
+    DynamicJsonDocument doc(2048);
+    JsonArray nodesArray = doc["nodes"].to<JsonArray>();
+    
+    for (const auto& node : allNodes) {
+        JsonObject nodeObj = nodesArray.createNestedObject();
+        nodeObj["node_id"] = node.towerId;
+        nodeObj["light_id"] = node.lightId;
+        nodeObj["last_duty"] = node.lastDuty;
         
-        Logger::info("set_light -> node=%s RGBW(%d,%d,%d,%d) pixel=%d fade=%dms",
-                     nodeId.c_str(), r, g, b, w, pixel, fadeMs);
+        bool online = (node.lastSeenMs > 0 && (now - node.lastSeenMs) <= 10000);
+        nodeObj["online"] = online;
+        nodeObj["last_seen_ms"] = node.lastSeenMs;
         
         if (espNow) {
-            bool sent = espNow->sendColorCommand(nodeId, r, g, b, w, fadeMs, overrideStatus, ttlMs, pixel);
-            if (sent) {
-                Logger::info("  ✓ ESP-NOW sent to %s", nodeId.c_str());
-            } else {
-                Logger::warn("  ✗ ESP-NOW failed to %s", nodeId.c_str());
-            }
-        } else {
-            Logger::error("ESP-NOW not initialized, cannot send to node");
+            nodeObj["rssi"] = espNow->getPeerRssi(node.towerId);
         }
-    } else if (cmd == "led.set") {
-        manualR = doc["r"] | 0;
-        manualG = doc["g"] | 0;
-        manualB = doc["b"] | 0;
-        uint32_t duration = doc["duration_ms"] | 0;
-        
-        manualLedMode = true;
-        if (duration > 0) {
-            manualLedTimeoutMs = millis() + duration;
-        } else {
-            manualLedTimeoutMs = 0; // Indefinite
-        }
-        Logger::info("Manual LED override: RGB(%d,%d,%d)", manualR, manualG, manualB);
-        updateLeds();
-    } else if (cmd == "led.reset") {
-        manualLedMode = false;
-        Logger::info("Manual LED override cleared");
-        updateLeds();
-    } else if (cmd == "update_config") {
-        // Handle configuration updates from frontend
-        JsonObject configObj = doc["config"];
-        if (!configObj.isNull()) {
-            ConfigManager config("coordinator");
-            if (!config.begin()) {
-                Logger::error("Failed to open config namespace");
-                publishLog("Config update failed: namespace error", "ERROR", "config");
-                return;
-            }
-            
-            int updateCount = 0;
-            
-            // Update each key from the config object
-            for (JsonPair kv : configObj) {
-                String key = kv.key().c_str();
-                
-                if (kv.value().is<int>()) {
-                    if (config.setInt(key, kv.value().as<int>())) {
-                        updateCount++;
-                        Logger::info("Updated config: %s = %d", key.c_str(), kv.value().as<int>());
-                    }
-                } else if (kv.value().is<float>()) {
-                    if (config.setFloat(key, kv.value().as<float>())) {
-                        updateCount++;
-                        Logger::info("Updated config: %s = %.2f", key.c_str(), kv.value().as<float>());
-                    }
-                } else if (kv.value().is<bool>()) {
-                    if (config.setBool(key, kv.value().as<bool>())) {
-                        updateCount++;
-                        Logger::info("Updated config: %s = %s", key.c_str(), kv.value().as<bool>() ? "true" : "false");
-                    }
-                } else if (kv.value().is<const char*>()) {
-                    if (config.setString(key, kv.value().as<String>())) {
-                        updateCount++;
-                        Logger::info("Updated config: %s = %s", key.c_str(), kv.value().as<String>().c_str());
-                    }
-                }
-            }
-            
-            config.end();
-            
-            String msg = "Configuration updated: " + String(updateCount) + " parameters changed";
-            publishLog(msg, "INFO", "config");
-            Logger::info("%s", msg.c_str());
-            
-            // Note: A reboot may be required for some parameters to take effect
-            if (updateCount > 0) {
-                Logger::warn("Some config changes may require restart to take effect");
-            }
-        } else {
-            Logger::warn("update_config command received with empty config object");
-        }
-    } else if (cmd == "ota") {
-        // ============================================================
-        // COORDINATOR OTA UPDATE
-        // Command: {"cmd": "ota", "url": "http://...", "checksum": "sha256:..."}
-        // ============================================================
-        String otaUrl = doc["url"] | "";
-        String otaChecksum = doc["checksum"] | "";
-        
-        if (otaUrl.length() == 0) {
-            Logger::error("OTA command missing 'url' field");
-            publishLog("OTA failed: missing URL", "ERROR", "ota");
-            return;
-        }
-        
-        Logger::info("Starting OTA update from: %s", otaUrl.c_str());
-        publishLog("OTA starting: " + otaUrl, "INFO", "ota");
-        
-        // Create progress callback that publishes to MQTT
-        auto progressCb = [this](OtaUpdater::Status status, int progress, const String& message) {
-            if (mqtt) {
-                mqtt->publishOtaStatus(
-                    OtaUpdater::statusToString(status),
-                    progress,
-                    message,
-                    status == OtaUpdater::Status::FAILED ? message : ""
-                );
-            }
-        };
-        
-        // Perform the OTA update
-        const char* checksumPtr = otaChecksum.length() > 0 ? otaChecksum.c_str() : nullptr;
-        OtaUpdater::Result result = OtaUpdater::updateFromUrl(otaUrl.c_str(), checksumPtr, progressCb);
-        
-        if (result.ok) {
-            Logger::info("OTA update successful, rebooting...");
-            publishLog("OTA successful, rebooting...", "INFO", "ota");
-            delay(1000);  // Give time for MQTT message to be sent
-            ESP.restart();
-        } else {
-            Logger::error("OTA update failed: %s (HTTP %d)", result.message.c_str(), result.httpCode);
-            publishLog("OTA failed: " + result.message, "ERROR", "ota");
-        }
-    } else if (topic.indexOf("/tower/") >= 0 && topic.endsWith("/cmd")) {
-        // ============================================================
-        // TOWER COMMAND FORWARDING (MQTT -> ESP-NOW)
-        // Topic pattern: farm/{farmId}/coord/{coordId}/tower/{towerId}/cmd
-        // ============================================================
-        
-        // Extract towerId from topic
-        int towerStart = topic.indexOf("/tower/") + 7;  // Skip "/tower/"
-        int towerEnd = topic.indexOf("/cmd");
-        
-        if (towerEnd <= towerStart) {
-            Logger::warn("Invalid tower command topic format: %s", topic.c_str());
-            return;
-        }
-        
-        String towerId = topic.substring(towerStart, towerEnd);
-        Logger::info("Tower command received for tower=%s cmd=%s", towerId.c_str(), cmd.c_str());
-        
-        // Look up MAC address from towerIdToMac map
-        auto it = towerIdToMac.find(towerId);
-        if (it == towerIdToMac.end()) {
-            Logger::warn("Unknown tower ID: %s (not in towerIdToMac map)", towerId.c_str());
-            publishLog("Tower command failed: unknown tower " + towerId, "WARN", "tower");
-            return;
-        }
-        
-        String macStr = it->second;
-        uint8_t mac[6];
-        if (!EspNow::macStringToBytes(macStr, mac)) {
-            Logger::error("Invalid MAC address for tower %s: %s", towerId.c_str(), macStr.c_str());
-            return;
-        }
-        
-        // Build TowerCommandMessage from JSON payload
-        TowerCommandMessage cmdMsg;
-        cmdMsg.msg = "tower_cmd";
-        cmdMsg.tower_id = towerId;
-        cmdMsg.command = cmd;
-        cmdMsg.ttl_ms = doc["ttl_ms"] | 3000;
-        
-        // Parse command-specific fields
-        if (cmd == "set_pump" || cmd == "tower_control") {
-            cmdMsg.pump_on = doc["pump_on"] | false;
-            cmdMsg.pump_duration_s = doc["pump_duration_s"] | 0;
-        }
-        
-        if (cmd == "set_light" || cmd == "tower_control") {
-            cmdMsg.light_on = doc["light_on"] | false;
-            cmdMsg.light_brightness = doc["light_brightness"] | 0;
-            cmdMsg.light_duration_m = doc["light_duration_m"] | 0;
-        }
-        
-        if (cmd == "ota") {
-            cmdMsg.ota_url = doc["ota_url"] | doc["url"] | "";
-            cmdMsg.ota_checksum = doc["ota_checksum"] | doc["checksum"] | "";
-        }
-        
-        // Send via ESP-NOW
-        if (!espNow) {
-            Logger::error("ESP-NOW not initialized, cannot forward tower command");
-            publishLog("Tower command failed: ESP-NOW not ready", "ERROR", "tower");
-            return;
-        }
-        
-        String json = cmdMsg.toJson();
-        Logger::debug("Sending tower command to %s: %s", macStr.c_str(), json.c_str());
-        
-        bool sent = espNow->sendToMac(mac, json);
-        if (sent) {
-            Logger::info("Tower command sent to %s (%s): %s", towerId.c_str(), macStr.c_str(), cmd.c_str());
-            publishLog("Tower command sent: " + towerId + " -> " + cmd, "INFO", "tower");
-        } else {
-            Logger::warn("Failed to send tower command to %s (%s)", towerId.c_str(), macStr.c_str());
-            publishLog("Tower command failed: ESP-NOW send error to " + towerId, "WARN", "tower");
-        }
-    }
-}
-
-void Coordinator::startPairingWindow(uint32_t durationMs, const char* reason) {
-    if (!nodes || !espNow) {
-        return;
-    }
-    nodes->startPairing(durationMs);
-    espNow->enablePairingMode(durationMs);
-    const char* origin = reason ? reason : "manual";
-    Logger::info("Pairing window (%s) open for %u ms", origin, durationMs);
-    Serial.printf("PAIRING MODE (%s) OPEN for %lu ms\n", origin, (unsigned long)durationMs);
-    String msg = "Pairing window (" + String(origin) + ") open for " + String(durationMs) + " ms";
-    publishLog(msg, "INFO", "pairing");
-    statusLed.pulse(0, 0, 180, 500);
-}
-
-void Coordinator::updateNodeTelemetryCache(const String& nodeId, const NodeStatusMessage& statusMsg) {
-    NodeTelemetrySnapshot snapshot;
-    snapshot.avgR = statusMsg.avg_r;
-    snapshot.avgG = statusMsg.avg_g;
-    snapshot.avgB = statusMsg.avg_b;
-    snapshot.avgW = statusMsg.avg_w;
-    snapshot.temperatureC = statusMsg.temperature;
-    snapshot.buttonPressed = statusMsg.button_pressed;
-    snapshot.lastUpdateMs = millis();
-    nodeTelemetry[nodeId] = snapshot;
-
-    if (mqtt) {
-        mqtt->publishNodeStatus(statusMsg);
-    }
-}
-
-void Coordinator::refreshCoordinatorSensors() {
-    uint32_t now = millis();
-    if (now - lastSensorSampleMs < 2000) {
-        return;
-    }
-    lastSensorSampleMs = now;
-
-    if (ambientLight) {
-        coordinatorSensors.lightLux = ambientLight->readLux();
     }
     
-    // Read ESP32 internal temperature sensor (if available)
-    #ifdef SOC_TEMP_SENSOR_SUPPORTED
-    coordinatorSensors.tempC = temperatureRead();
-    #else
-    coordinatorSensors.tempC = 0.0f;
-    #endif
+    doc["count"] = allNodes.size();
+    doc["timestamp"] = now;
     
-    coordinatorSensors.timestampMs = now;
-    bool mmWaveOnline = mmWave && mmWave->isOnline();
-    coordinatorSensors.mmWaveOnline = mmWaveOnline;
-    if (haveMmWaveSample && mmWaveOnline) {
-        coordinatorSensors.mmWavePresence = lastMmWaveEvent.presence;
-        coordinatorSensors.mmWaveConfidence = lastMmWaveEvent.confidence;
-    } else if (!mmWaveOnline) {
-        coordinatorSensors.mmWavePresence = false;
-        coordinatorSensors.mmWaveConfidence = 0.0f;
-    }
-
-    if (wifi) {
-        WifiManager::Status wifiStatus = wifi->getStatus();
-        coordinatorSensors.wifiConnected = wifiStatus.connected && !wifiStatus.offlineMode;
-        coordinatorSensors.wifiRssi = wifiStatus.connected ? wifiStatus.rssi : -127;
-    } else {
-        coordinatorSensors.wifiConnected = WiFi.status() == WL_CONNECTED;
-        coordinatorSensors.wifiRssi = coordinatorSensors.wifiConnected ? WiFi.RSSI() : -127;
-    }
-
-    if (mqtt) {
-        mqtt->publishCoordinatorTelemetry(coordinatorSensors);
-    }
+    String topicBase = mqtt->getFarmId() + "/" + mqtt->getCoordinatorId();
+    String topic = topicBase + "/nodes/list";
+    
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+    
+    Logger::info("Node list: %s", jsonStr.c_str());
 }
 
-void Coordinator::printSerialTelemetry() {
-    uint32_t now = millis();
-    if (now - lastSerialPrintMs < 3000) {
-        return;
-    }
-    lastSerialPrintMs = now;
+// ============================================================================
+// Connection Status Change Handler - Real-Time Event Publishing
+// ============================================================================
 
-    WifiManager::Status wifiStatus;
-    if (wifi) {
-        wifiStatus = wifi->getStatus();
-    } else {
-        wifiStatus.connected = (WiFi.status() == WL_CONNECTED);
-        wifiStatus.ssid = wifiStatus.connected ? WiFi.SSID() : "";
-        wifiStatus.rssi = wifiStatus.connected ? WiFi.RSSI() : -127;
-        wifiStatus.offlineMode = false;
-    }
-
-    bool mqttConnected = mqtt && mqtt->isConnected();
-    String brokerHost = mqtt ? mqtt->getBrokerHost() : String("n/a");
-    uint16_t brokerPort = mqtt ? mqtt->getBrokerPort() : 0;
-    const char* pairingState = (nodes && nodes->isPairingActive()) ? "OPEN" : "IDLE";
-    const char* mmStatus;
-    if (!coordinatorSensors.mmWaveOnline) {
-        mmStatus = "OFFLINE";
-    } else {
-        mmStatus = coordinatorSensors.mmWavePresence ? "PRESENT" : "CLEAR";
-    }
-    uint16_t mmRestarts = mmWave ? mmWave->getRestartCount() : 0;
-
-    size_t activeNodes = 0;
-    for (const auto& entry : nodeTelemetry) {
-        if (now - entry.second.lastUpdateMs <= 30000) {
-            activeNodes++;
-        }
-    }
-
-    Serial.println();
-    Serial.println("========== Coordinator Snapshot ==========");
-    Serial.printf("Sensors   | Lux %5.1f\n",
-                  coordinatorSensors.lightLux);
-    Serial.printf("mmWave    | %-8s  conf=%.2f restarts=%u\n",
-                  mmStatus,
-                  coordinatorSensors.mmWaveConfidence,
-                  static_cast<unsigned>(mmRestarts));
-    if (!coordinatorSensors.mmWaveOnline) {
-        Serial.println("           | sensor offline - verify LD2450 wiring (RX=GPIO44, TX=GPIO43, 3V3, GND)");
-    }
-    Serial.printf("Wi-Fi     | %-10s ssid=%s rssi=%d dBm offline=%s\n",
-                  wifiStatus.connected ? "CONNECTED" : "DISCONNECTED",
-                  wifiStatus.ssid.c_str(),
-                  wifiStatus.rssi,
-                  wifiStatus.offlineMode ? "true" : "false");
-    Serial.printf("MQTT      | %-10s %s:%u\n",
-                  mqttConnected ? "CONNECTED" : "RETRYING",
-                  brokerHost.c_str(),
-                  brokerPort);
-    Serial.printf("Pairing   | %s\n", pairingState);
-    if (activeNodes == 0) {
-        Serial.println("Nodes     | none paired (mmWave + ambient-only mode)");
-    } else {
-        Serial.printf("Nodes     | %u active\n", static_cast<unsigned>(activeNodes));
-        for (const auto& entry : nodeTelemetry) {
-            const auto& data = entry.second;
-            uint32_t age = now - data.lastUpdateMs;
-            if (age > 30000) {
-                continue;
-            }
-            Serial.printf("           - %s -> RGBW(%d,%d,%d,%d) temp=%.1f C btn=%s age=%lus\n",
-                          entry.first.c_str(),
-                          data.avgR,
-                          data.avgG,
-                          data.avgB,
-                          data.avgW,
-                          data.temperatureC,
-                          data.buttonPressed ? "DOWN" : "up",
-                          static_cast<unsigned long>(age / 1000));
-        }
-    }
-    Serial.println("==========================================");
-}
-
-void Coordinator::publishLog(const String& message, const String& level, const String& tag) {
+void Coordinator::handleConnectionStatusChange(const String& event, const String& detail) {
+    Logger::info("🔄 Connection status changed: %s (detail: %s)", event.c_str(), detail.c_str());
+    
+    // Publish to MQTT if available (will fail gracefully if MQTT is down)
     if (mqtt && mqtt->isConnected()) {
-        mqtt->publishSerialLog(message, level, tag);
+        mqtt->publishConnectionEvent(event, detail);
+    }
+    
+    // Also send as serial log for visibility in /logs page
+    String logMessage = "Connection event: " + event;
+    if (detail.length() > 0) {
+        logMessage += " (" + detail + ")";
+    }
+    
+    // Log at appropriate level based on event type
+    if (event == "wifi_disconnected" || event == "mqtt_disconnected") {
+        Logger::error("📡 %s", logMessage.c_str());
+    } else if (event == "wifi_connected" || event == "mqtt_connected" || event == "wifi_got_ip") {
+        Logger::info("📡 %s", logMessage.c_str());
+    } else {
+        Logger::info("📡 %s", logMessage.c_str());
     }
 }
-
-

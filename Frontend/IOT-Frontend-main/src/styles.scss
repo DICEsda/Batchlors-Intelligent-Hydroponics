@@ -2,45 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Spartan UI / shadcn CSS Variables - Dark Theme for IoT Dashboard */
+/* Spartan UI / shadcn CSS Variables - OKLCH Color Palette */
 @layer base {
   :root {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 13%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 13%;
-    --muted-foreground: 0 0% 63%;
-    --accent: 0 0% 13%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 100%;
-    --radius: 0.5rem;
+    --radius: 0.625rem;
+    
+    /* Spacing Scale - Design Tokens */
+    --spacing-xs: 0.25rem;   /* 4px */
+    --spacing-sm: 0.5rem;    /* 8px */
+    --spacing-md: 0.75rem;   /* 12px */
+    --spacing-lg: 1rem;      /* 16px */
+    --spacing-xl: 1.5rem;    /* 24px */
+    --spacing-2xl: 2rem;     /* 32px */
+    --spacing-3xl: 3rem;     /* 48px */
+    --spacing-4xl: 4rem;     /* 64px */
+    
+    /* Typography Scale */
+    --text-xs: 0.75rem;      /* 12px */
+    --text-sm: 0.875rem;     /* 14px */
+    --text-base: 1rem;       /* 16px */
+    --text-lg: 1.125rem;     /* 18px */
+    --text-xl: 1.25rem;      /* 20px */
+    --text-2xl: 1.5rem;      /* 24px */
+    --text-3xl: 2rem;        /* 32px */
+    --text-4xl: 3rem;        /* 48px */
+    
+    /* Line Heights */
+    --leading-tight: 1.25;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.75;
+    
+    /* Animation Timing */
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 300ms;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out-quad: cubic-bezier(0.45, 0, 0.55, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    
+    /* Stone/Warm Gray Light Theme - WCAG AA Compliant */
+    --background: oklch(0.97 0.002 75);
+    --foreground: oklch(0.22 0.01 60);
+    --card: oklch(0.99 0.001 75);
+    --card-foreground: oklch(0.22 0.01 60);
+    --popover: oklch(0.99 0.001 75);
+    --popover-foreground: oklch(0.22 0.01 60);
+    --primary: oklch(0.35 0.015 60);
+    --primary-foreground: oklch(0.98 0.002 75);
+    --secondary: oklch(0.93 0.003 70);
+    --secondary-foreground: oklch(0.30 0.01 60);
+    --muted: oklch(0.92 0.004 70);
+    --muted-foreground: oklch(0.45 0.01 60); /* Improved from 0.50 for better contrast */
+    --accent: oklch(0.93 0.003 70);
+    --accent-foreground: oklch(0.30 0.01 60);
+    --destructive: oklch(0.50 0.22 25); /* Darkened for better contrast */
+    --destructive-foreground: oklch(0.98 0.002 75);
+    --border: oklch(0.88 0.005 70);
+    --input: oklch(0.88 0.005 70);
+    --ring: oklch(0.55 0.02 60);
+    
+    /* Status colors - Light Mode */
+    --status-online: oklch(0.55 0.15 145);
+    --status-online-foreground: oklch(0.98 0.002 75);
+    --status-offline: oklch(0.50 0.05 30);
+    --status-offline-foreground: oklch(0.98 0.002 75);
+    --status-error: oklch(0.50 0.18 25);
+    --status-error-foreground: oklch(0.98 0.002 75);
+    --status-warning: oklch(0.65 0.13 85);
+    --status-warning-foreground: oklch(0.25 0.01 50);
+    --status-pairing: oklch(0.55 0.12 250);
+    --status-pairing-foreground: oklch(0.98 0.002 75);
+    
+    /* Sidebar specific - Stone Light */
+    --sidebar: oklch(0.95 0.003 70);
+    --sidebar-foreground: oklch(0.22 0.01 60);
+    --sidebar-primary: oklch(0.35 0.015 60);
+    --sidebar-primary-foreground: oklch(0.98 0.002 75);
+    --sidebar-accent: oklch(0.90 0.004 70);
+    --sidebar-accent-foreground: oklch(0.30 0.01 60);
+    --sidebar-border: oklch(0.85 0.006 70);
+    --sidebar-ring: oklch(0.55 0.02 60);
+  }
 
-    /* IoT Dashboard specific variables - preserved from original */
-    --bg-primary: #000000;
-    --bg-secondary: #202122;
-    --bg-tertiary: #151516;
-    --bg-card: #1e1e1e;
-    --text-primary: #ffffff;
-    --text-secondary: #a0a0a0;
-    --text-muted: #6b7280;
-    --accent-primary: #ffffff;
-    --accent-secondary: #ffffff;
-    --accent-warning: #f59e0b;
-    --accent-danger: #ef4444;
-    --border-color: #2a2f3a;
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
-    --glow-white: 0 0 20px rgba(255, 255, 255, 0.5);
+  .dark {
+    --background: oklch(0.147 0.004 49.25);
+    --foreground: oklch(0.985 0.001 106.423);
+    --card: oklch(0.216 0.006 56.043);
+    --card-foreground: oklch(0.985 0.001 106.423);
+    --popover: oklch(0.216 0.006 56.043);
+    --popover-foreground: oklch(0.985 0.001 106.423);
+    --primary: oklch(0.923 0.003 48.717);
+    --primary-foreground: oklch(0.216 0.006 56.043);
+    --secondary: oklch(0.268 0.007 34.298);
+    --secondary-foreground: oklch(0.985 0.001 106.423);
+    --muted: oklch(0.268 0.007 34.298);
+    --muted-foreground: oklch(0.75 0.01 56.259); /* Improved from 0.709 for better contrast */
+    --accent: oklch(0.268 0.007 34.298);
+    --accent-foreground: oklch(0.985 0.001 106.423);
+    --destructive: oklch(0.62 0.22 25); /* Lightened for better contrast */
+    --destructive-foreground: oklch(0.985 0.001 106.423);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.553 0.013 58.071);
+
+    /* Status colors - WCAG AA Compliant */
+    --status-online: oklch(0.70 0.17 145);
+    --status-online-foreground: oklch(0.985 0.001 106.423);
+    --status-offline: oklch(0.60 0.05 30);
+    --status-offline-foreground: oklch(0.985 0.001 106.423);
+    --status-error: oklch(0.65 0.2 25);
+    --status-error-foreground: oklch(0.985 0.001 106.423);
+    --status-warning: oklch(0.80 0.15 85);
+    --status-warning-foreground: oklch(0.2 0.01 50);
+    --status-pairing: oklch(0.70 0.12 250);
+    --status-pairing-foreground: oklch(0.985 0.001 106.423);
+    
+    /* Sidebar specific - dark mode */
+    --sidebar: oklch(0.216 0.006 56.043);
+    --sidebar-foreground: oklch(0.985 0.001 106.423);
+    --sidebar-primary: oklch(0.985 0.001 106.423);
+    --sidebar-primary-foreground: oklch(0.216 0.006 56.043);
+    --sidebar-accent: oklch(0.268 0.007 34.298);
+    --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.553 0.013 58.071);
   }
 }
 
@@ -52,9 +137,302 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: var(--text-sm); /* Base 14px for comfortable reading */
+    line-height: var(--leading-normal);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+  }
+  
+  /* Accessibility: Focus Visible States */
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  
+  /* Remove default focus for mouse users, keep for keyboard */
+  *:focus:not(:focus-visible) {
+    outline: none;
+  }
+  
+  /* Typography improvements */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    line-height: var(--leading-tight);
+    color: var(--foreground);
+  }
+  
+  h1 { font-size: var(--text-3xl); }
+  h2 { font-size: var(--text-2xl); }
+  h3 { font-size: var(--text-xl); }
+  h4 { font-size: var(--text-lg); }
+  h5 { font-size: var(--text-base); }
+  h6 { font-size: var(--text-sm); }
+  
+  /* Improved link styles */
+  a {
+    color: var(--foreground);
+    text-decoration: none;
+    transition: color var(--duration-fast) ease;
+    
+    &:hover {
+      color: var(--primary);
+    }
+  }
+  
+  /* Button cursor */
+  button, [role="button"] {
+    cursor: pointer;
+  }
+  
+  /* Disabled states */
+  :disabled, [aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+/* Theme Transition - smooth color changes when toggling theme
+   Only apply to key layout elements for better performance (60fps) */
+.theme-transition {
+  /* Use CSS custom property transitions on root - much faster than transitioning all elements */
+  &, 
+  & > *,
+  & .app-layout,
+  & .sidebar,
+  & .main-area,
+  & .top-header,
+  & .page-content,
+  & [hlmCard],
+  & .card-legacy {
+    transition: background-color var(--duration-fast) linear,
+                border-color var(--duration-fast) linear,
+                color var(--duration-fast) linear !important;
+  }
+}
+
+/* Page Transition Animations */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Skeleton Loading Animation */
+@keyframes skeletonPulse {
+  0%, 100% { 
+    opacity: 1; 
+  }
+  50% { 
+    opacity: 0.5; 
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Apply animation to router outlet content */
+router-outlet + * {
+  animation: pageEnter var(--duration-slow) var(--ease-out-expo) forwards;
+}
+
+/* Alternative: Apply to page content wrapper */
+.page-content > * {
+  animation: pageEnter var(--duration-slow) var(--ease-out-expo) forwards;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: none !important;
+  }
+  
+  router-outlet + *,
+  .page-content > * {
+    animation: pageFadeIn 0.15s ease forwards;
+  }
+}
+
+/* Enhanced Micro-interactions */
+@keyframes buttonPress {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes successCheck {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Global Card Hover Effects */
+@layer components {
+  .card-interactive {
+    transition: transform var(--duration-fast) var(--ease-out-expo),
+                box-shadow var(--duration-normal) var(--ease-out-expo),
+                border-color var(--duration-fast) ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px oklch(0 0 0 / 0.12);
+      border-color: var(--primary);
+    }
+    
+    &:active {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px oklch(0 0 0 / 0.08);
+    }
+  }
+  
+  /* Enhanced Button States */
+  .btn-enhanced {
+    position: relative;
+    overflow: hidden;
+    transition: all var(--duration-fast) var(--ease-out-expo);
+    
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px oklch(0 0 0 / 0.15);
+    }
+    
+    &:active:not(:disabled) {
+      animation: buttonPress 0.2s ease;
+    }
+    
+    /* Ripple effect on click */
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: oklch(1 0 0 / 0.3);
+      border-radius: 50%;
+      transform: scale(0);
+      pointer-events: none;
+    }
+    
+    &:active::after {
+      animation: ripple 0.6s ease-out;
+    }
+    
+    /* Loading state */
+    &.loading {
+      pointer-events: none;
+      opacity: 0.7;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+    }
+    
+    /* Success state */
+    &.success {
+      &::before {
+        content: '✓';
+        position: absolute;
+        animation: successCheck 0.5s var(--ease-spring);
+      }
+    }
+  }
+  
+  /* Pulse animation for critical badges */
+  .badge-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* Smooth height transitions */
+  .expand-collapse {
+    overflow: hidden;
+    transition: height var(--duration-normal) var(--ease-out-expo);
   }
 }
 
@@ -65,91 +443,117 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-secondary;
+  background: var(--secondary);
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted rounded;
+  background: var(--muted);
+  border-radius: var(--radius);
+  transition: background var(--duration-fast) ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/30;
+  background: var(--muted-foreground);
 }
 
 /* Legacy utility classes - preserved for backward compatibility */
 @layer components {
   .card-legacy {
-    background: var(--bg-card);
-    border: none;
-    border-radius: 8px;
-    padding: 1.25rem;
-    box-shadow: none;
+    background: var(--card);
+    color: var(--card-foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--spacing-xl);
+    transition: border-color var(--duration-fast) ease, 
+                box-shadow var(--duration-normal) ease;
+    
+    &:hover {
+      border-color: var(--ring);
+      box-shadow: 0 1px 3px oklch(0 0 0 / 0.1);
+    }
     
     @media (max-width: 768px) {
-      padding: 1rem;
+      padding: var(--spacing-lg);
     }
   }
 
   .button-legacy {
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--radius);
     border: none;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.875rem;
+    transition: all var(--duration-normal) var(--ease-out-expo);
+    font-size: var(--text-sm);
+    
+    &:focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+    
+    &:active {
+      transform: scale(0.98);
+    }
   }
 
   .button-primary-legacy {
-    background: var(--accent-primary);
-    color: var(--bg-primary);
-  }
-
-  .button-primary-legacy:hover {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px oklch(0 0 0 / 0.1);
+    }
   }
 
   .button-success-legacy {
-    background: var(--accent-secondary);
-    color: var(--bg-primary);
+    background: var(--secondary);
+    color: var(--secondary-foreground);
+    
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px oklch(0 0 0 / 0.1);
+    }
   }
 
-  .button-success-legacy:hover {
-    background: #e5e5e5;
-  }
-
-  /* IoT Status indicators */
+  /* IoT Status indicators (Monochrome) */
   .status-online {
-    @apply bg-green-500;
+    background: var(--foreground);
+    opacity: 0.7;
   }
 
   .status-offline {
-    @apply bg-red-500;
+    background: var(--muted-foreground);
+    opacity: 0.3;
   }
 
   .status-warning {
-    @apply bg-amber-500;
+    background: var(--muted-foreground);
+    opacity: 0.5;
   }
 
   .status-presence {
-    @apply bg-blue-500;
+    background: var(--foreground);
+    opacity: 0.6;
   }
 
   /* Pulse animation for live indicators */
   .pulse-live {
-    @apply animate-pulse-glow;
+    @apply animate-pulse;
   }
 }
 
-/* Form element styling preserved from original */
+/* Form element styling */
 input:not([type="checkbox"]):not([type="radio"]):not([hlmInput]),
 select:not([hlmSelect]),
 textarea:not([hlmTextarea]) {
-  background: var(--bg-tertiary);
-  border: none;
-  color: var(--text-primary);
+  background: var(--input);
+  border: 1px solid var(--border);
+  color: var(--foreground);
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 0.875rem;
   transition: all 0.3s ease;
 }
@@ -158,22 +562,22 @@ input:not([type="checkbox"]):not([type="radio"]):not([hlmInput]):focus,
 select:not([hlmSelect]):focus,
 textarea:not([hlmTextarea]):focus {
   outline: none;
-  background: var(--bg-secondary);
+  border-color: var(--ring);
 }
 
-/* Toggle switch - preserved from original */
+/* Toggle switch */
 .toggle-switch {
   position: relative;
   width: 50px;
   height: 26px;
-  background: var(--bg-tertiary);
+  background: var(--muted);
   border-radius: 13px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .toggle-switch.active {
-  background: #ffffff;
+  background: var(--primary);
 }
 
 .toggle-switch::after {
@@ -183,7 +587,7 @@ textarea:not([hlmTextarea]):focus {
   left: 3px;
   width: 20px;
   height: 20px;
-  background: var(--bg-primary);
+  background: var(--background);
   border-radius: 50%;
   transition: all 0.3s ease;
 }

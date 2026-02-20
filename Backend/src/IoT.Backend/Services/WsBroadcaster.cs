@@ -129,6 +129,70 @@ public class WsBroadcaster : IWsBroadcaster
         var payload = new { JobId = jobId, Status = status };
         return BroadcastAsync("ota_status", payload, ct);
     }
+
+    /// <summary>
+    /// Broadcasts coordinator serial log messages to all connected clients.
+    /// Used for real-time log streaming from coordinator firmware to frontend.
+    /// </summary>
+    public Task BroadcastCoordinatorLogAsync(CoordinatorLogPayload payload, CancellationToken ct = default)
+    {
+        return BroadcastAsync("coordinator_log", payload, ct);
+    }
+
+    /// <summary>
+    /// Broadcasts farm statistics update to all connected clients.
+    /// </summary>
+    public Task BroadcastFarmUpdateAsync(FarmUpdatePayload payload, CancellationToken ct = default)
+    {
+        return BroadcastAsync("farm_update", payload, ct);
+    }
+
+    /// <summary>
+    /// Broadcasts a newly created alert to all connected clients.
+    /// </summary>
+    public Task BroadcastAlertCreatedAsync(AlertPayload payload, CancellationToken ct = default)
+    {
+        return BroadcastAsync("alert_created", payload, ct);
+    }
+
+    /// <summary>
+    /// Broadcasts an alert update (acknowledged or resolved) to all connected clients.
+    /// </summary>
+    public Task BroadcastAlertUpdatedAsync(AlertPayload payload, CancellationToken ct = default)
+    {
+        return BroadcastAsync("alert_updated", payload, ct);
+    }
+
+    /// <summary>
+    /// Broadcasts tower status change to all connected clients.
+    /// </summary>
+    public Task BroadcastTowerStatusAsync(TowerStatusPayload payload, CancellationToken ct = default)
+    {
+        return BroadcastAsync("tower_status", payload, ct);
+    }
+
+    /// <summary>
+    /// Broadcasts coordinator connection status events (WiFi/MQTT connect/disconnect) to all connected clients.
+    /// Used for real-time connection monitoring in the frontend.
+    /// </summary>
+    public Task BroadcastConnectionStatusAsync(ConnectionStatusPayload payload, CancellationToken ct = default)
+    {
+        return BroadcastAsync("connection_status", payload, ct);
+    }
+
+    /// <summary>
+    /// Broadcasts a coordinator registration request to all connected clients.
+    /// Triggered when an unknown coordinator is detected on MQTT.
+    /// </summary>
+    public Task BroadcastCoordinatorRegistrationRequestAsync(CoordinatorRegistrationPayload payload, CancellationToken ct = default)
+        => BroadcastAsync("coordinator_registration_request", payload, ct);
+
+    /// <summary>
+    /// Broadcasts a coordinator registered event to all connected clients.
+    /// Triggered when a coordinator registration is approved.
+    /// </summary>
+    public Task BroadcastCoordinatorRegisteredAsync(CoordinatorRegisteredPayload payload, CancellationToken ct = default)
+        => BroadcastAsync("coordinator_registered", payload, ct);
 }
 
 /// <summary>

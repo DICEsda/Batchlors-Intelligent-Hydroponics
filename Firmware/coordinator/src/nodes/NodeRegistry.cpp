@@ -50,7 +50,7 @@ bool NodeRegistry::registerNode(const String& nodeId, const String& lightId) {
     }
     
     NodeInfo info;
-    info.nodeId = nodeId;
+    info.towerId = nodeId;  // NodeInfo is TowerInfo, use towerId field
     info.lightId = lightId;
     info.lastDuty = 0;
     info.lastSeenMs = millis();
@@ -187,7 +187,7 @@ void NodeRegistry::loadFromStorage() {
             uint8_t lastDuty = data.substring(comma2 + 1).toInt();
             
             NodeInfo info;
-            info.nodeId = nodeId;
+            info.towerId = nodeId;
             info.lightId = lightId;
             info.lastDuty = lastDuty;
             info.lastSeenMs = 0; // Mark as not seen in this session
@@ -208,7 +208,7 @@ void NodeRegistry::saveToStorage() {
     size_t i = 0;
     for (const auto& pair : nodes) {
         const NodeInfo& info = pair.second;
-        String data = info.nodeId + "," + info.lightId + "," + String(info.lastDuty);
+        String data = info.towerId + "," + info.lightId + "," + String(info.lastDuty);
         prefs.putString(("node" + String(i)).c_str(), data);
         i++;
     }

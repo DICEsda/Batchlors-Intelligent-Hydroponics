@@ -1,0 +1,27 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+WORKDIR /src
+
+# Copy all project files first for better layer caching
+COPY Backend/src/IoT.Backend/IoT.Backend.csproj Backend/src/IoT.Backend/
+COPY Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj Backend/tests/IoT.Backend.IntegrationTests/
+
+# Restore dependencies
+RUN dotnet restore Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj
+
+# Copy all source code
+COPY Backend/ Backend/
+
+# Build (with restore to ensure all deps are resolved)
+RUN dotnet build Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj -c Release
+
+# Testcontainers configuration for Docker-in-Docker (DinD) scenarios
+# Disable Ryuk (Resource Reaper) as it causes issues in DinD
+ENV TESTCONTAINERS_RYUK_DISABLED=true
+# Use host.docker.internal to access containers from inside Docker
+ENV TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal
+# Set Docker host to use the socket
+ENV DOCKER_HOST=unix:///var/run/docker.sock
+
+# Run tests (Testcontainers needs access to Docker socket)
+ENTRYPOINT ["dotnet", "test", "Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj", "--no-build", "-c", "Release", "--logger", "console;verbosity=detailed"]

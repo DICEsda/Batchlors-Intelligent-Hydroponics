@@ -3,6 +3,7 @@
 #include <esp_wifi.h>
 #include <esp_now.h>
 #include "../../shared/src/EspNowMessage.h"
+#include "../../shared/src/ConfigStore.h"
 #include "../nodes/NodeRegistry.h"
 #include "../utils/Logger.h"
 #include <Preferences.h>
@@ -13,10 +14,10 @@ static EspNow* s_self = nullptr;
 // Recently handled JOIN requests to avoid duplicate processing
 static std::map<String, uint32_t> s_recentJoin;
 
-// ✓ ESP-NOW v2.0 callback signatures (Checklist: ESP-NOW Version)
-// v2 uses esp_now_recv_info_t instead of passing MAC directly
+// ESP-NOW callback with version compatibility
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+// ESP-NOW v2.0 API (Arduino ESP32 3.x+)
 void staticRecvCallback(const esp_now_recv_info_t* recv_info, const uint8_t* data, int len) {
-    // Extract RSSI and pass to handler (ESP-NOW v2.0 provides RSSI in recv_info)
     if (s_self && recv_info && recv_info->src_addr) {
         s_self->handleEspNowReceive(recv_info->src_addr, data, len);
         
@@ -37,6 +38,28 @@ void staticRecvCallback(const esp_now_recv_info_t* recv_info, const uint8_t* dat
         Logger::error("s_self is NULL or invalid recv_info in receive callback!");
     }
 }
+#else
+// ESP-NOW v1.0 API (Arduino ESP32 2.x)
+void staticRecvCallback(const uint8_t* mac_addr, const uint8_t* data, int len) {
+    if (s_self && mac_addr) {
+        s_self->handleEspNowReceive(mac_addr, data, len);
+        
+        // Update stats (no RSSI available in v1.0 API)
+        char macStr[18];
+        snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 mac_addr[0], mac_addr[1], mac_addr[2],
+                 mac_addr[3], mac_addr[4], mac_addr[5]);
+        String smac(macStr);
+        
+        auto& stats = s_self->peerStats[smac];
+        stats.lastRssi = -70; // Default RSSI value when not available
+        stats.lastSeenMs = millis();
+        stats.messageCount++;
+    } else {
+        Logger::error("s_self is NULL or invalid mac_addr in receive callback!");
+    }
+}
+#endif
 
 void staticSendCallback(const uint8_t* mac, esp_now_send_status_t status) {
     if (!mac) {
@@ -170,17 +193,26 @@ bool EspNow::begin() {
         Logger::warn("  PMK set failed: %d", (int)pmkRes);
     }
     
-    // Set WiFi channel - both devices must use same channel
-    Logger::info("✓ [7/9] Setting WiFi channel to 1...");
+    // Set WiFi channel - load from config (must match WiFi router channel)
+    Config config = ConfigStore::load();
+    uint8_t targetChannel = config.espnow.channel;
+    
+    // Use default channel 1 if not configured yet
+    if (targetChannel == 0) {
+        targetChannel = 1;
+        Logger::warn("ESP-NOW channel not configured, defaulting to 1");
+    }
+    
+    Logger::info("✓ [7/9] Setting WiFi channel to %d (locked with WiFi)...", targetChannel);
     esp_wifi_set_promiscuous(true);
-    esp_err_t chRes = esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+    esp_err_t chRes = esp_wifi_set_channel(targetChannel, WIFI_SECOND_CHAN_NONE);
     esp_wifi_set_promiscuous(false);
     
     uint8_t primary = 0; wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
     esp_wifi_get_channel(&primary, &second);
     
-    if (primary != 1) {
-        Logger::error("✗ Failed to set channel to 1! Currently on channel %d", (int)primary);
+    if (primary != targetChannel) {
+        Logger::error("✗ Failed to set channel to %d! Currently on channel %d", targetChannel, (int)primary);
         return false;
     }
     Logger::info("  ✓ Channel set to %d (secondary: %d)", (int)primary, (int)second);

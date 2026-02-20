@@ -1,3 +1,4 @@
+using IoT.Backend.Models;
 using IoT.Backend.Models.DigitalTwin;
 using MongoDB.Driver;
 
@@ -416,6 +417,56 @@ public sealed class TwinRepository : ITwinRepository
     // ============================================================================
     // Bulk Operations
     // ============================================================================
+
+    public async Task<IReadOnlyList<TowerTwin>> GetAllTowerTwinsAsync(CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<TowerTwin>(TowerTwinsCollection);
+        return await collection.Find(Builders<TowerTwin>.Filter.Empty).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<TowerTwin>> GetTowerTwinsWithActiveCropAsync(CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<TowerTwin>(TowerTwinsCollection);
+        
+        // Filter: CropType != "unknown" (or not "Unknown") AND PlantingDate is set
+        var filter = Builders<TowerTwin>.Filter.And(
+            Builders<TowerTwin>.Filter.Ne(t => t.CropType, CropType.Unknown),
+            Builders<TowerTwin>.Filter.Ne(t => t.PlantingDate, null)
+        );
+        
+        return await collection.Find(filter).ToListAsync(ct);
+    }
+
+    public async Task<bool> UpdateTowerMlPredictionsAsync(string towerId, MlPredictions predictions, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<TowerTwin>(TowerTwinsCollection);
+        var filter = Builders<TowerTwin>.Filter.Eq(t => t.TowerId, towerId);
+
+        // Update ML predictions and also sync to the top-level fields for backward compatibility
+        var update = Builders<TowerTwin>.Update
+            .Set(t => t.MlPredictions, predictions)
+            .Set(t => t.PredictedHeightCm, (float?)predictions.PredictedHeightCm)
+            .Set(t => t.ExpectedHarvestDate, predictions.ExpectedHarvestDate)
+            .Inc("metadata.version", 1);
+
+        try
+        {
+            var result = await collection.UpdateOneAsync(filter, update, cancellationToken: ct);
+            
+            if (result.MatchedCount == 0)
+            {
+                _logger.LogDebug("Tower twin {TowerId} not found for ML predictions update", towerId);
+                return false;
+            }
+            
+            return result.ModifiedCount > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update tower {TowerId} ML predictions", towerId);
+            throw;
+        }
+    }
 
     public async Task<(IReadOnlyList<TowerTwin> Towers, IReadOnlyList<CoordinatorTwin> Coordinators)> GetPendingSyncTwinsAsync(CancellationToken ct = default)
     {

@@ -25,12 +25,12 @@
     .page-title {
       font-size: 1.875rem;
       font-weight: 700;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
       margin: 0;
     }
 
     .page-description {
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
       margin: 0.25rem 0 0;
     }
   }
@@ -53,8 +53,8 @@
     align-items: center;
     gap: 0.75rem;
     padding: 1rem 1.25rem;
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
+    background: var(--card);
+    border: 1px solid var(--border);
     border-radius: 0.75rem;
 
     .stat-icon {
@@ -70,12 +70,12 @@
       .stat-value {
         font-size: 1.25rem;
         font-weight: 600;
-        color: hsl(var(--foreground));
+        color: var(--foreground);
       }
 
       .stat-label {
         font-size: 0.75rem;
-        color: hsl(var(--muted-foreground));
+        color: var(--muted-foreground);
       }
     }
   }
@@ -88,8 +88,8 @@
 }
 
 .device-card {
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
   overflow: hidden;
   transition: all 150ms ease;
@@ -139,13 +139,13 @@
       align-items: center;
       gap: 0.375rem;
       padding: 0.5rem;
-      background: hsl(var(--muted) / 0.3);
+      background: color-mix(in oklch, var(--muted) 30%, transparent);
       border-radius: 0.375rem;
       font-size: 0.8125rem;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
 
       ng-icon {
-        color: hsl(var(--muted-foreground));
+        color: var(--muted-foreground);
         flex-shrink: 0;
       }
     }
@@ -153,7 +153,7 @@
 
   .card-footer {
     padding: 0.75rem 1rem;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid var(--border);
 
     .view-link {
       display: flex;
@@ -181,26 +181,26 @@
   justify-content: center;
   padding: 3rem 2rem;
   text-align: center;
-  background: hsl(var(--card));
-  border: 1px dashed hsl(var(--border));
+  background: var(--card);
+  border: 1px dashed var(--border);
   border-radius: 0.75rem;
 
   .empty-icon {
     width: 3rem;
     height: 3rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     margin-bottom: 1rem;
   }
 
   h3 {
     font-size: 1.125rem;
     font-weight: 600;
-    color: hsl(var(--foreground));
+    color: var(--foreground);
     margin: 0 0 0.5rem;
   }
 
   p {
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     margin: 0 0 1.5rem;
     max-width: 320px;
   }
@@ -211,18 +211,18 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: hsl(var(--destructive) / 0.1);
-  border: 1px solid hsl(var(--destructive) / 0.3);
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent);
   border-radius: 0.5rem;
   margin-bottom: 1rem;
 
   ng-icon {
-    color: hsl(var(--destructive));
+    color: var(--destructive);
   }
 
   span {
     flex: 1;
-    color: hsl(var(--destructive));
+    color: var(--destructive);
     font-size: 0.875rem;
   }
 }
@@ -233,17 +233,17 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: hsl(var(--muted) / 0.5);
+  background: color-mix(in oklch, var(--muted) 50%, transparent);
   border-radius: 0.5rem;
   margin-top: 1.5rem;
 
   ng-icon {
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
   }
 
   span {
     font-size: 0.75rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
   }
 }
 

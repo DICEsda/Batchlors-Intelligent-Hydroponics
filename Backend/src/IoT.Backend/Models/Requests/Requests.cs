@@ -41,6 +41,97 @@ public class WifiConfigRequest
 }
 
 /// <summary>
+/// Request to update coordinator metadata (name, description, location, tags, color).
+/// </summary>
+public class UpdateCoordinatorRequest
+{
+    /// <summary>
+    /// Custom display name for the coordinator/reservoir
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// Optional description of the coordinator/reservoir
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Physical location of the coordinator (e.g., "Greenhouse A, Section 2")
+    /// </summary>
+    public string? Location { get; set; }
+
+    /// <summary>
+    /// Tags for categorizing/filtering coordinators
+    /// </summary>
+    public List<string>? Tags { get; set; }
+
+    /// <summary>
+    /// Display color for UI visualization (hex color code, e.g., "#3b82f6")
+    /// </summary>
+    public string? Color { get; set; }
+}
+
+/// <summary>
+/// Request body for updating coordinator configuration.
+/// Metadata fields (Name, Description, etc.) are persisted to the database.
+/// Operational fields (NodeListeningEnabled, LogPublishFrequencySeconds, etc.)
+/// are published via MQTT to <c>coordinator/{coordId}/config</c> for the firmware to consume.
+/// All fields are optional — only provided fields are applied.
+/// </summary>
+public class UpdateCoordinatorConfigRequest
+{
+    // ── Metadata (persisted to DB) ──────────────────────────────────────
+
+    /// <summary>
+    /// Custom display name for the coordinator/reservoir
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// Optional description of the coordinator/reservoir
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Physical location of the coordinator (e.g., "Greenhouse A, Section 2")
+    /// </summary>
+    public string? Location { get; set; }
+
+    /// <summary>
+    /// Display color for UI visualization (hex color code, e.g., "#3b82f6")
+    /// </summary>
+    public string? Color { get; set; }
+
+    /// <summary>
+    /// Tags for categorizing/filtering coordinators
+    /// </summary>
+    public List<string>? Tags { get; set; }
+
+    // ── Operational settings (published to MQTT) ────────────────────────
+
+    /// <summary>
+    /// Whether the coordinator should listen for new tower node pairing requests.
+    /// </summary>
+    public bool? NodeListeningEnabled { get; set; }
+
+    /// <summary>
+    /// How often (in seconds) the coordinator should publish serial log messages.
+    /// Set to 0 to disable log publishing.
+    /// </summary>
+    public int? LogPublishFrequencySeconds { get; set; }
+
+    /// <summary>
+    /// How often (in seconds) the coordinator should report its status.
+    /// </summary>
+    public int? StatusReportIntervalSeconds { get; set; }
+
+    /// <summary>
+    /// How often (in seconds) the coordinator should publish telemetry data.
+    /// </summary>
+    public int? TelemetryIntervalSeconds { get; set; }
+}
+
+/// <summary>
 /// Command to send to a tower via coordinator broadcast.
 /// </summary>
 public class TowerCommand

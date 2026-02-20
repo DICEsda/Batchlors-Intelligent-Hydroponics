@@ -1,0 +1,196 @@
+@if (isOpen()) {
+  <!-- Blurred Overlay -->
+  <div class="dialog-overlay" [class.closing]="isClosing()" (click)="onOverlayClick($event)">
+    <!-- Dialog Content -->
+    <div class="dialog-content" (click)="$event.stopPropagation()">
+      <!-- Header -->
+      <div class="dialog-header">
+        <div class="header-title">
+          <ng-icon name="lucideWaves" size="24" />
+          <div>
+            <h2>Edit Reservoir</h2>
+            <p class="header-description">
+              Customize reservoir information to distinguish it from other coordinators
+            </p>
+          </div>
+        </div>
+        <button class="close-btn" (click)="close()" aria-label="Close dialog">
+          <ng-icon name="lucideX" size="20" />
+        </button>
+      </div>
+
+      <!-- Form Content -->
+      <div class="dialog-body">
+        <!-- Basic Info Section -->
+        <div class="form-section">
+          <h3 class="section-title">Basic Information</h3>
+          
+          <div class="form-grid">
+            <!-- Name -->
+            <div class="form-group full-width">
+              <label hlmLabel for="coord-name">
+                Reservoir Name <span class="required">*</span>
+              </label>
+              <input 
+                hlmInput 
+                id="coord-name" 
+                type="text" 
+                placeholder="Enter custom name (e.g., Main Greenhouse, Basement Unit)"
+                [ngModel]="formData().name"
+                (ngModelChange)="updateField('name', $event)"
+              />
+            </div>
+
+            <!-- Coordinator ID (Read-only) -->
+            <div class="form-group full-width">
+              <label hlmLabel for="coord-id">
+                <ng-icon name="lucideServer" size="14" />
+                Coordinator ID
+              </label>
+              <input 
+                hlmInput 
+                id="coord-id" 
+                type="text" 
+                readonly
+                [value]="formData().coord_id"
+                class="readonly-input"
+              />
+              <small class="input-hint">
+                <ng-icon name="lucideInfo" size="12" />
+                This is the hardware MAC address and cannot be changed
+              </small>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group full-width">
+              <label hlmLabel for="coord-description">Description</label>
+              <textarea 
+                hlmInput 
+                id="coord-description" 
+                rows="2"
+                placeholder="Add notes about this reservoir (e.g., location, purpose, special configuration)"
+                [ngModel]="formData().description"
+                (ngModelChange)="updateField('description', $event)"
+              ></textarea>
+            </div>
+
+            <!-- Location -->
+            <div class="form-group full-width">
+              <label hlmLabel for="coord-location">
+                <ng-icon name="lucideMapPin" size="14" />
+                Physical Location
+              </label>
+              <input 
+                hlmInput 
+                id="coord-location" 
+                type="text" 
+                placeholder="Building, Room, or Area (e.g., Building A - Floor 2 - West Wing)"
+                [ngModel]="formData().location"
+                (ngModelChange)="updateField('location', $event)"
+              />
+            </div>
+          </div>
+
+          <!-- Color Picker -->
+          <div class="form-group">
+            <label hlmLabel>
+              <ng-icon name="lucidePalette" size="14" />
+              Reservoir Color
+            </label>
+            <p class="field-description">Choose a color to help identify this reservoir in the dashboard</p>
+            <div class="color-picker">
+              @for (color of colorPresets; track color) {
+                <button 
+                  class="color-swatch" 
+                  [style.background-color]="color"
+                  [class.selected]="formData().color === color"
+                  (click)="selectColor(color)"
+                  type="button"
+                  [attr.aria-label]="'Select color ' + color"
+                >
+                  @if (formData().color === color) {
+                    <ng-icon name="lucideCheck" size="14" class="check-icon" />
+                  }
+                </button>
+              }
+              <input 
+                type="color" 
+                class="custom-color"
+                [ngModel]="formData().color"
+                (ngModelChange)="updateField('color', $event)"
+                title="Custom color"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <ng-icon name="lucideTag" size="16" />
+            Tags
+          </h3>
+          <p class="section-description">
+            Add tags to organize and filter reservoirs (e.g., "Production", "Testing", "Zone-A")
+          </p>
+
+          <!-- Tag Input -->
+          <div class="tag-input-group">
+            <input 
+              hlmInput 
+              type="text" 
+              placeholder="Add a tag and press Enter"
+              [ngModel]="newTag()"
+              (ngModelChange)="newTag.set($event)"
+              (keypress)="onTagKeyPress($event)"
+              class="tag-input"
+            />
+            <button 
+              hlmBtn 
+              variant="outline" 
+              size="sm"
+              (click)="addTag()"
+              [disabled]="!newTag().trim()"
+            >
+              <ng-icon name="lucideCheck" size="14" />
+              Add
+            </button>
+          </div>
+
+          <!-- Tags List -->
+          @if (formData().tags && formData().tags!.length > 0) {
+            <div class="tags-list">
+              @for (tag of formData().tags; track tag) {
+                <span class="tag-chip" hlmBadge variant="secondary">
+                  {{ tag }}
+                  <button 
+                    class="tag-remove"
+                    (click)="removeTag(tag)"
+                    [attr.aria-label]="'Remove tag ' + tag"
+                  >
+                    <ng-icon name="lucideX" size="12" />
+                  </button>
+                </span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="dialog-footer">
+        <button hlmBtn variant="outline" (click)="close()">
+          Cancel
+        </button>
+        <button 
+          hlmBtn 
+          variant="default" 
+          [disabled]="!isFormValid()"
+          (click)="save()"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+}

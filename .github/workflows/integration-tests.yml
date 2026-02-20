@@ -1,0 +1,337 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug logging'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  NODE_VERSION: '20'
+
+jobs:
+  # Backend Integration Tests
+  backend-tests:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj
+
+      - name: Build test project
+        run: dotnet build Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj --no-restore --configuration Release
+
+      - name: Run integration tests
+        run: |
+          dotnet test Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --logger "console;verbosity=detailed" \
+            --results-directory ./TestResults \
+            --collect:"XPlat Code Coverage"
+        env:
+          # Enable detailed logging for debugging test failures
+          DOTNET_CLI_UI_LANGUAGE: en
+          TESTCONTAINERS_RYUK_DISABLED: false
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: |
+            ./TestResults/**/*.trx
+            ./TestResults/**/*.xml
+          retention-days: 30
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: ./TestResults/**/coverage.cobertura.xml
+          retention-days: 30
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Backend Test Results
+          path: ./TestResults/**/*.trx
+          reporter: dotnet-trx
+          fail-on-error: true
+
+  # Frontend E2E Tests
+  frontend-e2e-tests:
+    name: Frontend E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [] # Can run in parallel with backend tests
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: admin123
+          MONGO_INITDB_DATABASE: iot_test
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mosquitto:
+        image: eclipse-mosquitto:2.0
+        ports:
+          - 1883:1883
+          - 9001:9001
+        options: >-
+          --health-cmd "mosquitto_sub -t '$$SYS/#' -C 1 -W 3"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: Frontend/IOT-Frontend-main/package-lock.json
+
+      - name: Create Mosquitto config
+        run: |
+          cat > /tmp/mosquitto.conf << 'EOF'
+          listener 1883
+          allow_anonymous true
+          log_type all
+          log_dest stdout
+          EOF
+          docker cp /tmp/mosquitto.conf ${{ job.services.mosquitto.id }}:/mosquitto/config/mosquitto.conf
+          docker kill --signal=SIGHUP ${{ job.services.mosquitto.id }}
+
+      - name: Build Backend
+        run: |
+          dotnet restore Backend/src/IoT.Backend/IoT.Backend.csproj
+          dotnet build Backend/src/IoT.Backend/IoT.Backend.csproj --configuration Release
+
+      - name: Start Backend
+        run: |
+          dotnet run --project Backend/src/IoT.Backend/IoT.Backend.csproj --configuration Release &
+          echo "Waiting for backend to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/health/live; then
+              echo "Backend is ready!"
+              break
+            fi
+            sleep 2
+          done
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          ConnectionStrings__MongoDB: mongodb://admin:admin123@localhost:27017
+          MongoDB__Database: iot_test
+          Mqtt__Host: localhost
+          Mqtt__Port: 1883
+          Cors__Origins__0: http://localhost:4200
+
+      - name: Install Frontend dependencies
+        run: npm ci
+        working-directory: Frontend/IOT-Frontend-main
+
+      - name: Build Frontend
+        run: npm run build -- --configuration production
+        working-directory: Frontend/IOT-Frontend-main
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: Frontend/IOT-Frontend-main
+
+      - name: Start Frontend (production build)
+        run: |
+          npx serve -s dist/iot-frontend/browser -l 4200 &
+          echo "Waiting for frontend to start..."
+          for i in {1..20}; do
+            if curl -f http://localhost:4200; then
+              echo "Frontend is ready!"
+              break
+            fi
+            sleep 2
+          done
+        working-directory: Frontend/IOT-Frontend-main
+
+      - name: Run Playwright E2E tests
+        run: npm run e2e
+        working-directory: Frontend/IOT-Frontend-main
+        env:
+          BACKEND_URL: http://localhost:8000
+          FRONTEND_URL: http://localhost:4200
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: Frontend/IOT-Frontend-main/e2e/playwright-report/
+          retention-days: 30
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: Frontend/IOT-Frontend-main/e2e/test-results/
+          retention-days: 30
+
+  # Full Stack Integration Test
+  full-stack-test:
+    name: Full Stack Docker Compose Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend-tests]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create test Mosquitto config
+        run: |
+          mkdir -p Backend/config
+          cat > Backend/config/mosquitto.conf << 'EOF'
+          listener 1883
+          allow_anonymous true
+          log_type all
+          log_dest stdout
+          EOF
+          touch Backend/config/pwfile
+
+      - name: Build and start services
+        run: |
+          docker compose up -d mongodb mosquitto
+          echo "Waiting for services to be healthy..."
+          sleep 15
+
+      - name: Build backend image
+        run: docker compose build backend
+
+      - name: Start backend
+        run: |
+          docker compose up -d backend
+          echo "Waiting for backend..."
+          for i in {1..30}; do
+            if docker compose exec -T backend curl -f http://localhost:8000/health/live 2>/dev/null; then
+              echo "Backend is healthy!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 3
+          done
+
+      - name: Run health checks
+        run: |
+          # Check MongoDB
+          docker compose exec -T mongodb mongosh --eval "db.adminCommand('ping')"
+          
+          # Check Backend API
+          curl -f http://localhost:8000/health/live
+          curl -f http://localhost:8000/health/ready
+
+      - name: Run API smoke tests
+        run: |
+          # Test health endpoints
+          curl -f http://localhost:8000/health/live
+          curl -f http://localhost:8000/health/ready
+          
+          # Test API endpoints return valid responses
+          curl -f http://localhost:8000/api/zones/site/test-site || true
+          curl -f http://localhost:8000/api/towers/farm/test-farm || true
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== MongoDB Logs ===" 
+          docker compose logs mongodb
+          echo "=== Mosquitto Logs ==="
+          docker compose logs mosquitto
+          echo "=== Backend Logs ==="
+          docker compose logs backend
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
+
+  # Summary job
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-e2e-tests, full-stack-test]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.backend-tests.result }}" == "success" ]; then
+            echo "✅ Backend Integration Tests: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Backend Integration Tests: ${{ needs.backend-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.frontend-e2e-tests.result }}" == "success" ]; then
+            echo "✅ Frontend E2E Tests: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Frontend E2E Tests: ${{ needs.frontend-e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.full-stack-test.result }}" == "success" ]; then
+            echo "✅ Full Stack Docker Test: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Full Stack Docker Test: ${{ needs.full-stack-test.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail if any tests failed
+        if: |
+          needs.backend-tests.result == 'failure' ||
+          needs.frontend-e2e-tests.result == 'failure' ||
+          needs.full-stack-test.result == 'failure'
+        run: exit 1

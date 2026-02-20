@@ -65,5 +65,11 @@ struct ReservoirSensorSnapshot {
     uint32_t timestampMs = 0;
 };
 
-// Backward compatibility alias
+// Backward compatibility aliases
 using CoordinatorSensorSnapshot = ReservoirSensorSnapshot;
+using NodeInfo = TowerInfo;  // NodeInfo is an alias for TowerInfo
+
+// Forward declaration for TowerStatusMessage from shared messages
+struct NodeStatusMessage;
+using TowerStatusMessage = NodeStatusMessage;  // TowerStatusMessage is an alias for NodeStatusMessage
+

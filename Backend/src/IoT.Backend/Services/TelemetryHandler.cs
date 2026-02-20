@@ -18,6 +18,7 @@ public class TelemetryHandler : BackgroundService
     private readonly IWsBroadcaster _broadcaster;
     private readonly ITwinService _twinService;
     private readonly IPairingService _pairingService;
+    private readonly ICoordinatorRegistrationService _registrationService;
     private readonly ILogger<TelemetryHandler> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -29,6 +30,7 @@ public class TelemetryHandler : BackgroundService
         IWsBroadcaster broadcaster,
         ITwinService twinService,
         IPairingService pairingService,
+        ICoordinatorRegistrationService registrationService,
         ILogger<TelemetryHandler> logger)
     {
         _mqtt = mqtt;
@@ -38,6 +40,7 @@ public class TelemetryHandler : BackgroundService
         _broadcaster = broadcaster;
         _twinService = twinService;
         _pairingService = pairingService;
+        _registrationService = registrationService;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -55,6 +58,9 @@ public class TelemetryHandler : BackgroundService
         }
 
         if (stoppingToken.IsCancellationRequested) return;
+
+        // Load registered coordinators into cache before processing any messages
+        await _registrationService.RefreshCacheAsync(stoppingToken);
 
         _logger.LogInformation("TelemetryHandler subscribing to MQTT topics");
 
@@ -97,6 +103,27 @@ public class TelemetryHandler : BackgroundService
         // Subscribe to pairing completion events from coordinator
         await _mqtt.SubscribeAsync("farm/+/coord/+/pairing/complete", HandlePairingComplete, ct: stoppingToken);
 
+        // ============================================================================
+        // Coordinator Serial Log Topics (Real-time log streaming)
+        // ============================================================================
+        
+        // Subscribe to coordinator serial logs (debug/diagnostics)
+        await _mqtt.SubscribeAsync("farm/+/coord/+/serial", HandleSerialLog, ct: stoppingToken);
+
+        // ============================================================================
+        // Connection Status Topics (WiFi/MQTT connection events)
+        // ============================================================================
+        
+        // Subscribe to connection status events (WiFi/MQTT connect/disconnect)
+        await _mqtt.SubscribeAsync("farm/+/coord/+/status/connection", HandleConnectionStatus, ct: stoppingToken);
+
+        // ============================================================================
+        // Coordinator Registration Topics (coordinator announce/discovery)
+        // ============================================================================
+        
+        // Subscribe to coordinator announce (registration)
+        await _mqtt.SubscribeAsync("coordinator/+/announce", HandleCoordinatorAnnounce, ct: stoppingToken);
+
         _logger.LogInformation("TelemetryHandler subscribed to all telemetry topics");
 
         // Keep running until stopped
@@ -107,12 +134,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: site/{siteId}/coord/{coordId}/telemetry
             var parts = topic.Split('/');
             if (parts.Length < 4) return;
 
             var siteId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
 
             var telemetry = JsonSerializer.Deserialize<CoordinatorTelemetry>(payload, _jsonOptions);
             if (telemetry == null) return;
@@ -155,11 +189,18 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             var parts = topic.Split('/');
             if (parts.Length < 4) return;
 
             var siteId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
 
             var status = JsonSerializer.Deserialize<StatusUpdate>(payload, _jsonOptions);
             if (status == null) return;
@@ -244,12 +285,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: farm/{farmId}/coord/{coordId}/reservoir/telemetry
             var parts = topic.Split('/');
             if (parts.Length < 5) return;
 
             var farmId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
 
             var telemetry = JsonSerializer.Deserialize<ReservoirTelemetryDto>(payload, _jsonOptions);
             if (telemetry == null) return;
@@ -323,12 +371,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: farm/{farmId}/coord/{coordId}/tower/{towerId}/telemetry
             var parts = topic.Split('/');
             if (parts.Length < 7) return;
 
             var farmId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
             var towerId = parts[5];
 
             var telemetry = JsonSerializer.Deserialize<TowerTelemetryDto>(payload, _jsonOptions);
@@ -417,12 +472,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: farm/{farmId}/coord/{coordId}/tower/{towerId}/status
             var parts = topic.Split('/');
             if (parts.Length < 7) return;
 
             var farmId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
             var towerId = parts[5];
 
             var status = JsonSerializer.Deserialize<TowerStatusDto>(payload, _jsonOptions);
@@ -467,12 +529,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: farm/{farmId}/coord/{coordId}/pairing/request
             var parts = topic.Split('/');
             if (parts.Length < 5) return;
 
             var farmId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
 
             var dto = JsonSerializer.Deserialize<PairingRequestDto>(payload, _jsonOptions);
             if (dto == null || string.IsNullOrEmpty(dto.TowerId)) return;
@@ -508,12 +577,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: farm/{farmId}/coord/{coordId}/pairing/status
             var parts = topic.Split('/');
             if (parts.Length < 5) return;
 
             var farmId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
 
             var status = JsonSerializer.Deserialize<PairingStatusUpdate>(payload, _jsonOptions);
             if (status == null) return;
@@ -538,12 +614,19 @@ public class TelemetryHandler : BackgroundService
     {
         try
         {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
             // Parse topic: farm/{farmId}/coord/{coordId}/pairing/complete
             var parts = topic.Split('/');
             if (parts.Length < 5) return;
 
             var farmId = parts[1];
-            var coordId = parts[3];
+            coordId = parts[3];
 
             var completion = JsonSerializer.Deserialize<PairingCompleteEvent>(payload, _jsonOptions);
             if (completion == null) return;
@@ -558,6 +641,209 @@ public class TelemetryHandler : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling pairing complete from {Topic}", topic);
+        }
+    }
+
+    // ============================================================================
+    // Serial Log Handler (Real-time log streaming)
+    // ============================================================================
+
+    /// <summary>
+    /// Handle coordinator serial log messages for real-time debugging
+    /// Topic: farm/{farmId}/coord/{coordId}/serial
+    /// </summary>
+    private async Task HandleSerialLog(string topic, byte[] payload)
+    {
+        try
+        {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
+            // Parse topic: farm/{farmId}/coord/{coordId}/serial
+            var parts = topic.Split('/');
+            if (parts.Length < 5)
+            {
+                _logger.LogWarning("Invalid serial log topic format: {Topic}", topic);
+                return;
+            }
+
+            var farmId = parts[1];
+            coordId = parts[3];
+
+            _logger.LogDebug("Received serial log from {FarmId}/{CoordId}", farmId, coordId);
+
+            // Deserialize log payload
+            var logDto = JsonSerializer.Deserialize<SerialLogDto>(payload, _jsonOptions);
+            if (logDto == null)
+            {
+                _logger.LogWarning("Failed to deserialize serial log from {Topic}", topic);
+                return;
+            }
+
+            // Console debug output
+            Console.WriteLine($"[SERIAL LOG] {farmId}/{coordId} [{logDto.Level}] {logDto.Message}");
+            _logger.LogInformation("Serial log from {CoordId}: [{Level}] {Message}", 
+                coordId, logDto.Level ?? "INFO", logDto.Message);
+
+            // Broadcast to WebSocket clients for real-time display
+            var wsPayload = new CoordinatorLogPayload
+            {
+                CoordId = coordId,
+                FarmId = farmId,
+                Message = logDto.Message,
+                Level = logDto.Level ?? "INFO",
+                Tag = logDto.Tag,
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+            
+            await _broadcaster.BroadcastCoordinatorLogAsync(wsPayload);
+            
+            _logger.LogDebug("Broadcasted serial log to WebSocket clients");
+
+            // TODO: Optionally persist to MongoDB for historical analysis
+            // await _repository.InsertSerialLogAsync(new SerialLog { ... });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling serial log from {Topic}", topic);
+            Console.WriteLine($"[ERROR] Failed to handle serial log: {ex.Message}");
+        }
+    }
+
+    // ============================================================================
+    // Connection Status Handler (WiFi/MQTT lifecycle events)
+    // ============================================================================
+
+    /// <summary>
+    /// Handle coordinator connection status events (WiFi/MQTT connect/disconnect).
+    /// Topic: farm/{farmId}/coord/{coordId}/status/connection
+    /// </summary>
+    private async Task HandleConnectionStatus(string topic, byte[] payload)
+    {
+        try
+        {
+            var coordId = ExtractCoordIdFromTopic(topic);
+            if (coordId != null && !await _registrationService.IsRegisteredAsync(coordId))
+            {
+                await _registrationService.ProcessUnknownCoordinatorAsync(coordId, topic, payload);
+                return; // Drop message from unregistered coordinator
+            }
+
+            // Parse topic: farm/{farmId}/coord/{coordId}/status/connection
+            var parts = topic.Split('/');
+            if (parts.Length < 6)
+            {
+                _logger.LogWarning("Invalid connection status topic format: {Topic}", topic);
+                return;
+            }
+
+            var farmId = parts[1];
+            coordId = parts[3];
+
+            _logger.LogDebug("Received connection status from {FarmId}/{CoordId}", farmId, coordId);
+
+            // Deserialize connection status payload
+            var statusDto = JsonSerializer.Deserialize<ConnectionStatusDto>(payload, _jsonOptions);
+            if (statusDto == null)
+            {
+                _logger.LogWarning("Failed to deserialize connection status from {Topic}", topic);
+                return;
+            }
+
+            // Log connection event for backend diagnostics
+            var eventType = statusDto.Event switch
+            {
+                "wifi_connected" => "WiFi Connected",
+                "wifi_disconnected" => "WiFi Disconnected",
+                "mqtt_connected" => "MQTT Connected",
+                "mqtt_disconnected" => "MQTT Disconnected",
+                "wifi_got_ip" => "WiFi Got IP",
+                "wifi_lost_ip" => "WiFi Lost IP",
+                _ => statusDto.Event
+            };
+
+            var reasonMsg = !string.IsNullOrEmpty(statusDto.Reason) ? $" (Reason: {statusDto.Reason})" : "";
+            _logger.LogInformation("Connection status from {CoordId}: {Event}{Reason} | WiFi: {WifiStatus} (RSSI: {Rssi}), MQTT: {MqttStatus}",
+                coordId, eventType, reasonMsg, 
+                statusDto.WifiConnected ? "Connected" : "Disconnected", statusDto.WifiRssi,
+                statusDto.MqttConnected ? "Connected" : "Disconnected");
+
+            // Broadcast to WebSocket clients for real-time frontend updates
+            var wsPayload = new ConnectionStatusPayload
+            {
+                Ts = statusDto.Ts,
+                CoordId = coordId,
+                FarmId = farmId,
+                Event = statusDto.Event,
+                WifiConnected = statusDto.WifiConnected,
+                WifiRssi = statusDto.WifiRssi,
+                MqttConnected = statusDto.MqttConnected,
+                UptimeMs = statusDto.UptimeMs,
+                FreeHeap = statusDto.FreeHeap,
+                Reason = statusDto.Reason
+            };
+
+            await _broadcaster.BroadcastConnectionStatusAsync(wsPayload);
+
+            _logger.LogDebug("Broadcasted connection status to WebSocket clients");
+
+            // TODO: Optionally persist to MongoDB for historical analysis and uptime tracking
+            // await _repository.InsertConnectionEventAsync(new ConnectionEvent { ... });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling connection status from {Topic}", topic);
+        }
+    }
+
+    // ============================================================================
+    // Coordinator Registration Helpers
+    // ============================================================================
+
+    /// <summary>
+    /// Extract the coordinator ID from an MQTT topic.
+    /// Handles patterns like: farm/{farmId}/coord/{coordId}/...
+    ///                    and: site/{siteId}/coord/{coordId}/...
+    /// </summary>
+    private static string? ExtractCoordIdFromTopic(string topic)
+    {
+        var parts = topic.Split('/');
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            if (parts[i] == "coord" && i + 1 < parts.Length)
+                return parts[i + 1];
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Handle coordinator announce message for registration workflow.
+    /// Topic: coordinator/{mac}/announce
+    /// </summary>
+    private async Task HandleCoordinatorAnnounce(string topic, byte[] payload)
+    {
+        try
+        {
+            // Topic: coordinator/{mac}/announce
+            var parts = topic.Split('/');
+            if (parts.Length < 3) return;
+            var coordId = parts[1];
+
+            var announce = JsonSerializer.Deserialize<CoordinatorAnnounceDto>(payload, _jsonOptions);
+            if (announce == null) return;
+
+            _logger.LogInformation("Coordinator announce from {CoordId}: FW={Fw}, IP={Ip}, RSSI={Rssi}",
+                coordId, announce.FwVersion, announce.Ip, announce.WifiRssi);
+
+            await _registrationService.HandleCoordinatorAnnounceAsync(coordId, announce);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling coordinator announce from {Topic}", topic);
         }
     }
 
@@ -695,5 +981,90 @@ public class TelemetryHandler : BackgroundService
         public int? Rssi { get; set; }
     }
 
+    /// <summary>
+    /// DTO for coordinator serial log messages
+    /// Topic: farm/{farmId}/coord/{coordId}/serial
+    /// </summary>
+    private class SerialLogDto
+    {
+        /// <summary>
+        /// Timestamp in seconds since boot
+        /// </summary>
+        public int Ts { get; set; }
+
+        /// <summary>
+        /// Log message content
+        /// </summary>
+        public string Message { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Log level: DEBUG, INFO, WARN, ERROR
+        /// </summary>
+        public string? Level { get; set; }
+
+        /// <summary>
+        /// Optional subsystem tag (e.g., "WiFi", "MQTT", "Sensor")
+        /// </summary>
+        public string? Tag { get; set; }
+    }
+
+    /// <summary>
+    /// DTO for coordinator connection status events (WiFi/MQTT lifecycle)
+    /// Topic: farm/{farmId}/coord/{coordId}/status/connection
+    /// </summary>
+    private class ConnectionStatusDto
+    {
+        /// <summary>
+        /// Timestamp in seconds since epoch
+        /// </summary>
+        public long Ts { get; set; }
+
+        /// <summary>
+        /// Coordinator ID
+        /// </summary>
+        public string CoordId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Farm ID
+        /// </summary>
+        public string FarmId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Event type: wifi_connected, wifi_disconnected, mqtt_connected, mqtt_disconnected, wifi_got_ip, wifi_lost_ip
+        /// </summary>
+        public string Event { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Current WiFi connection status
+        /// </summary>
+        public bool WifiConnected { get; set; }
+
+        /// <summary>
+        /// WiFi signal strength (RSSI in dBm)
+        /// </summary>
+        public int WifiRssi { get; set; }
+
+        /// <summary>
+        /// Current MQTT broker connection status
+        /// </summary>
+        public bool MqttConnected { get; set; }
+
+        /// <summary>
+        /// Coordinator uptime in milliseconds
+        /// </summary>
+        public long UptimeMs { get; set; }
+
+        /// <summary>
+        /// Free heap memory in bytes
+        /// </summary>
+        public int FreeHeap { get; set; }
+
+        /// <summary>
+        /// Optional disconnect reason (e.g., "Beacon timeout", "Association leave")
+        /// </summary>
+        public string? Reason { get; set; }
+    }
+
     #endregion
 }
+

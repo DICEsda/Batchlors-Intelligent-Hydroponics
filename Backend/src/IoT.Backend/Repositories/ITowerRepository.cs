@@ -7,6 +7,7 @@ namespace IoT.Backend.Repositories;
 /// </summary>
 public interface ITowerRepository
 {
+    Task<IReadOnlyList<Tower>> GetAllAsync(CancellationToken ct = default);
     Task<Tower?> GetByIdAsync(string towerId, CancellationToken ct = default);
     Task<Tower?> GetByFarmCoordAndIdAsync(string farmId, string coordId, string towerId, CancellationToken ct = default);
     Task<IReadOnlyList<Tower>> GetByCoordinatorAsync(string farmId, string coordId, CancellationToken ct = default);

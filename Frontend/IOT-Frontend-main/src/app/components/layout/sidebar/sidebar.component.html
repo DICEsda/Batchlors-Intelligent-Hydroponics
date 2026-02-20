@@ -1,21 +1,25 @@
-<aside class="sidebar">
+<aside class="sidebar" [class.collapsed]="collapsed()">
   <!-- Logo Section -->
   <div class="sidebar-header">
     <div class="logo-container">
       <div class="logo-icon">
         <ng-icon name="lucideCommand" size="20" />
       </div>
-      <div class="logo-text">
-        <span class="company-name">SmartTile</span>
-        <span class="company-tier">IoT System</span>
-      </div>
+      @if (!collapsed()) {
+        <div class="logo-text">
+          <span class="company-name">SmartTile</span>
+          <span class="company-tier">IoT System</span>
+        </div>
+      }
     </div>
   </div>
 
   <!-- Platform Navigation -->
   <nav class="sidebar-nav">
     <div class="nav-section">
-      <span class="nav-section-title">Platform</span>
+      @if (!collapsed()) {
+        <span class="nav-section-title">Platform</span>
+      }
       
       @for (item of platformItems(); track item.label) {
         @if (item.children) {
@@ -25,26 +29,74 @@
               class="nav-item expandable"
               [class.expanded]="item.expanded"
               (click)="toggleExpand(item)"
+              (mouseenter)="onNavItemHover(item, $event)"
+              (mouseleave)="onNavItemLeave()"
             >
               <ng-icon [name]="item.icon" size="18" />
-              <span class="nav-label">{{ item.label }}</span>
-              <ng-icon 
-                [name]="item.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
-                size="16" 
-                class="chevron"
-              />
+              @if (!collapsed()) {
+                <span class="nav-label">{{ item.label }}</span>
+                <ng-icon 
+                  [name]="item.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                  size="16" 
+                  class="chevron"
+                />
+              }
             </button>
             
-            @if (item.expanded) {
+            @if (item.expanded && !collapsed()) {
               <div class="nav-children">
                 @for (child of item.children; track child.label) {
-                  <a 
-                    [routerLink]="child.route" 
-                    routerLinkActive="active"
-                    class="nav-item child"
-                  >
-                    <span class="nav-label">{{ child.label }}</span>
-                  </a>
+                  @if (child.children) {
+                    <!-- Nested Expandable Item -->
+                    <div class="nav-item-subgroup">
+                      <a 
+                        [routerLink]="child.route" 
+                        routerLinkActive="active"
+                        class="nav-item child expandable-child"
+                        [class.expanded]="child.expanded"
+                      >
+                        <ng-icon [name]="child.icon" size="16" />
+                        @if (!collapsed()) {
+                          <span class="nav-label">{{ child.label }}</span>
+                          <ng-icon 
+                            [name]="child.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                            size="14" 
+                            class="chevron"
+                            (click)="toggleExpand(child); $event.preventDefault(); $event.stopPropagation()"
+                          />
+                        }
+                      </a>
+                      
+                      @if (child.expanded) {
+                        <div class="nav-grandchildren">
+                          @for (grandchild of child.children; track grandchild.label) {
+                            <a 
+                              [routerLink]="grandchild.route" 
+                              routerLinkActive="active"
+                              class="nav-item grandchild"
+                            >
+                              <ng-icon [name]="grandchild.icon" size="14" />
+                              @if (!collapsed()) {
+                                <span class="nav-label">{{ grandchild.label }}</span>
+                              }
+                            </a>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <!-- Regular Child Item -->
+                    <a 
+                      [routerLink]="child.route" 
+                      routerLinkActive="active"
+                      class="nav-item child"
+                    >
+                      <ng-icon [name]="child.icon" size="16" />
+                      @if (!collapsed()) {
+                        <span class="nav-label">{{ child.label }}</span>
+                      }
+                    </a>
+                  }
                 }
               </div>
             }
@@ -55,9 +107,13 @@
             [routerLink]="item.route" 
             routerLinkActive="active"
             class="nav-item"
+            (mouseenter)="onNavItemHover(item, $event)"
+            (mouseleave)="onNavItemLeave()"
           >
             <ng-icon [name]="item.icon" size="18" />
-            <span class="nav-label">{{ item.label }}</span>
+            @if (!collapsed()) {
+              <span class="nav-label">{{ item.label }}</span>
+            }
           </a>
         }
       }
@@ -65,92 +121,114 @@
 
     <!-- Projects Section -->
     <div class="nav-section">
-      <span class="nav-section-title">Projects</span>
+      @if (!collapsed()) {
+        <span class="nav-section-title">Projects</span>
+      }
       
       @for (project of projects(); track project.label) {
         <a 
           [routerLink]="project.route" 
           routerLinkActive="active"
           class="nav-item"
+          (mouseenter)="onNavItemHover(project, $event)"
+          (mouseleave)="onNavItemLeave()"
         >
           <ng-icon [name]="project.icon" size="18" />
-          <span class="nav-label">{{ project.label }}</span>
+          @if (!collapsed()) {
+            <span class="nav-label">{{ project.label }}</span>
+          }
         </a>
       }
     </div>
   </nav>
 
-  <!-- Bottom Section - System Status & Role Switcher -->
+  <!-- Bottom Section - System Status & User Account -->
   <div class="sidebar-footer">
-    <!-- System Status Section -->
+    <!-- System Status Section (Compact) -->
     <div class="system-status">
-      <span class="status-section-title">System Status</span>
+      @if (!collapsed()) {
+        <span class="status-section-title">System Status</span>
+      }
       
       <!-- MQTT Status -->
-      <div class="status-item">
+      <div class="status-item" [title]="collapsed() ? ('MQTT: ' + (wsConnected() ? 'Connected' : 'Offline')) : ''">
         <div class="status-indicator" [class.online]="wsConnected()" [class.offline]="!wsConnected()">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideWifi" size="16" />
-        <span class="status-label">MQTT</span>
-        <span class="status-value" [class.online]="wsConnected()">
-          {{ wsConnected() ? 'Connected' : 'Disconnected' }}
-        </span>
+        <ng-icon name="lucideWifi" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">MQTT</span>
+          <span class="status-value" [class.online]="wsConnected()">
+            {{ wsConnected() ? 'Connected' : 'Offline' }}
+          </span>
+        }
       </div>
       
       <!-- Backend Status -->
-      <div class="status-item">
+      <div class="status-item" [title]="collapsed() ? ('Backend: ' + (backendConnected() ? 'Online' : 'Offline')) : ''">
         <div class="status-indicator" [class.online]="backendConnected()" [class.offline]="!backendConnected()">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideDatabase" size="16" />
-        <span class="status-label">Backend</span>
-        <span class="status-value" [class.online]="backendConnected()">
-          {{ backendConnected() ? 'Online' : 'Offline' }}
-        </span>
+        <ng-icon name="lucideDatabase" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">Backend</span>
+          <span class="status-value" [class.online]="backendConnected()">
+            {{ backendConnected() ? 'Online' : 'Offline' }}
+          </span>
+        }
       </div>
       
       <!-- Connected Coordinators -->
-      <div class="status-item">
+      <div class="status-item" [title]="collapsed() ? ('Coordinators: ' + onlineCoordinators() + '/' + totalCoordinators()) : ''">
         <div class="status-indicator" [class.online]="onlineCoordinators() > 0" [class.offline]="onlineCoordinators() === 0">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideCpu" size="16" />
-        <span class="status-label">Coordinators</span>
-        <span class="status-value" [class.online]="onlineCoordinators() > 0">
-          {{ onlineCoordinators() }}/{{ totalCoordinators() }}
-        </span>
+        <ng-icon name="lucideCpu" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">Coordinators</span>
+          <span class="status-value" [class.online]="onlineCoordinators() > 0">
+            {{ onlineCoordinators() }}/{{ totalCoordinators() }}
+          </span>
+        }
       </div>
       
       <!-- Connected Nodes -->
-      <div class="status-item">
+      <div class="status-item" [title]="collapsed() ? ('Nodes: ' + onlineNodes() + '/' + totalNodes()) : ''">
         <div class="status-indicator" [class.online]="onlineNodes() > 0" [class.offline]="onlineNodes() === 0">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideLightbulb" size="16" />
-        <span class="status-label">Nodes</span>
-        <span class="status-value" [class.online]="onlineNodes() > 0">
-          {{ onlineNodes() }}/{{ totalNodes() }}
-        </span>
+        <ng-icon name="lucideLightbulb" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">Nodes</span>
+          <span class="status-value" [class.online]="onlineNodes() > 0">
+            {{ onlineNodes() }}/{{ totalNodes() }}
+          </span>
+        }
       </div>
     </div>
     
-    <!-- Role Switcher -->
+    <!-- User Account / Role Switcher -->
     <div class="role-switcher" (clickOutside)="closeDropdown()">
-      <button class="role-button" (click)="toggleRoleDropdown()">
+      <button 
+        class="role-button" 
+        (click)="toggleRoleDropdown()"
+        [title]="collapsed() ? currentRoleDisplay()?.label : ''"
+      >
         <div class="role-icon">
           <ng-icon [name]="currentRoleDisplay()?.icon || 'lucideUser'" size="18" />
         </div>
-        <div class="role-info">
-          <span class="role-title">{{ currentRoleDisplay()?.label }}</span>
-          <span class="role-subtitle">Switch Role</span>
-        </div>
-        <ng-icon 
-          name="lucideChevronDown" 
-          size="16" 
-          class="role-chevron"
-          [class.rotated]="roleDropdownOpen()" 
-        />
+        @if (!collapsed()) {
+          <div class="role-info">
+            <span class="role-title">{{ currentRoleDisplay()?.label }}</span>
+            <span class="role-subtitle">Switch Role</span>
+          </div>
+          <ng-icon 
+            name="lucideChevronDown" 
+            size="16" 
+            class="role-chevron"
+            [class.rotated]="roleDropdownOpen()" 
+          />
+        }
       </button>
       
       @if (roleDropdownOpen()) {
@@ -172,4 +250,47 @@
       }
     </div>
   </div>
+
+  <!-- Hover Popup for Collapsed Sidebar -->
+  @if (collapsed() && hoveredItem()) {
+    <div class="sidebar-hover-popup" 
+         [style.top.px]="popupPosition() ? popupPosition()!.top : 0"
+         (mouseenter)="onPopupEnter()" 
+         (mouseleave)="onPopupLeave()">
+      @if (hasChildren(hoveredItem()!)) {
+        <!-- Show children menu -->
+        <div class="popup-header">{{ hoveredItem()!.label }}</div>
+        <div class="popup-children">
+          @for (child of getChildren(hoveredItem()!); track child.label) {
+            @if (child.route) {
+              <a 
+                [routerLink]="child.route" 
+                routerLinkActive="active-popup"
+                class="popup-child-item"
+              >
+                <ng-icon [name]="child.icon" size="16" />
+                <span>{{ child.label }}</span>
+              </a>
+            }
+            @if (child.children && child.children.length > 0) {
+              <!-- Nested children -->
+              @for (grandchild of child.children; track grandchild.label) {
+                <a 
+                  [routerLink]="grandchild.route" 
+                  routerLinkActive="active-popup"
+                  class="popup-child-item nested"
+                >
+                  <ng-icon [name]="grandchild.icon" size="14" />
+                  <span>{{ grandchild.label }}</span>
+                </a>
+              }
+            }
+          }
+        </div>
+      } @else {
+        <!-- Show just the label -->
+        <div class="popup-label">{{ hoveredItem()!.label }}</div>
+      }
+    </div>
+  }
 </aside>

@@ -1,0 +1,59 @@
+# ML Environment for IoT Smart Hydroponics
+# Install: pip install -r requirements.txt
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# MongoDB Connection
+pymongo>=4.6.0
+motor>=3.3.0  # Async MongoDB driver
+
+# MQTT for real-time data
+paho-mqtt>=2.0.0
+
+# Azure Digital Twins
+azure-digitaltwins-core>=1.2.0
+azure-identity>=1.15.0
+azure-core>=1.30.0
+
+# Machine Learning
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+
+# Deep Learning (optional, for advanced models)
+# torch>=2.0.0
+# tensorflow>=2.15.0
+
+# Time Series
+statsmodels>=0.14.0
+prophet>=1.1.0  # Facebook Prophet for forecasting
+
+# Visualization
+matplotlib>=3.8.0
+seaborn>=0.13.0
+plotly>=5.18.0
+
+# Jupyter Environment
+jupyter>=1.0.0
+jupyterlab>=4.0.0
+ipywidgets>=8.0.0
+
+# API Serving
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+loguru>=0.7.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# Code Quality
+black>=24.0.0
+ruff>=0.2.0

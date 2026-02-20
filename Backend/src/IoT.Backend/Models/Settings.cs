@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace IoT.Backend.Models;
@@ -8,6 +9,11 @@ namespace IoT.Backend.Models;
 /// </summary>
 public class Settings
 {
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    [JsonIgnore]
+    public string? Id { get; set; }
+
     [BsonElement("site_id")]
     [JsonPropertyName("site_id")]
     public string SiteId { get; set; } = string.Empty;

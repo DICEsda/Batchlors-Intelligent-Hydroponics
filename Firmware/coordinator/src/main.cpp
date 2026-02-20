@@ -2,6 +2,7 @@
 #include <nvs_flash.h>
 #include "core/Coordinator.h"
 #include "utils/Logger.h"
+#include "../../shared/src/ConfigStore.h"
 
 Coordinator coordinator;
 
@@ -58,6 +59,19 @@ void setup() {
     }
     Serial.flush();
     delay(1000); // Critical: Wait for NVS to fully stabilize
+    
+    // Initialize ConfigStore - unified configuration system
+    Logger::info("Initializing configuration store...");
+    Serial.println("Initializing ConfigStore...");
+    if (!ConfigStore::initialize()) {
+        Logger::error("✗ ConfigStore initialization failed!");
+        Serial.println("✗ ConfigStore initialization failed!");
+        Serial.println("System will continue with defaults, but config may not persist.");
+    } else {
+        Logger::info("✓ ConfigStore initialized");
+        Serial.println("✓ ConfigStore initialized");
+    }
+    Serial.flush();
     
     Logger::info("*** SETUP START ***");
     Serial.println("Starting Coordinator...");

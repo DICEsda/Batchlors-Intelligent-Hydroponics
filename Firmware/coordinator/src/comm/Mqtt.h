@@ -9,7 +9,7 @@
 #include "../sensors/ThermalControl.h" // for NodeThermalData
 #include "WifiManager.h"
 #include "../../shared/src/EspNowMessage.h"
-#include "../../shared/src/ConfigManager.h"
+#include "../../shared/src/ConfigStore.h"
 
 class Mqtt {
 public:
@@ -33,6 +33,13 @@ public:
     void publishReservoirTelemetry(const ReservoirTelemetryMessage& telemetry);
     void publishOtaStatus(const String& status, int progress, const String& message, const String& error = "");
     
+    // Connection event publishing (real-time status updates)
+    void publishConnectionEvent(const String& event, const String& reason = "");
+    
+    // Coordinator registration / announce
+    void publishAnnounce();
+    void saveFarmId(const String& newFarmId);
+    
     // Configuration
     void setBrokerConfig(const char* host, uint16_t port, const char* username, const char* password);
     void setWifiManager(WifiManager* manager);
@@ -55,7 +62,6 @@ public:
 private:
     WiFiClient wifiClient;
     PubSubClient mqttClient;
-    ConfigManager config;
     
     // Configuration
     String brokerHost;
@@ -72,6 +78,7 @@ private:
     int8_t lastFailureState = 0;
     uint32_t lastDiagPrintMs = 0;
     bool loopbackHintPrinted = false;
+    bool announcePublished = false;
     
     bool connectMqtt();
     bool ensureConfigLoaded();
@@ -79,6 +86,7 @@ private:
     void persistConfig();
     static void handleMqttMessage(char* topic, uint8_t* payload, unsigned int length);
     void processMessage(const String& topic, const String& payload);
+    void handleRegistrationMessage(const String& payload);
     bool autoDiscoverBroker();
     bool tryBrokerCandidate(const IPAddress& candidate);
     void logConnectionFailureDetail(int8_t state);
@@ -95,6 +103,9 @@ private:
     String coordinatorMmwaveTopic() const;
     String coordinatorOtaStatusTopic() const;
     String towerCmdTopic(const String& towerId) const;
+    String connectionStatusTopic() const;
+    String coordinatorAnnounceTopic() const;
+    String coordinatorRegisteredTopic() const;
     
     // Legacy topic builders (for backward compatibility during migration)
     String nodeTelemetryTopic(const String& nodeId) const;

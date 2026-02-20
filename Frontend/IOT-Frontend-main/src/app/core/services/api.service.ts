@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError, catchError, retry, timeout } from 'rxjs';
+import { Observable, throwError, catchError, retry, timeout, of } from 'rxjs';
 import { EnvironmentService } from './environment.service';
 import {
   // Site
@@ -8,7 +8,6 @@ import {
   // Coordinator
   Coordinator,
   CoordinatorSummary,
-  CoordinatorPairCommand,
   CoordinatorRestartCommand,
   CoordinatorWifiCommand,
   // Node
@@ -51,11 +50,17 @@ import {
   // Digital Twin
   FarmTopology,
   DigitalTwinState,
+  // Pairing
+  PairingSession,
+  TowerPairingRequest,
+  Tower,
   // Common
   ApiResponse,
   PaginatedResponse,
   HealthStatus,
   PaginationParams,
+  // Coordinator Registration
+  ApproveCoordinatorRequest,
 } from '../models';
 
 /**
@@ -137,32 +142,90 @@ export class ApiService {
     return this.get<Coordinator>(`/coordinators/${coordId}`);
   }
 
+  // ============================================================================
+  // Pairing API
+  // ============================================================================
+
   /**
-   * Start pairing mode on coordinator
+   * Start pairing mode on coordinator.
+   * Puts the coordinator into pairing mode for the specified duration.
    */
-  startPairing(command: CoordinatorPairCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/coordinator/pair', command);
+  startPairing(farmId: string, coordId: string, durationSeconds = 60): Observable<PairingSession> {
+    return this.post<PairingSession>('/api/pairing/start', {
+      farm_id: farmId,
+      coord_id: coordId,
+      duration_seconds: durationSeconds
+    });
   }
 
   /**
-   * Stop pairing mode on coordinator
+   * Stop an active pairing session.
+   * Exits the coordinator from pairing mode.
    */
-  stopPairing(coordinatorId: string): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/coordinator/pair/stop', { coordinator_id: coordinatorId });
+  stopPairing(farmId: string, coordId: string): Observable<PairingSession> {
+    return this.post<PairingSession>('/api/pairing/stop', {
+      farm_id: farmId,
+      coord_id: coordId
+    });
   }
 
   /**
-   * Approve a discovered node during pairing
+   * Get the active pairing session for a coordinator.
    */
-  approveNode(request: { coordinator_id: string; node_id: string; mac_address: string; name?: string }): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/pairing/approve', request);
+  getPairingSession(farmId: string, coordId: string): Observable<PairingSession | null> {
+    return this.get<PairingSession>(`/api/pairing/session/${farmId}/${coordId}`).pipe(
+      catchError((err) => {
+        // 404 means no active session, return null
+        if (err.message?.includes('404')) {
+          return of(null);
+        }
+        throw err;
+      })
+    );
   }
 
   /**
-   * Reject a discovered node during pairing
+   * Get all pending tower pairing requests for a coordinator.
    */
-  rejectNode(request: { coordinator_id: string; node_id: string }): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/pairing/reject', request);
+  getPendingPairingRequests(farmId: string, coordId: string): Observable<TowerPairingRequest[]> {
+    return this.get<TowerPairingRequest[]>(`/api/pairing/requests/${farmId}/${coordId}`);
+  }
+
+  /**
+   * Approve a pending tower pairing request.
+   * Creates the tower entity and sends approval to the coordinator.
+   */
+  approveNode(farmId: string, coordId: string, towerId: string): Observable<Tower> {
+    return this.post<Tower>('/api/pairing/approve', {
+      farm_id: farmId,
+      coord_id: coordId,
+      tower_id: towerId
+    });
+  }
+
+  /**
+   * Reject a pending tower pairing request.
+   * Sends rejection to the coordinator - tower will go to idle state.
+   */
+  rejectNode(farmId: string, coordId: string, towerId: string): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/pairing/reject', {
+      farm_id: farmId,
+      coord_id: coordId,
+      tower_id: towerId
+    });
+  }
+
+  /**
+   * Forget a paired device.
+   * Removes the tower from the backend and sends a command to the coordinator
+   * to notify the tower to wipe its credentials.
+   */
+  forgetDevice(farmId: string, coordId: string, towerId: string): Observable<ApiResponse<void>> {
+    return this.post<ApiResponse<void>>('/api/pairing/forget', {
+      farm_id: farmId,
+      coord_id: coordId,
+      tower_id: towerId
+    });
   }
 
   /**
@@ -177,6 +240,20 @@ export class ApiService {
    */
   updateCoordinatorWifi(command: CoordinatorWifiCommand): Observable<ApiResponse<void>> {
     return this.post<ApiResponse<void>>('/api/v1/coordinator/wifi', command);
+  }
+
+  /**
+   * Update coordinator metadata (name, description, etc.)
+   */
+  updateCoordinator(coordId: string, data: any): Observable<any> {
+    return this.put(`/api/v1/coordinators/${encodeURIComponent(coordId)}`, data);
+  }
+
+  /**
+   * Update coordinator operational configuration (intervals, listening mode, etc.)
+   */
+  updateCoordinatorConfig(coordId: string, config: any): Observable<any> {
+    return this.put(`/api/coordinators/${encodeURIComponent(coordId)}/config`, config);
   }
 
   // ============================================================================
@@ -464,6 +541,48 @@ export class ApiService {
 
   getDigitalTwinState(): Observable<DigitalTwinState> {
     return this.get<DigitalTwinState>('/api/v1/digital-twin/state');
+  }
+
+  // ============================================================================
+  // Coordinator Registration API
+  // ============================================================================
+
+  /**
+   * Get all pending coordinator registration requests
+   */
+  getPendingCoordinatorRegistrations(): Observable<any[]> {
+    return this.get<any[]>('/api/coordinators/pending');
+  }
+
+  /**
+   * Approve a pending coordinator registration
+   */
+  approveCoordinatorRegistration(request: ApproveCoordinatorRequest): Observable<any> {
+    // Backend expects snake_case JSON (PropertyNamingPolicy.SnakeCaseLower)
+    const body = {
+      coord_id: request.coordId,
+      farm_id: request.farmId,
+      name: request.name,
+      description: request.description,
+      color: request.color,
+      tags: request.tags,
+      location: request.location
+    };
+    return this.post('/api/coordinators/register/approve', body);
+  }
+
+  /**
+   * Reject a pending coordinator registration
+   */
+  rejectCoordinatorRegistration(coordId: string): Observable<any> {
+    return this.post('/api/coordinators/register/reject', { coord_id: coordId });
+  }
+
+  /**
+   * Remove a registered coordinator
+   */
+  removeCoordinator(coordId: string): Observable<any> {
+    return this.delete(`/api/coordinators/${encodeURIComponent(coordId)}`);
   }
 
   // ============================================================================

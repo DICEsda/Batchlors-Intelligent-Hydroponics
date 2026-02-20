@@ -89,14 +89,36 @@ export const routes: Routes = [
     title: 'Node Detail | Smart Tile Dashboard'
   },
 
-  // Zones - Lighting zone management
+  // Farms - Farm management (top-level organization)
+  {
+    path: 'farms',
+    loadComponent: () =>
+      import('./pages/farms-list/farms-list.component').then(
+        m => m.FarmsListComponent
+      ),
+    title: 'Farms | Smart Tile Dashboard'
+  },
+
+  // Farm Detail - Farm with reservoirs and towers
+  {
+    path: 'farms/:id',
+    loadComponent: () =>
+      import('./pages/farm-detail/farm-detail.component').then(
+        m => m.FarmDetailComponent
+      ),
+    title: 'Farm Detail | Smart Tile Dashboard'
+  },
+
+  // Legacy zones redirect to farms
   {
     path: 'zones',
-    loadComponent: () =>
-      import('./pages/zones-list/zones-list.component').then(
-        m => m.ZonesListComponent
-      ),
-    title: 'Zones | Smart Tile Dashboard'
+    redirectTo: '/farms',
+    pathMatch: 'full'
+  },
+  {
+    path: 'zones/:id',
+    redirectTo: '/farms/:id',
+    pathMatch: 'prefix'
   },
 
   // Radar View - Presence detection visualization
@@ -179,14 +201,21 @@ export const routes: Routes = [
     title: 'Settings | Smart Tile Dashboard'
   },
 
-  // Alerts - Alert history and management
+  // Logs - Coordinator logs and system logs
   {
-    path: 'alerts',
+    path: 'logs',
     loadComponent: () =>
       import('./pages/alerts/alerts.component').then(
         m => m.AlertsComponent
       ),
-    title: 'Alerts | Smart Tile Dashboard'
+    title: 'Logs | Smart Tile Dashboard'
+  },
+
+  // Legacy redirect from alerts to logs
+  {
+    path: 'alerts',
+    redirectTo: '/logs',
+    pathMatch: 'full'
   },
 
   // Wildcard redirect

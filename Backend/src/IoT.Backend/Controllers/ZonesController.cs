@@ -27,6 +27,17 @@ public class ZonesController : ControllerBase
     }
 
     /// <summary>
+    /// Get all zones (system-wide) for frontend /api/v1/zones endpoint.
+    /// </summary>
+    [HttpGet]
+    [Route("/api/v1/zones")]
+    public async Task<ActionResult<IEnumerable<Zone>>> GetAllZones(CancellationToken ct)
+    {
+        var zones = await _zoneRepository.GetAllAsync(ct);
+        return Ok(zones);
+    }
+
+    /// <summary>
     /// Get all zones for a site.
     /// </summary>
     [HttpGet("site/{siteId}")]

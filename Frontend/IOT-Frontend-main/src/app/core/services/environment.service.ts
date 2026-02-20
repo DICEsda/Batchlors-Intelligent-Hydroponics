@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, isDevMode } from '@angular/core';
 
 /**
  * Environment Service
@@ -11,9 +11,9 @@ import { Injectable } from '@angular/core';
 export class EnvironmentService {
   private readonly config = {
     // Backend API configuration
-    // Default connects directly to backend:8000; override API_URL to use nginx /api proxy in production
+    // Using Docker backend on host machine (localhost:8000 maps to Docker container)
     apiUrl: this.getEnvVar('API_URL', 'http://localhost:8000'),
-    wsUrl: this.getEnvVar('WS_URL', 'ws://localhost:8000/ws'),
+    wsUrl: this.getEnvVar('WS_URL', 'ws://localhost:8000/ws/broadcast'),
     
     // MQTT WebSocket configuration
     mqttWsUrl: this.getEnvVar('MQTT_WS_URL', 'ws://localhost:8000/mqtt'),
@@ -33,9 +33,9 @@ export class EnvironmentService {
     // API timeouts
     apiTimeout: parseInt(this.getEnvVar('API_TIMEOUT', '30000'), 10),
     
-    // Development mode
-    isDevelopment: this.getEnvVar('NODE_ENV', 'development') === 'development',
-    isProduction: this.getEnvVar('NODE_ENV', 'development') === 'production',
+    // Development mode - use Angular's isDevMode() for accurate detection
+    isDevelopment: isDevMode(),
+    isProduction: !isDevMode(),
   };
 
   constructor() {

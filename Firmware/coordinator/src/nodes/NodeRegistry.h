@@ -39,6 +39,10 @@ public:
     
     // Get all stored node MAC addresses (for re-pairing on boot)
     std::vector<String> getAllNodeMacs() const;
+    
+    // Storage methods (public for coordinator access)
+    void loadFromStorage();
+    void saveToStorage();
 
 private:
     std::map<String, NodeInfo> nodes;
@@ -48,9 +52,6 @@ private:
     
     bool pairingActive;
     uint32_t pairingEndTime;
-    
-    void loadFromStorage();
-    void saveToStorage();
     void cleanupStaleNodes();
     std::function<void(const String& nodeId, const String& lightId)> nodeRegisteredCallback = nullptr;
     

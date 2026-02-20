@@ -1,0 +1,162 @@
+{
+  "@context": "dtmi:dtdl:context;2",
+  "@id": "dtmi:iot:hydroponics:Coordinator;1",
+  "@type": "Interface",
+  "displayName": "Hydroponic Coordinator",
+  "description": "ESP32-S3 coordinator managing towers and reservoir",
+  "contents": [
+    {
+      "@type": "Property",
+      "name": "mac_address",
+      "displayName": "MAC Address",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "firmware_version",
+      "displayName": "Firmware Version",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "status",
+      "displayName": "Status",
+      "schema": {
+        "@type": "Enum",
+        "valueSchema": "string",
+        "enumValues": [
+          { "name": "online", "enumValue": "online" },
+          { "name": "offline", "enumValue": "offline" },
+          { "name": "pairing", "enumValue": "pairing" },
+          { "name": "maintenance", "enumValue": "maintenance" },
+          { "name": "error", "enumValue": "error" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "wifi_rssi",
+      "displayName": "WiFi Signal Strength",
+      "schema": "integer",
+      "unit": "decibelMilliwatts"
+    },
+    {
+      "@type": "Property",
+      "name": "uptime_seconds",
+      "displayName": "Uptime",
+      "schema": "long",
+      "unit": "second"
+    },
+    {
+      "@type": "Property",
+      "name": "towers_online",
+      "displayName": "Towers Online",
+      "schema": "integer"
+    },
+    {
+      "@type": "Property",
+      "name": "last_seen",
+      "displayName": "Last Seen",
+      "schema": "dateTime"
+    },
+    {
+      "@type": "Property",
+      "name": "reported_state",
+      "displayName": "Reported State",
+      "description": "State reported by the physical device",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "ambient_light_lux", "schema": "double" },
+          { "name": "ambient_temp_c", "schema": "double" },
+          { "name": "mmwave_presence", "schema": "boolean" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "desired_state",
+      "displayName": "Desired State",
+      "description": "Desired state to be applied to device",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "pairing_enabled", "schema": "boolean" },
+          { "name": "discovery_enabled", "schema": "boolean" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "ml_predictions",
+      "displayName": "ML Predictions",
+      "description": "Machine learning predictions and insights",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "anomaly_score", "schema": "double" },
+          { "name": "predicted_failures", "schema": "string" },
+          { "name": "recommended_actions", "schema": "string" },
+          { "name": "model_name", "schema": "string" },
+          { "name": "model_version", "schema": "string" },
+          { "name": "generated_at", "schema": "dateTime" }
+        ]
+      }
+    },
+    {
+      "@type": "Telemetry",
+      "name": "ambient_light",
+      "displayName": "Ambient Light",
+      "schema": "double",
+      "unit": "lux"
+    },
+    {
+      "@type": "Telemetry",
+      "name": "ambient_temperature",
+      "displayName": "Ambient Temperature",
+      "schema": "double",
+      "unit": "degreeCelsius"
+    },
+    {
+      "@type": "Telemetry",
+      "name": "mmwave_event",
+      "displayName": "mmWave Presence Event",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "presence", "schema": "boolean" },
+          { "name": "confidence", "schema": "double" },
+          { "name": "target_count", "schema": "integer" }
+        ]
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "startPairing",
+      "displayName": "Start Pairing",
+      "description": "Start pairing mode for new towers",
+      "request": {
+        "name": "duration_ms",
+        "schema": "integer"
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "restart",
+      "displayName": "Restart Coordinator",
+      "description": "Restart the coordinator device"
+    },
+    {
+      "@type": "Relationship",
+      "name": "hasTower",
+      "displayName": "Has Tower",
+      "target": "dtmi:iot:hydroponics:Tower;1"
+    },
+    {
+      "@type": "Relationship",
+      "name": "hasReservoir",
+      "displayName": "Has Reservoir",
+      "target": "dtmi:iot:hydroponics:Reservoir;1"
+    }
+  ]
+}

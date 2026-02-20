@@ -6,7 +6,7 @@ $transition-normal: 200ms ease;
 $color-success: hsl(142 76% 36%);
 $color-warning: hsl(45 93% 47%);
 $color-info: hsl(200 80% 50%);
-$color-danger: hsl(var(--destructive));
+$color-danger: var(--destructive);
 
 .ota-dashboard {
   padding: 1.5rem;
@@ -37,12 +37,12 @@ $color-danger: hsl(var(--destructive));
     .page-title {
       font-size: 1.875rem;
       font-weight: 700;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
       margin: 0;
     }
 
     .page-description {
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
       margin: 0.25rem 0 0;
       font-size: 0.875rem;
     }
@@ -66,10 +66,10 @@ $color-danger: hsl(var(--destructive));
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: hsl(var(--destructive) / 0.1);
-  border: 1px solid hsl(var(--destructive) / 0.3);
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent);
   border-radius: 0.5rem;
-  color: hsl(var(--destructive));
+  color: var(--destructive);
   margin-bottom: 1.5rem;
 
   span {
@@ -191,11 +191,11 @@ $color-danger: hsl(var(--destructive));
   gap: 0.5rem;
   font-size: 1.125rem;
   font-weight: 600;
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   margin: 0;
 
   .section-icon {
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
   }
 }
 
@@ -203,8 +203,8 @@ $color-danger: hsl(var(--destructive));
 .active-jobs-section {
   margin-bottom: 2rem;
   padding: 1.25rem;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
 }
 
@@ -251,7 +251,7 @@ $color-danger: hsl(var(--destructive));
       align-items: center;
       gap: 0.375rem;
       font-size: 0.75rem;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
     }
   }
 
@@ -259,7 +259,7 @@ $color-danger: hsl(var(--destructive));
     display: flex;
     justify-content: flex-end;
     padding: 0.75rem 1rem;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -273,7 +273,7 @@ $color-danger: hsl(var(--destructive));
 .progress-bar {
   flex: 1;
   height: 8px;
-  background: hsl(var(--muted));
+  background: var(--muted);
   border-radius: 4px;
   overflow: hidden;
 
@@ -288,7 +288,7 @@ $color-danger: hsl(var(--destructive));
 .progress-text {
   font-size: 0.75rem;
   font-weight: 600;
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   min-width: 40px;
   text-align: right;
 }
@@ -314,8 +314,8 @@ $color-danger: hsl(var(--destructive));
   transition: all $transition-normal;
 
   &:hover {
-    border-color: hsl(var(--primary) / 0.5);
-    box-shadow: 0 2px 8px hsl(var(--primary) / 0.1);
+    border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+    box-shadow: 0 2px 8px color-mix(in oklch, var(--primary) 10%, transparent);
   }
 
   &.update-available {
@@ -330,7 +330,7 @@ $color-danger: hsl(var(--destructive));
 
   &.failed {
     border-left: 3px solid $color-danger;
-    background: hsl(var(--destructive) / 0.02);
+    background: color-mix(in oklch, var(--destructive) 2%, transparent);
   }
 
   .device-header {
@@ -353,7 +353,7 @@ $color-danger: hsl(var(--destructive));
       gap: 0.5rem;
 
       .device-type-icon {
-        color: hsl(var(--muted-foreground));
+        color: var(--muted-foreground);
         flex-shrink: 0;
       }
     }
@@ -376,7 +376,7 @@ $color-danger: hsl(var(--destructive));
     font-size: 0.875rem;
 
     .version-label {
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
     }
 
     .version-value {
@@ -395,7 +395,7 @@ $color-danger: hsl(var(--destructive));
     display: flex;
     justify-content: flex-end;
     padding: 0.75rem 1rem;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -455,7 +455,7 @@ $color-danger: hsl(var(--destructive));
 
   .firmware-size {
     font-size: 0.75rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     font-family: monospace;
   }
 
@@ -468,9 +468,9 @@ $color-danger: hsl(var(--destructive));
     align-items: flex-start;
     gap: 0.5rem;
     font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     padding: 0.75rem;
-    background: hsl(var(--muted) / 0.3);
+    background: color-mix(in oklch, var(--muted) 30%, transparent);
     border-radius: 0.375rem;
 
     ng-icon {
@@ -483,7 +483,7 @@ $color-danger: hsl(var(--destructive));
 .empty-firmware {
   padding: 2rem;
   text-align: center;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }
 
 // History Section
@@ -519,7 +519,7 @@ $color-danger: hsl(var(--destructive));
   .history-icon {
     flex-shrink: 0;
     margin-top: 0.125rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
   }
 
   .history-content {
@@ -537,7 +537,7 @@ $color-danger: hsl(var(--destructive));
 
   .history-title {
     font-weight: 600;
-    color: hsl(var(--foreground));
+    color: var(--foreground);
   }
 
   .history-details {
@@ -545,10 +545,10 @@ $color-danger: hsl(var(--destructive));
     align-items: center;
     gap: 0.5rem;
     font-size: 0.8125rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
 
     .separator {
-      color: hsl(var(--border));
+      color: var(--border);
     }
   }
 
@@ -558,10 +558,10 @@ $color-danger: hsl(var(--destructive));
     gap: 0.375rem;
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: hsl(var(--destructive) / 0.1);
+    background: color-mix(in oklch, var(--destructive) 10%, transparent);
     border-radius: 0.375rem;
     font-size: 0.8125rem;
-    color: hsl(var(--destructive));
+    color: var(--destructive);
 
     ng-icon {
       flex-shrink: 0;
@@ -581,11 +581,11 @@ $color-danger: hsl(var(--destructive));
   align-items: center;
   justify-content: center;
   padding: 3rem 1.5rem;
-  background: hsl(var(--muted) / 0.3);
+  background: color-mix(in oklch, var(--muted) 30%, transparent);
   border-radius: 0.75rem;
-  border: 2px dashed hsl(var(--border));
+  border: 2px dashed var(--border);
   text-align: center;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 
   ng-icon {
     margin-bottom: 0.5rem;
@@ -595,7 +595,7 @@ $color-danger: hsl(var(--destructive));
     margin: 0.5rem 0;
     font-size: 1rem;
     font-weight: 600;
-    color: hsl(var(--foreground));
+    color: var(--foreground);
   }
 
   p {

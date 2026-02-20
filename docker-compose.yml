@@ -100,6 +100,80 @@ services:
       retries: 3
       start_period: 10s
 
+  # Machine Learning API Service
+  ml-api:
+    build:
+      context: ./ML
+      dockerfile: Dockerfile
+    container_name: iot-ml-api
+    restart: unless-stopped
+    environment:
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_DATABASE: ${MONGO_DB:-iot_smarttile}
+      MONGODB_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGODB_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-user1}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-user1}
+      ML_API_HOST: "0.0.0.0"
+      ML_API_PORT: "8000"
+    ports:
+      - "8001:8000"  # ML API
+    volumes:
+      - ./ML/src:/app/src
+      - ./ML/models:/app/models
+      - ml_data:/app/data
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # JupyterLab for ML development
+  ml-jupyter:
+    build:
+      context: ./ML
+      dockerfile: Dockerfile
+    container_name: iot-ml-jupyter
+    restart: unless-stopped
+    command: ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--NotebookApp.token=''"]
+    environment:
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_DATABASE: ${MONGO_DB:-iot_smarttile}
+      MONGODB_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGODB_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-user1}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-user1}
+    ports:
+      - "8888:8888"  # JupyterLab
+    volumes:
+      - ./ML/notebooks:/app/notebooks
+      - ./ML/src:/app/src
+      - ./ML/models:/app/models
+      - ml_data:/app/data
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - iot-network
+    profiles:
+      - dev  # Only start with: docker compose --profile dev up
+
 networks:
   iot-network:
     driver: bridge
@@ -109,3 +183,4 @@ volumes:
   mongodb_config:
   mosquitto_data:
   mosquitto_log:
+  ml_data:

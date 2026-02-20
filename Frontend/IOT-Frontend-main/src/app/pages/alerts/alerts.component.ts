@@ -1,7 +1,9 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideArrowLeft,
@@ -37,14 +39,16 @@ import {
 import { HlmBadgeDirective } from '../../components/ui/badge';
 import { HlmButtonDirective } from '../../components/ui/button';
 import { HlmIconDirective } from '../../components/ui/icon';
-import { HlmSkeletonComponent } from '../../components/ui/skeleton';
-import { HlmInputDirective } from '../../components/ui/input';
-import { AlertService } from '../../core/services';
+import { AlertService, IoTDataService, WebSocketService } from '../../core/services';
+import { LogStorageService } from '../../core/services/log-storage.service';
 import {
   Alert,
   AlertSeverity,
   AlertStatus,
   AlertCategory,
+  CoordinatorSummary,
+  NodeSummary,
+  CoordinatorLog,
 } from '../../core/models';
 
 @Component({
@@ -61,8 +65,6 @@ import {
     HlmBadgeDirective,
     HlmButtonDirective,
     HlmIconDirective,
-    HlmSkeletonComponent,
-    HlmInputDirective,
   ],
   providers: [
     provideIcons({
@@ -95,75 +97,54 @@ import {
   templateUrl: './alerts.component.html',
   styleUrls: ['./alerts.component.scss'],
 })
-export class AlertsComponent implements OnInit {
+export class AlertsComponent implements OnInit, OnDestroy, AfterViewChecked {
   private readonly alertService = inject(AlertService);
+  private readonly dataService = inject(IoTDataService);
+  readonly wsService = inject(WebSocketService); // Public for template access
+  private readonly logStorage = inject(LogStorageService);
+  private logSubscription?: Subscription;
+  private connectionStatusSubscription?: Subscription;
+
+  @ViewChild('logsContainer') private logsContainer?: ElementRef<HTMLDivElement>;
+  private shouldAutoScroll = true;
+  private previousLogCount = 0;
 
   // ============================================================================
-  // State from service
+  // State from services
   // ============================================================================
   readonly isLoading = this.alertService.isLoading;
   readonly error = this.alertService.error;
   readonly usingMockData = this.alertService.usingMockData;
 
-  // Alerts data
-  readonly alerts = this.alertService.alerts;
-  readonly filteredAlerts = this.alertService.filteredAlerts;
-  readonly alertStats = this.alertService.alertStats;
-
-  // Counts
-  readonly activeCount = this.alertService.activeCount;
-  readonly criticalCount = this.alertService.criticalCount;
-  readonly activeAlerts = this.alertService.activeAlerts;
-  readonly acknowledgedAlerts = this.alertService.acknowledgedAlerts;
-  readonly resolvedAlerts = this.alertService.resolvedAlerts;
-
-  // Filters from service
-  readonly filterSeverity = this.alertService.filterSeverity;
-  readonly filterStatus = this.alertService.filterStatus;
-  readonly filterCategory = this.alertService.filterCategory;
-  readonly searchTerm = this.alertService.searchTerm;
+  // Data from IoT service
+  readonly coordinators = this.dataService.coordinators;
+  readonly nodes = this.dataService.nodes;
 
   // ============================================================================
-  // Local UI state
+  // Local UI state for logs
   // ============================================================================
-  readonly expandedAlertId = signal<string | null>(null);
-  readonly showFilters = signal(true);
-
-  // ============================================================================
-  // Computed values
-  // ============================================================================
-  readonly hasActiveFilters = computed(() => {
-    return (
-      this.filterSeverity() !== 'all' ||
-      this.filterStatus() !== 'all' ||
-      this.filterCategory() !== 'all' ||
-      this.searchTerm().trim() !== ''
-    );
+  readonly selectedCoordinatorId = signal<string>('');
+  readonly logLevelFilter = signal<string[]>(['INFO', 'WARN', 'ERROR']); // Exclude DEBUG by default
+  
+  // Computed: Get logs from storage service, filtered by coordinator and level
+  readonly coordinatorLogs = computed(() => {
+    const selectedId = this.selectedCoordinatorId();
+    const levelFilter = this.logLevelFilter();
+    const allLogs = this.logStorage.logs();
+    
+    return allLogs
+      .filter(log => !selectedId || log.coordId === selectedId)
+      .filter(log => levelFilter.includes(log.level))
+      .map(log => log.formattedMessage);
   });
 
-  readonly sortedAlerts = computed(() => {
-    return [...this.filteredAlerts()].sort((a, b) => {
-      // Sort by status first (active > acknowledged > resolved)
-      const statusOrder: Record<AlertStatus, number> = {
-        active: 0,
-        acknowledged: 1,
-        resolved: 2,
-      };
-      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-      if (statusDiff !== 0) return statusDiff;
-
-      // Then by severity (critical > warning > info)
-      const severityOrder: Record<AlertSeverity, number> = {
-        critical: 0,
-        warning: 1,
-        info: 2,
-      };
-      const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-      if (severityDiff !== 0) return severityDiff;
-
-      // Finally by date (newest first)
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+  // ============================================================================
+  // Computed values for dropdown
+  // ============================================================================
+  readonly selectedCoordinator = computed(() => {
+    const id = this.selectedCoordinatorId();
+    if (!id) return null;
+    return this.coordinators().find(c => c._id === id || c.coord_id === id);
   });
 
   // ============================================================================
@@ -171,196 +152,212 @@ export class AlertsComponent implements OnInit {
   // ============================================================================
   ngOnInit(): void {
     this.loadData();
+    // Default to "All" — user can pick a specific coordinator from the pill selector
+    
+    // Connect WebSocket if not connected
+    if (!this.wsService.connected()) {
+      this.wsService.connect();
+    }
+    
+    // Subscribe to coordinator logs
+    this.subscribeToLogs();
+    
+    // Subscribe to connection status events
+    this.subscribeToConnectionEvents();
+  }
+  
+  ngOnDestroy(): void {
+    this.logSubscription?.unsubscribe();
+    this.connectionStatusSubscription?.unsubscribe();
   }
 
   // ============================================================================
   // Data loading
   // ============================================================================
   async loadData(): Promise<void> {
-    await this.alertService.loadAlerts();
+    await this.dataService.loadDashboardData();
   }
 
   async refreshData(): Promise<void> {
-    await this.alertService.refresh();
+    await this.dataService.loadDashboardData();
   }
 
   // ============================================================================
-  // Filter actions
+  // Real-time log streaming
   // ============================================================================
-  setSeverityFilter(severity: AlertSeverity | 'all'): void {
-    this.alertService.setSeverityFilter(severity);
-  }
-
-  setStatusFilter(status: AlertStatus | 'all'): void {
-    this.alertService.setStatusFilter(status);
-  }
-
-  setCategoryFilter(category: AlertCategory | 'all'): void {
-    this.alertService.setCategoryFilter(category);
-  }
-
-  onSearchChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.alertService.setSearchTerm(input.value);
-  }
-
-  clearFilters(): void {
-    this.alertService.clearFilters();
-  }
-
-  toggleFilters(): void {
-    this.showFilters.update(v => !v);
-  }
-
-  // ============================================================================
-  // Alert actions
-  // ============================================================================
-  async acknowledgeAlert(alertId: string, event?: Event): Promise<void> {
-    event?.stopPropagation();
-    await this.alertService.acknowledgeAlert(alertId);
-  }
-
-  async resolveAlert(alertId: string, event?: Event): Promise<void> {
-    event?.stopPropagation();
-    await this.alertService.resolveAlert(alertId);
-  }
-
-  async dismissAlert(alertId: string, event?: Event): Promise<void> {
-    event?.stopPropagation();
-    await this.alertService.dismissAlert(alertId);
-  }
-
-  async acknowledgeAllActive(): Promise<void> {
-    await this.alertService.acknowledgeAllActive();
-  }
-
-  async resolveAllAcknowledged(): Promise<void> {
-    await this.alertService.resolveAllAcknowledged();
+  private subscribeToLogs(): void {
+    this.logSubscription = this.wsService.coordinatorLogs$
+      .pipe(
+        filter(log => log !== null)
+      )
+      .subscribe(log => {
+        // Format log message with timestamp and level
+        const timestamp = new Date(log.timestamp).toLocaleTimeString('en-US', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        const formattedLog = `[${timestamp}] [${log.level}] ${log.message}`;
+        
+        // Store in persistent storage service (last 100 logs)
+        this.logStorage.addLog({
+          timestamp: log.timestamp,
+          level: log.level,
+          message: log.message,
+          coordId: log.coordId,
+          formattedMessage: formattedLog
+        });
+      });
   }
 
   // ============================================================================
-  // UI helpers
+  // Real-time connection status events
   // ============================================================================
-  toggleAlertExpand(alertId: string): void {
-    this.expandedAlertId.update(current => (current === alertId ? null : alertId));
+  private subscribeToConnectionEvents(): void {
+    this.connectionStatusSubscription = this.wsService.connectionStatus$
+      .pipe(
+        filter(status => status !== null)
+      )
+      .subscribe(status => {
+        // Format connection event as log entry
+        const timestamp = new Date(status.ts * 1000).toLocaleTimeString('en-US', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        
+        const level = this.getLogLevelForEvent(status.event);
+        const icon = this.getIconForEvent(status.event);
+        const message = this.formatConnectionMessage(status);
+        
+        const formattedLog = `[${timestamp}] [${level}] ${icon} ${message}`;
+        
+        // Store in log storage with special flag
+        this.logStorage.addLog({
+          timestamp: status.ts * 1000, // Convert seconds to milliseconds
+          level: level,
+          message: message,
+          coordId: status.coordId,
+          formattedMessage: formattedLog,
+          isConnectionEvent: true
+        });
+      });
   }
 
-  isExpanded(alertId: string): boolean {
-    return this.expandedAlertId() === alertId;
-  }
-
-  // ============================================================================
-  // Display helpers
-  // ============================================================================
-  getSeverityIcon(severity: AlertSeverity): string {
-    switch (severity) {
-      case 'critical':
-        return 'lucideAlertCircle';
-      case 'warning':
-        return 'lucideAlertTriangle';
-      case 'info':
-        return 'lucideInfo';
+  private getLogLevelForEvent(event: string): string {
+    switch(event) {
+      case 'wifi_disconnected':
+      case 'mqtt_disconnected':
+      case 'wifi_lost_ip':
+        return 'ERROR';
+      case 'wifi_connected':
+      case 'mqtt_connected':
+      case 'wifi_got_ip':
+        return 'INFO';
       default:
-        return 'lucideBell';
+        return 'INFO';
     }
   }
 
-  getSeverityBadgeVariant(severity: AlertSeverity): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (severity) {
-      case 'critical':
-        return 'destructive';
-      case 'warning':
-        return 'secondary';
-      case 'info':
-        return 'outline';
-      default:
-        return 'default';
+  private getIconForEvent(event: string): string {
+    switch(event) {
+      case 'wifi_connected': return '📶';
+      case 'wifi_disconnected': return '📵';
+      case 'mqtt_connected': return '📡';
+      case 'mqtt_disconnected': return '🔴';
+      case 'wifi_got_ip': return '🌐';
+      case 'wifi_lost_ip': return '⚠️';
+      default: return '🔄';
     }
   }
 
-  getStatusBadgeVariant(status: AlertStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (status) {
-      case 'active':
-        return 'destructive';
-      case 'acknowledged':
-        return 'secondary';
-      case 'resolved':
-        return 'default';
+  private formatConnectionMessage(status: any): string {
+    let msg = '';
+    
+    switch(status.event) {
+      case 'wifi_connected':
+        msg = `WiFi connected (RSSI: ${status.wifiRssi} dBm)`;
+        break;
+      case 'wifi_disconnected':
+        msg = `WiFi disconnected${status.reason ? ': ' + status.reason : ''}`;
+        break;
+      case 'mqtt_connected':
+        msg = 'MQTT broker connected';
+        break;
+      case 'mqtt_disconnected':
+        msg = `MQTT connection lost${status.reason ? ': ' + status.reason : ''}`;
+        break;
+      case 'wifi_got_ip':
+        msg = 'WiFi obtained IP address';
+        break;
+      case 'wifi_lost_ip':
+        msg = 'WiFi lost IP address';
+        break;
       default:
-        return 'outline';
+        msg = `Connection event: ${status.event}`;
+    }
+    
+    return `[${status.coordId}] ${msg}`;
+  }
+  
+  // ============================================================================
+  // Coordinator selection
+  // ============================================================================
+  selectCoordinator(coordId: string): void {
+    this.selectedCoordinatorId.set(coordId);
+  }
+
+  // ============================================================================
+  // Auto-scroll on new logs
+  // ============================================================================
+  ngAfterViewChecked(): void {
+    const currentLogCount = this.coordinatorLogs().length;
+    if (currentLogCount > this.previousLogCount && this.shouldAutoScroll) {
+      this.scrollToBottom();
+    }
+    this.previousLogCount = currentLogCount;
+  }
+
+  private scrollToBottom(): void {
+    if (this.logsContainer) {
+      const el = this.logsContainer.nativeElement;
+      el.scrollTop = el.scrollHeight;
     }
   }
 
-  getCategoryIcon(category: AlertCategory): string {
-    switch (category) {
-      case 'sensor':
-        return 'lucideCpu';
-      case 'system':
-        return 'lucideServer';
-      case 'network':
-        return 'lucideWifi';
-      case 'maintenance':
-        return 'lucideWrench';
-      case 'security':
-        return 'lucideShield';
-      default:
-        return 'lucideBell';
+  onLogsScroll(): void {
+    if (this.logsContainer) {
+      const el = this.logsContainer.nativeElement;
+      // Auto-scroll if user is near the bottom (within 100px)
+      this.shouldAutoScroll = (el.scrollHeight - el.scrollTop - el.clientHeight) < 100;
     }
   }
 
-  getSourceIcon(sourceType: string): string {
-    switch (sourceType) {
-      case 'coordinator':
-        return 'lucideServer';
-      case 'tower':
-      case 'node':
-        return 'lucideRadio';
-      case 'system':
-        return 'lucideCpu';
-      case 'backend':
-        return 'lucideServer';
-      default:
-        return 'lucideBell';
-    }
-  }
-
-  formatDate(date: Date | string | undefined): string {
-    if (!date) return 'N/A';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+  toggleLogLevel(level: string): void {
+    this.logLevelFilter.update(levels => {
+      if (levels.includes(level)) {
+        return levels.filter(l => l !== level);
+      } else {
+        return [...levels, level];
+      }
     });
   }
-
-  formatTimeAgo(date: Date | string | undefined): string {
-    if (!date) return 'Unknown';
-    const now = new Date();
-    const then = new Date(date);
-    const diffMs = now.getTime() - then.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 60) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHour < 24) return `${diffHour}h ago`;
-    if (diffDay < 7) return `${diffDay}d ago`;
-    return this.formatDate(date);
-  }
-
-  capitalizeFirst(str: string): string {
-    return str.charAt(0).toUpperCase() + str.slice(1);
+  
+  clearLogs(): void {
+    const selectedId = this.selectedCoordinatorId();
+    if (selectedId) {
+      this.logStorage.clearCoordinatorLogs(selectedId);
+    } else {
+      this.logStorage.clearLogs();
+    }
   }
 
   // ============================================================================
   // TrackBy functions
   // ============================================================================
-  trackByAlertId(index: number, alert: Alert): string {
-    return alert._id;
+  trackByIndex(index: number): number {
+    return index;
   }
 }

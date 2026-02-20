@@ -1,0 +1,206 @@
+@if (isOpen()) {
+  <!-- Blurred Overlay -->
+  <div class="dialog-overlay" [class.closing]="isClosing()" (click)="onOverlayClick($event)">
+    <!-- Dialog Content -->
+    <div class="dialog-content" (click)="$event.stopPropagation()">
+      <!-- Header -->
+      <div class="dialog-header">
+        <div class="header-title">
+          <ng-icon name="lucideBuilding" size="24" />
+          <div>
+            <h2>{{ isEditMode() ? 'Edit Farm' : 'Create New Farm' }}</h2>
+            <p class="header-description">
+              {{ isEditMode() ? 'Update farm details and reservoir assignments' : 'Set up a new farm with reservoirs and towers' }}
+            </p>
+          </div>
+        </div>
+        <button class="close-btn" (click)="close()" aria-label="Close dialog">
+          <ng-icon name="lucideX" size="20" />
+        </button>
+      </div>
+
+      <!-- Form Content -->
+      <div class="dialog-body">
+        <!-- Basic Info Section -->
+        <div class="form-section">
+          <h3 class="section-title">Basic Information</h3>
+          
+          <div class="form-grid">
+            <!-- Name -->
+            <div class="form-group full-width">
+              <label hlmLabel for="farm-name">
+                Farm Name <span class="required">*</span>
+              </label>
+              <input 
+                hlmInput 
+                id="farm-name" 
+                type="text" 
+                placeholder="Enter farm name"
+                [ngModel]="formData().name"
+                (ngModelChange)="updateField('name', $event)"
+              />
+            </div>
+
+            <!-- Description -->
+            <div class="form-group full-width">
+              <label hlmLabel for="farm-description">Description</label>
+              <textarea 
+                hlmInput 
+                id="farm-description" 
+                rows="2"
+                placeholder="Brief description of this farm"
+                [ngModel]="formData().description"
+                (ngModelChange)="updateField('description', $event)"
+              ></textarea>
+            </div>
+
+            <!-- Location -->
+            <div class="form-group">
+              <label hlmLabel for="farm-location">
+                <ng-icon name="lucideMapPin" size="14" />
+                Location
+              </label>
+              <input 
+                hlmInput 
+                id="farm-location" 
+                type="text" 
+                placeholder="Building A, Floor 1"
+                [ngModel]="formData().location"
+                (ngModelChange)="updateField('location', $event)"
+              />
+            </div>
+
+            <!-- Plant Type -->
+            <div class="form-group">
+              <label hlmLabel for="farm-plant-type">
+                <ng-icon name="lucideSprout" size="14" />
+                Plant Type
+              </label>
+              <select 
+                hlmInput 
+                id="farm-plant-type"
+                [ngModel]="formData().plantType"
+                (ngModelChange)="updateField('plantType', $event)"
+              >
+                <option value="">Select plant type...</option>
+                @for (type of plantTypes; track type) {
+                  <option [value]="type">{{ type }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <!-- Color Picker -->
+          <div class="form-group">
+            <label hlmLabel>
+              <ng-icon name="lucidePalette" size="14" />
+              Farm Color
+            </label>
+            <div class="color-picker">
+              @for (color of colorPresets; track color) {
+                <button 
+                  class="color-swatch" 
+                  [style.background-color]="color"
+                  [class.selected]="formData().color === color"
+                  (click)="selectColor(color)"
+                  type="button"
+                  [attr.aria-label]="'Select color ' + color"
+                >
+                  @if (formData().color === color) {
+                    <ng-icon name="lucideCheck" size="14" class="check-icon" />
+                  }
+                </button>
+              }
+              <input 
+                type="color" 
+                class="custom-color"
+                [ngModel]="formData().color"
+                (ngModelChange)="updateField('color', $event)"
+                title="Custom color"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Reservoirs Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <ng-icon name="lucideWaves" size="16" />
+            Assign Reservoirs
+          </h3>
+          <p class="section-description">
+            Select reservoirs to include in this farm. All towers connected to selected reservoirs will be automatically added.
+          </p>
+
+          <div class="reservoirs-list">
+            @for (reservoir of availableReservoirs(); track reservoir._id) {
+              <div 
+                class="reservoir-item" 
+                [class.selected]="isReservoirSelected(reservoir._id)"
+                (click)="toggleReservoir(reservoir._id)"
+              >
+                <div class="reservoir-checkbox">
+                  @if (isReservoirSelected(reservoir._id)) {
+                    <ng-icon name="lucideCheck" size="14" />
+                  }
+                </div>
+                <div class="reservoir-info">
+                  <span class="reservoir-name">{{ reservoir.name || reservoir.coord_id }}</span>
+                  <span class="reservoir-meta">
+                    {{ reservoir.light_lux || 0 }} lux | {{ reservoir.temp_c !== undefined ? reservoir.temp_c.toFixed(1) : '--' }}°C
+                  </span>
+                </div>
+                <span hlmBadge variant="outline" size="sm" class="reservoir-badge">
+                  <ng-icon name="lucideLeaf" size="12" />
+                  {{ getTowersForReservoir(reservoir).length }} towers
+                </span>
+              </div>
+            } @empty {
+              <div class="empty-reservoirs">
+                <ng-icon name="lucideWaves" size="32" />
+                <p>No reservoirs available</p>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Selected Towers Preview -->
+        @if (selectedReservoirTowers().length > 0) {
+          <div class="form-section towers-preview">
+            <h3 class="section-title">
+              <ng-icon name="lucideLeaf" size="16" />
+              Towers Included ({{ selectedReservoirTowers().length }})
+            </h3>
+            <div class="towers-chips">
+              @for (tower of selectedReservoirTowers().slice(0, 8); track tower._id) {
+                <span class="tower-chip" [class]="'status-' + tower.status_mode">
+                  {{ tower.name || tower.light_id }}
+                </span>
+              }
+              @if (selectedReservoirTowers().length > 8) {
+                <span class="tower-chip more">
+                  +{{ selectedReservoirTowers().length - 8 }} more
+                </span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="dialog-footer">
+        <button hlmBtn variant="outline" (click)="close()">
+          Cancel
+        </button>
+        <button 
+          hlmBtn 
+          variant="default" 
+          [disabled]="!isFormValid()"
+          (click)="save()"
+        >
+          {{ isEditMode() ? 'Save Changes' : 'Create Farm' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

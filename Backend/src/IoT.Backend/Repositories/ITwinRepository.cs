@@ -120,10 +120,25 @@ public interface ITwinRepository
     // ============================================================================
 
     /// <summary>
+    /// Get all tower twins (across all farms)
+    /// </summary>
+    Task<IReadOnlyList<TowerTwin>> GetAllTowerTwinsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Get all tower twins with an active crop (CropType != Unknown and PlantingDate is set)
+    /// </summary>
+    Task<IReadOnlyList<TowerTwin>> GetTowerTwinsWithActiveCropAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Get all twins (tower and coordinator) that need sync (status = Pending)
     /// Used by the sync service to find twins needing command dispatch
     /// </summary>
     Task<(IReadOnlyList<TowerTwin> Towers, IReadOnlyList<CoordinatorTwin> Coordinators)> GetPendingSyncTwinsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Update only the ML predictions section of a tower twin
+    /// </summary>
+    Task<bool> UpdateTowerMlPredictionsAsync(string towerId, MlPredictions predictions, CancellationToken ct = default);
 
     /// <summary>
     /// Mark twins as stale if they haven't reported within the threshold

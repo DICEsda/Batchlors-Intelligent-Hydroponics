@@ -1,36 +1,44 @@
-<div class="list-page">
-  <header class="page-header">
-    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
-      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
-    </a>
+<div class="towers-page">
+  <!-- Page Header -->
+  <div class="page-header">
     <div class="header-content">
-      <h1 class="page-title">Towers</h1>
-      <p class="page-description">Manage your hydroponic tower units</p>
+      <a routerLink="/overview" class="back-link">
+        <ng-icon name="lucideChevronRight" size="16" class="back-icon" />
+      </a>
+      <div class="header-text">
+        <h1>Towers</h1>
+        <p class="header-description">
+          Manage your hydroponic tower units
+        </p>
+      </div>
     </div>
     <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="secondary" class="mock-badge">Mock Data</span>
+      }
       <span hlmBadge [variant]="wsConnected() ? 'default' : 'destructive'">
-        <ng-icon hlmIcon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="sm" />
-        {{ wsConnected() ? 'Connected' : 'Disconnected' }}
+        <ng-icon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="14" />
+        {{ wsConnected() ? 'Live' : 'Offline' }}
       </span>
       <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
-        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        <ng-icon name="lucideRefreshCw" size="16" />
         Refresh
       </button>
     </div>
-  </header>
+  </div>
 
   <!-- Stats Summary -->
   <div class="stats-row">
     <div class="stat-card">
-      <ng-icon hlmIcon name="lucideFlower2" class="stat-icon" />
+      <ng-icon name="lucideLeaf" size="20" class="stat-icon towers" />
       <div class="stat-info">
-        <span class="stat-value">{{ onlineCount() }} / {{ totalCount() }}</span>
+        <span class="stat-value">{{ onlineCount() }}/{{ totalCount() }}</span>
         <span class="stat-label">Online Towers</span>
       </div>
     </div>
     @if (pairingCount() > 0) {
-      <div class="stat-card warning">
-        <ng-icon hlmIcon name="lucideActivity" class="stat-icon" />
+      <div class="stat-card pairing">
+        <ng-icon name="lucideActivity" size="20" class="stat-icon" />
         <div class="stat-info">
           <span class="stat-value">{{ pairingCount() }}</span>
           <span class="stat-label">Pairing</span>
@@ -39,94 +47,242 @@
     }
     @if (lowBatteryCount() > 0) {
       <div class="stat-card warning">
-        <ng-icon hlmIcon name="lucideBattery" class="stat-icon" />
+        <ng-icon name="lucideBattery" size="20" class="stat-icon" />
         <div class="stat-info">
           <span class="stat-value">{{ lowBatteryCount() }}</span>
           <span class="stat-label">Low Battery</span>
         </div>
       </div>
     }
+    <div class="stat-card">
+      <ng-icon name="lucideWaves" size="20" class="stat-icon reservoirs" />
+      <div class="stat-info">
+        <span class="stat-value">{{ towersByReservoir().length }}</span>
+        <span class="stat-label">Reservoirs</span>
+      </div>
+    </div>
   </div>
 
   <!-- Loading State -->
   @if (loading()) {
-    <div class="device-grid">
-      @for (i of [1, 2, 3, 4, 5, 6]; track i) {
-        <div hlmCard class="device-card">
-          <hlm-skeleton class="card-skeleton" />
-        </div>
-      }
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading towers...</p>
     </div>
   }
 
   <!-- Error State -->
   @if (error()) {
     <div class="error-banner">
-      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+      <ng-icon name="lucideAlertTriangle" size="18" />
       <span>{{ error() }}</span>
       <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
     </div>
   }
 
-  <!-- Empty State -->
-  @if (!loading() && nodes().length === 0) {
-    <div class="empty-state" hlmCard>
-      <ng-icon hlmIcon name="lucideFlower2" class="empty-icon" />
-      <h3>No Towers Found</h3>
-      <p>Connect tower units to your reservoirs to start monitoring plant growth.</p>
-      <button hlmBtn variant="default">
-        <ng-icon hlmIcon name="lucidePlus" size="sm" />
-        Add Tower
-      </button>
-    </div>
-  }
+  <!-- Towers List - Grouped by Reservoir -->
+  @if (!loading()) {
+    <div class="towers-list">
+      @for (group of towersByReservoir(); track trackByGroupId($index, group)) {
+        <div class="reservoir-group">
+          <!-- Group Header -->
+          <div class="group-header" (click)="toggleGroup(group.id)">
+            <div class="group-icon">
+              <ng-icon name="lucideWaves" size="20" />
+            </div>
+            <div class="group-info">
+              <div class="group-title-row">
+                <h2>{{ group.reservoir?.name || group.reservoir?.coord_id || 'Unassigned Towers' }}</h2>
+                <div class="group-badges">
+                  @if (group.reservoir) {
+                    <span hlmBadge [variant]="getStatusBadgeVariant(group.reservoir.status)" size="sm">
+                      {{ group.reservoir.status }}
+                    </span>
+                  }
+                  <span hlmBadge variant="outline" size="sm">
+                    <ng-icon name="lucideLeaf" size="12" />
+                    {{ group.onlineCount }}/{{ group.towers.length }} Online
+                  </span>
+                </div>
+              </div>
+              @if (group.reservoir) {
+                <div class="group-meta">
+                  <span class="meta-item">
+                    <ng-icon name="lucideThermometer" size="14" />
+                    {{ group.reservoir.temp_c !== undefined ? group.reservoir.temp_c.toFixed(1) : '--' }}°C
+                  </span>
+                  <span class="meta-item">
+                    <ng-icon name="lucideDroplet" size="14" />
+                    {{ group.reservoir.light_lux || '--' }} lux
+                  </span>
+                </div>
+              }
+            </div>
+            <ng-icon 
+              [name]="isGroupExpanded(group.id) ? 'lucideChevronDown' : 'lucideChevronRight'" 
+              size="20" 
+              class="expand-icon"
+            />
+          </div>
 
-  <!-- Towers Grid -->
-  @if (!loading() && nodes().length > 0) {
-    <div class="device-grid">
-      @for (node of nodes(); track trackByNodeId($index, node)) {
-        <a [routerLink]="['/towers', node._id]" hlmCard class="device-card clickable">
-          <div hlmCardHeader>
-            <div class="card-header-row">
-              <ng-icon hlmIcon name="lucideFlower2" class="device-icon" />
-              <span hlmBadge [variant]="getStatusBadgeVariant(node.status_mode)" size="sm">
-                {{ getStatusDisplay(node.status_mode) }}
-              </span>
+          <!-- Towers Grid - Expanded -->
+          @if (isGroupExpanded(group.id)) {
+            <div class="group-content">
+              <div class="towers-grid">
+                @for (tower of group.towers; track trackByNodeId($index, tower)) {
+                  <a [routerLink]="['/towers', tower._id]" class="tower-card" [class]="'status-border-' + tower.status_mode">
+                    <div class="tower-header">
+                      <div class="tower-icon" [class]="'status-' + tower.status_mode">
+                        <ng-icon name="lucideLeaf" size="20" />
+                      </div>
+                      <div class="tower-title">
+                        <h3>{{ tower.name || tower.light_id }}</h3>
+                        <span class="tower-id">{{ tower.light_id }}</span>
+                      </div>
+                      <div class="tower-actions">
+                        <button class="icon-btn" title="Edit Tower" (click)="editTower(tower._id, $event)">
+                          <ng-icon name="lucidePencil" size="14" />
+                        </button>
+                        <button class="icon-btn danger" title="Delete Tower" (click)="deleteTower(tower._id, $event)">
+                          <ng-icon name="lucideTrash2" size="14" />
+                        </button>
+                      </div>
+                      <span hlmBadge [variant]="getStatusBadgeVariant(tower.status_mode)" size="sm">
+                        {{ getStatusDisplay(tower.status_mode) }}
+                      </span>
+                    </div>
+                    
+                    <div class="tower-metrics">
+                      <div class="metric">
+                        <ng-icon name="lucideThermometer" size="14" />
+                        <span class="metric-value">{{ tower.temp_c !== undefined ? tower.temp_c.toFixed(1) : '--' }}°C</span>
+                        <span class="metric-label">Temp</span>
+                      </div>
+                      <div class="metric" [class]="'battery-' + getBatteryStatus(tower.vbat_mv)">
+                        <ng-icon name="lucideBattery" size="14" />
+                        <span class="metric-value">{{ tower.vbat_mv || '--' }}</span>
+                        <span class="metric-label">mV</span>
+                      </div>
+                      <div class="metric">
+                        <ng-icon name="lucideWifi" size="14" />
+                        <span class="metric-value">{{ tower.avg_r || '--' }}</span>
+                        <span class="metric-label">dBm</span>
+                      </div>
+                    </div>
+
+                    <div class="tower-footer">
+                      <span class="last-seen">
+                        Last seen: {{ formatLastSeen(tower.last_seen) }}
+                      </span>
+                      <span class="view-link">
+                        View Details
+                        <ng-icon name="lucideChevronRight" size="14" />
+                      </span>
+                    </div>
+                  </a>
+                }
+              </div>
             </div>
-            <span hlmCardTitle>{{ node.name || node.light_id }}</span>
-            <span hlmCardDescription>Last seen: {{ formatLastSeen(node.last_seen) }}</span>
-          </div>
-          <div hlmCardContent>
-            <div class="metric-grid">
-              <div class="metric">
-                <ng-icon hlmIcon name="lucideThermometer" size="sm" />
-                <span>{{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C</span>
-              </div>
-              <div class="metric">
-                <ng-icon hlmIcon name="lucideBattery" size="sm" />
-                <span>{{ node.vbat_mv || '--' }} mV</span>
-              </div>
-              <div class="metric">
-                <ng-icon hlmIcon name="lucideWifi" size="sm" />
-                <span>{{ node.avg_r || '--' }} dBm</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <span class="view-link">
-              View Details
-              <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-            </span>
-          </div>
-        </a>
+          }
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <ng-icon name="lucideLeaf" size="64" />
+          <h3>No Towers Found</h3>
+          <p>Connect tower units to your reservoirs to start monitoring plant growth.</p>
+        </div>
       }
     </div>
   }
 
-  @if (usingMockData()) {
-    <div class="mock-banner">
-      <ng-icon hlmIcon name="lucideActivity" size="sm" />
-      <span>Displaying mock data - Backend unavailable</span>
+  <!-- Pairing Configuration Dialog -->
+  <hlm-dialog [isOpen]="showPairingDialog()" [size]="'lg'" (closed)="closePairingDialog()">
+    <div class="pairing-dialog">
+      <button hlmDialogClose (click)="closePairingDialog()" class="dialog-close-btn">
+        <ng-icon name="lucideX" size="20" />
+      </button>
+      
+      <div hlmDialogHeader>
+        <div class="dialog-icon">
+          <ng-icon name="lucideRadioTower" size="32" />
+        </div>
+        <h2 hlmDialogTitle>Configure New Tower</h2>
+        <p hlmDialogDescription>
+          Tower {{ pairingTowerId() }} is ready to be paired. Configure its settings below.
+        </p>
+      </div>
+
+      <div class="dialog-body">
+        <div class="form-group">
+          <label hlmLabel for="tower-id">Tower ID</label>
+          <input 
+            hlmInput 
+            id="tower-id" 
+            type="text" 
+            [value]="pairingTowerId()"
+            disabled
+            class="input-disabled"
+          />
+          <span class="form-hint">Automatically detected from the device</span>
+        </div>
+
+        <div class="form-group">
+          <label hlmLabel for="tower-name">Tower Name</label>
+          <input 
+            hlmInput 
+            id="tower-name" 
+            type="text" 
+            placeholder="e.g., Lettuce Tower A"
+            [value]="pairingTowerName()"
+            (input)="pairingTowerName.set($any($event.target).value)"
+          />
+          <span class="form-hint">Give this tower a friendly name</span>
+        </div>
+
+        <div class="form-group">
+          <label hlmLabel for="coordinator">Assign to Reservoir</label>
+          <select 
+            hlmInput 
+            id="coordinator"
+            [value]="pairingCoordinatorId()"
+            (change)="pairingCoordinatorId.set($any($event.target).value)"
+          >
+            <option value="">Select a reservoir...</option>
+            @for (coord of coordinators(); track coord._id) {
+              <option [value]="coord._id">{{ coord.name || coord.coord_id }}</option>
+            }
+          </select>
+          <span class="form-hint">Connect this tower to a reservoir coordinator</span>
+        </div>
+
+        <div class="device-info">
+          <h3>Device Information</h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Signal Strength</span>
+              <span class="info-value">-45 dBm</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Battery</span>
+              <span class="info-value">3.7V</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Firmware</span>
+              <span class="info-value">v1.2.3</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div hlmDialogFooter>
+        <button hlmBtn variant="outline" (click)="closePairingDialog()">
+          Cancel
+        </button>
+        <button hlmBtn variant="default" (click)="approvePairing()">
+          <ng-icon name="lucideCheck" size="16" />
+          Approve Pairing
+        </button>
+      </div>
     </div>
-  }
+  </hlm-dialog>
 </div>

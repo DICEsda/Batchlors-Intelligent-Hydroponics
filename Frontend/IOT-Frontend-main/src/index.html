@@ -6,6 +6,40 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script>
+    // Apply theme and accent color immediately to prevent flash
+    (function() {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      if (savedTheme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) document.documentElement.classList.add('dark');
+      } else if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      }
+      
+      // Apply saved accent color
+      const accentColors = {
+        'stone': 'oklch(0.55 0.02 60)',
+        'zinc': 'oklch(0.55 0 0)',
+        'blue': 'oklch(0.55 0.15 250)',
+        'green': 'oklch(0.55 0.15 145)',
+        'amber': 'oklch(0.65 0.15 85)',
+        'rose': 'oklch(0.55 0.15 15)',
+        'violet': 'oklch(0.55 0.15 290)',
+        'cyan': 'oklch(0.55 0.15 200)'
+      };
+      const savedColor = localStorage.getItem('accentColor');
+      if (savedColor && accentColors[savedColor]) {
+        document.documentElement.style.setProperty('--primary', accentColors[savedColor]);
+        // Amber needs dark foreground
+        if (savedColor === 'amber') {
+          document.documentElement.style.setProperty('--primary-foreground', 'oklch(0.22 0.01 60)');
+        } else {
+          document.documentElement.style.setProperty('--primary-foreground', 'oklch(0.98 0.002 75)');
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>

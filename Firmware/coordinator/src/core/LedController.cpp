@@ -22,18 +22,18 @@ void LedController::rebuildMapping(const std::vector<NodeInfo>& nodeList) {
     std::fill(groupConnected_.begin(), groupConnected_.end(), false);
     std::fill(groupFlashUntilMs_.begin(), groupFlashUntilMs_.end(), 0);
 
-    // Sort by nodeId for deterministic assignment
+    // Sort by towerId for deterministic assignment
     std::vector<NodeInfo> sorted = nodeList;
     std::sort(sorted.begin(), sorted.end(), [](const NodeInfo& a, const NodeInfo& b) {
-        return a.nodeId < b.nodeId;
+        return a.towerId < b.towerId;
     });
 
     uint32_t now = millis();
     int idx = 0;
     for (const auto& n : sorted) {
         if (idx >= groupCount_) break;
-        nodeToGroup_[n.nodeId] = idx;
-        groupToNode_[idx] = n.nodeId;
+        nodeToGroup_[n.towerId] = idx;
+        groupToNode_[idx] = n.towerId;
         // Mark as connected if recently seen (within last 6 seconds)
         groupConnected_[idx] = (n.lastSeenMs > 0 && (now - n.lastSeenMs) <= 6000U);
         idx++;

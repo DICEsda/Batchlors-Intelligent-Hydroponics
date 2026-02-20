@@ -60,6 +60,7 @@ export type WSMessageType =
   | 'node_telemetry'
   | 'coord_telemetry'
   | 'device_status'
+  | 'connection_status'
   | 'alert'
   | 'ota_progress'
   | 'prediction_update'
@@ -69,13 +70,19 @@ export type WSMessageType =
   | 'unsubscribed'
   | 'heartbeat'
   | 'digital_twin_update'
+  | 'coordinator_log'
   | 'pong'
   // Pairing events
   | 'pairing_started'
   | 'pairing_stopped'
   | 'node_discovered'
   | 'node_paired'
-  | 'pairing_timeout';
+  | 'pairing_timeout'
+  // Coordinator registration events
+  | 'coordinator_registration_request'
+  | 'coordinator_registered'
+  | 'coordinator_rejected'
+  | 'coordinator_removed';
 
 export interface WSMessage<T = unknown> {
   type: WSMessageType;
@@ -103,6 +110,19 @@ export interface WSCommandAckPayload {
   commandId: string;
   success: boolean;
   error?: string;
+}
+
+export interface WSConnectionStatusPayload {
+  ts: number;
+  coordId: string;
+  farmId: string;
+  event: 'wifi_connected' | 'wifi_disconnected' | 'mqtt_connected' | 'mqtt_disconnected' | 'wifi_got_ip' | 'wifi_lost_ip';
+  wifiConnected: boolean;
+  wifiRssi: number;
+  mqttConnected: boolean;
+  uptimeMs: number;
+  freeHeap: number;
+  reason?: string;
 }
 
 // ============================================================================
@@ -234,3 +254,37 @@ export const StatusValues = {
 } as const;
 
 export type StatusValue = typeof StatusValues[keyof typeof StatusValues];
+
+// ============================================================================
+// Coordinator Registration Models
+// ============================================================================
+
+export interface WSCoordinatorRegistrationPayload {
+  coordId: string;
+  fwVersion?: string;
+  chipModel?: string;
+  wifiRssi: number;
+  ip?: string;
+  freeHeap: number;
+  firstSeenAt: string;
+}
+
+export interface WSCoordinatorRegisteredPayload {
+  coordId: string;
+  farmId: string;
+  name: string;
+  description?: string;
+  color?: string;
+  location?: string;
+  registeredAt: string;
+}
+
+export interface ApproveCoordinatorRequest {
+  coordId: string;
+  farmId: string;
+  name: string;
+  description?: string;
+  color?: string;
+  tags?: string[];
+  location?: string;
+}

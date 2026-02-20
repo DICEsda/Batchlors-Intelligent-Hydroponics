@@ -11,10 +11,16 @@ public interface ICoordinatorRepository
     Task<Coordinator?> GetBySiteAndIdAsync(string siteId, string coordId, CancellationToken ct = default);
     Task<Coordinator?> GetByFarmAndIdAsync(string farmId, string coordId, CancellationToken ct = default);
     Task<IReadOnlyList<Coordinator>> GetByFarmAsync(string farmId, CancellationToken ct = default);
+    Task<IReadOnlyList<Coordinator>> GetAllAsync(CancellationToken ct = default);
     Task UpsertAsync(Coordinator coordinator, CancellationToken ct = default);
     
     /// <summary>
     /// Counts coordinators that have been seen within the specified threshold.
     /// </summary>
     Task<long> CountOnlineAsync(TimeSpan threshold, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delete a coordinator by its coord_id.
+    /// </summary>
+    Task<bool> DeleteAsync(string coordId, CancellationToken ct = default);
 }

@@ -4,25 +4,64 @@
   width: 240px;
   min-width: 240px;
   height: 100vh;
-  background-color: hsl(0 0% 7%);
-  border-right: 1px solid hsl(0 0% 15%);
+  background-color: var(--sidebar);
+  border-right: 1px solid var(--sidebar-border);
   overflow-y: auto;
   overflow-x: hidden;
+  transition: width 0.3s ease, min-width 0.3s ease;
 
   &::-webkit-scrollbar {
     width: 4px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 20%);
+    background: var(--muted-foreground);
     border-radius: 2px;
+  }
+
+  // Collapsed state - show only icons
+  &.collapsed {
+    width: 60px;
+    min-width: 60px;
+
+    .nav-label,
+    .nav-section-title,
+    .status-section-title,
+    .status-label,
+    .status-value,
+    .role-info,
+    .role-chevron,
+    .logo-text,
+    .chevron {
+      display: none;
+    }
+
+    .nav-item,
+    .footer-link {
+      justify-content: center;
+      padding: 8px;
+    }
+
+    .status-item {
+      justify-content: center;
+      padding: 6px;
+    }
+
+    .role-button {
+      justify-content: center;
+      padding: 8px;
+    }
+
+    .logo-container {
+      justify-content: center;
+    }
   }
 }
 
 // Header / Logo
 .sidebar-header {
-  padding: 16px;
-  border-bottom: 1px solid hsl(0 0% 15%);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .logo-container {
@@ -37,9 +76,9 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: hsl(0 0% 15%);
+  background: var(--sidebar-accent);
   border-radius: 8px;
-  color: hsl(0 0% 90%);
+  color: var(--sidebar-foreground);
 }
 
 .logo-text {
@@ -50,13 +89,13 @@
 .company-name {
   font-size: 14px;
   font-weight: 600;
-  color: hsl(0 0% 95%);
+  color: var(--sidebar-foreground);
   line-height: 1.2;
 }
 
 .company-tier {
   font-size: 12px;
-  color: hsl(0 0% 50%);
+  color: var(--muted-foreground);
   line-height: 1.2;
 }
 
@@ -72,44 +111,66 @@
 .nav-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .nav-section-title {
-  font-size: 11px;
-  font-weight: 500;
-  color: hsl(0 0% 45%);
+  font-size: var(--text-xs); /* 12px - improved from 11px */
+  font-weight: 600;
+  color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0 8px;
-  margin-bottom: 8px;
+  padding: 0 var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  color: hsl(0 0% 65%);
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius);
+  color: var(--sidebar-foreground);
+  opacity: 0.7;
   text-decoration: none;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 400;
-  transition: all 0.15s ease;
+  transition: all var(--duration-fast) var(--ease-out-expo);
   cursor: pointer;
   background: transparent;
   border: none;
   width: 100%;
   text-align: left;
+  position: relative;
 
   &:hover {
-    background-color: hsl(0 0% 12%);
-    color: hsl(0 0% 90%);
+    background-color: var(--sidebar-accent);
+    opacity: 1;
+    transform: translateX(2px);
   }
 
   &.active {
-    background-color: hsl(0 0% 15%);
-    color: hsl(0 0% 95%);
+    background-color: var(--sidebar-accent);
+    color: var(--sidebar-accent-foreground);
+    opacity: 1;
+    font-weight: 500;
+    
+    /* Active indicator bar */
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 20%;
+      bottom: 20%;
+      width: 3px;
+      background-color: var(--sidebar-primary);
+      border-radius: 0 2px 2px 0;
+    }
+  }
+  
+  &:focus-visible {
+    outline: 2px solid var(--sidebar-ring);
+    outline-offset: -2px;
   }
 
   &.expandable {
@@ -124,6 +185,20 @@
   &.child {
     padding-left: 38px;
     font-size: 13px;
+  }
+
+  &.expandable-child {
+    justify-content: flex-start;
+    
+    .chevron {
+      margin-left: auto;
+      opacity: 0.5;
+    }
+  }
+
+  &.grandchild {
+    padding-left: 56px;
+    font-size: 12px;
   }
 
   ng-icon {
@@ -144,77 +219,131 @@
   flex-direction: column;
 }
 
+.nav-item-subgroup {
+  display: flex;
+  flex-direction: column;
+}
+
 .nav-children {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 2px;
+  gap: 1px;
+  margin-top: 1px;
+}
+
+.nav-grandchildren {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 1px;
 }
 
 // Footer
 .sidebar-footer {
   padding: 12px;
-  border-top: 1px solid hsl(0 0% 15%);
+  border-top: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
-// System Status Section
+// Footer Links (Support, Feedback)
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.footer-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: var(--sidebar-foreground);
+  opacity: 0.6;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 400;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+
+  &:hover {
+    background-color: var(--sidebar-accent);
+    opacity: 1;
+  }
+
+  ng-icon {
+    flex-shrink: 0;
+  }
+}
+
+// System Status Section (Compact & Monochrome)
 .system-status {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid hsl(0 0% 12%);
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .status-section-title {
-  font-size: 10px;
-  font-weight: 500;
-  color: hsl(0 0% 40%);
+  font-size: var(--text-xs); /* 12px - improved from 10px */
+  font-weight: 600;
+  color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0 4px;
-  margin-bottom: 4px;
+  padding: 0 var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
 }
 
 .status-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: hsl(0 0% 55%);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: calc(var(--radius) / 2);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  transition: background-color var(--duration-fast) ease;
+
+  &:hover {
+    background-color: var(--sidebar-accent);
+  }
 
   ng-icon {
     flex-shrink: 0;
-    opacity: 0.7;
+    opacity: 0.6;
   }
 }
 
 .status-label {
   flex: 1;
-  font-size: 12px;
-  color: hsl(0 0% 60%);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
 }
 
 .status-value {
-  font-size: 11px;
-  font-weight: 500;
-  color: hsl(0 0% 45%);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: oklch(0.55 0 0); // Neutral gray for offline state
 
   &.online {
-    color: hsl(142 76% 45%);
+    color: var(--sidebar-foreground);
   }
 }
 
-// Status Indicator with Pulsing Dot
+// Status Indicator (Monochrome)
 .status-indicator {
   position: relative;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   flex-shrink: 0;
 }
 
@@ -222,32 +351,25 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background-color: hsl(0 0% 35%);
-  transition: background-color 0.3s ease;
+  background-color: oklch(0.55 0 0); // Neutral gray
+  opacity: 0.5;
+  transition: all 0.3s ease;
 }
 
 .status-indicator.online .status-dot {
-  background-color: hsl(142 76% 45%);
-  animation: pulse 2s ease-in-out infinite;
+  background-color: var(--sidebar-foreground);
+  opacity: 0.8;
 }
 
 .status-indicator.offline .status-dot {
-  background-color: hsl(0 72% 51%);
+  background-color: oklch(0.55 0 0); // Neutral gray
+  opacity: 0.5;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 hsla(142, 76%, 45%, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 4px hsla(142, 76%, 45%, 0);
-  }
-}
-
-// Role Switcher
+// Role Switcher / User Account (Matches Reference)
 .role-switcher {
   position: relative;
 }
@@ -257,28 +379,27 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px;
+  padding: 8px;
   background: transparent;
-  border: 1px solid hsl(0 0% 15%);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: all 0.15s ease;
 
   &:hover {
-    background-color: hsl(0 0% 12%);
-    border-color: hsl(0 0% 20%);
+    background-color: var(--sidebar-accent);
   }
 }
 
 .role-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 26%));
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  background: var(--sidebar-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--sidebar-foreground);
 }
 
 .role-info {
@@ -292,18 +413,18 @@
 .role-title {
   font-size: 13px;
   font-weight: 500;
-  color: hsl(0 0% 90%);
+  color: var(--sidebar-foreground);
   line-height: 1.2;
 }
 
 .role-subtitle {
   font-size: 11px;
-  color: hsl(0 0% 50%);
+  color: var(--muted-foreground);
   line-height: 1.2;
 }
 
 .role-chevron {
-  color: hsl(0 0% 40%);
+  color: var(--muted-foreground);
   flex-shrink: 0;
   transition: transform 0.2s ease;
 
@@ -318,11 +439,11 @@
   bottom: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: hsl(0 0% 10%);
-  border: 1px solid hsl(0 0% 18%);
-  border-radius: 8px;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 4px;
-  box-shadow: 0 4px 12px hsla(0, 0%, 0%, 0.5);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
   z-index: 100;
 }
 
@@ -334,35 +455,150 @@
   padding: 10px 12px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 13px;
-  color: hsl(0 0% 70%);
+  color: var(--popover-foreground);
+  opacity: 0.7;
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
 
   &:hover {
-    background-color: hsl(0 0% 15%);
-    color: hsl(0 0% 95%);
+    background-color: var(--accent);
+    opacity: 1;
   }
 
   &.active {
-    background-color: hsl(142 76% 36% / 0.15);
-    color: hsl(142 76% 55%);
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+    opacity: 1;
 
     ng-icon {
-      color: hsl(142 76% 55%);
+      color: var(--accent-foreground);
     }
   }
 
   ng-icon {
     flex-shrink: 0;
-    opacity: 0.8;
   }
 
   .check-mark {
     margin-left: auto;
-    color: hsl(142 76% 55%);
+    color: var(--sidebar-foreground);
     font-weight: 600;
+  }
+}
+
+// Hover Popup for Collapsed Sidebar
+.sidebar-hover-popup {
+  position: fixed;
+  left: 64px; // 60px sidebar width + 4px gap (smaller gap for easier hover)
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px oklch(0 0 0 / 0.2);
+  padding: var(--spacing-sm);
+  min-width: 200px;
+  max-width: 280px;
+  z-index: 9999;
+  animation: popupSlideIn var(--duration-fast) var(--ease-out-expo);
+  pointer-events: auto;
+  
+  // Center the popup vertically relative to the icon
+  transform: translateY(-50%);
+  
+  // Ensure it's above everything
+  isolation: isolate;
+  
+  // Add invisible bridge to make hover easier
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 100%;
+    width: 8px; // Bridge area between sidebar and popup
+    background: transparent;
+  }
+}
+
+@keyframes popupSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) translateY(-50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(-50%);
+  }
+}
+
+// Popup Header (for items with children)
+.popup-header {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--popover-foreground);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--border);
+}
+
+// Popup Label (for end items without children)
+.popup-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--popover-foreground);
+  padding: var(--spacing-sm) var(--spacing-md);
+  white-space: nowrap;
+}
+
+// Popup Children List
+.popup-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.popup-child-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: calc(var(--radius) / 1.5);
+  color: var(--popover-foreground);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  transition: all var(--duration-fast) ease;
+  opacity: 0.8;
+  
+  &:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+    opacity: 1;
+    transform: translateX(2px);
+  }
+  
+  &.active-popup {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+    opacity: 1;
+    font-weight: 500;
+  }
+  
+  ng-icon {
+    flex-shrink: 0;
+  }
+  
+  span {
+    white-space: nowrap;
+  }
+  
+  &.nested {
+    padding-left: var(--spacing-2xl);
+    font-size: calc(var(--text-sm) - 1px);
+    
+    ng-icon {
+      opacity: 0.7;
+    }
   }
 }

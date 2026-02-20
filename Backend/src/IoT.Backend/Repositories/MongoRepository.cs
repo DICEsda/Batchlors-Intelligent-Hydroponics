@@ -123,6 +123,33 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
         return await collection.CountDocumentsAsync(filter, cancellationToken: ct);
     }
 
+    public async Task<bool> DeleteCoordinatorAsync(string coordId, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<Coordinator>(CoordinatorsCollection);
+        var filter = Builders<Coordinator>.Filter.Or(
+            Builders<Coordinator>.Filter.Eq("_id", coordId),
+            Builders<Coordinator>.Filter.Eq("coord_id", coordId)
+        );
+
+        try
+        {
+            var result = await collection.DeleteOneAsync(filter, ct);
+            _logger.LogInformation("Deleted coordinator {CoordId}, count: {Count}", coordId, result.DeletedCount);
+            return result.DeletedCount > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete coordinator {CoordId}", coordId);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<Coordinator>> GetAllCoordinatorsAsync(CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<Coordinator>(CoordinatorsCollection);
+        return await collection.Find(Builders<Coordinator>.Filter.Empty).ToListAsync(ct);
+    }
+
     #endregion
 
     #region Tower Operations (Hydroponic System)
@@ -222,6 +249,12 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
             .Set("updated_at", DateTime.UtcNow);
 
         await collection.UpdateOneAsync(filter, update, cancellationToken: ct);
+    }
+
+    public async Task<IReadOnlyList<Tower>> GetAllTowersAsync(CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<Tower>(TowersCollection);
+        return await collection.Find(Builders<Tower>.Filter.Empty).ToListAsync(ct);
     }
 
     #endregion
@@ -384,6 +417,12 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
         var options = new ReplaceOptions { IsUpsert = false };
 
         await collection.ReplaceOneAsync(filter, zone, options, ct);
+    }
+
+    public async Task<IReadOnlyList<Zone>> GetAllZonesAsync(CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<Zone>(ZonesCollection);
+        return await collection.Find(Builders<Zone>.Filter.Empty).ToListAsync(ct);
     }
 
     #endregion
@@ -885,12 +924,18 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
     
     Task<IReadOnlyList<Coordinator>> ICoordinatorRepository.GetByFarmAsync(string farmId, CancellationToken ct)
         => GetCoordinatorsByFarmAsync(farmId, ct);
+
+    Task<IReadOnlyList<Coordinator>> ICoordinatorRepository.GetAllAsync(CancellationToken ct)
+        => GetAllCoordinatorsAsync(ct);
     
     Task ICoordinatorRepository.UpsertAsync(Coordinator coordinator, CancellationToken ct)
         => UpsertCoordinatorAsync(coordinator, ct);
     
     Task<long> ICoordinatorRepository.CountOnlineAsync(TimeSpan threshold, CancellationToken ct)
         => CountOnlineCoordinatorsAsync(threshold, ct);
+
+    Task<bool> ICoordinatorRepository.DeleteAsync(string coordId, CancellationToken ct)
+        => DeleteCoordinatorAsync(coordId, ct);
 
     // ITowerRepository
     Task<Tower?> ITowerRepository.GetByIdAsync(string towerId, CancellationToken ct)
@@ -904,6 +949,9 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
     
     Task<IReadOnlyList<Tower>> ITowerRepository.GetByFarmAsync(string farmId, CancellationToken ct)
         => GetTowersByFarmAsync(farmId, ct);
+
+    Task<IReadOnlyList<Tower>> ITowerRepository.GetAllAsync(CancellationToken ct)
+        => GetAllTowersAsync(ct);
     
     Task ITowerRepository.UpsertAsync(Tower tower, CancellationToken ct)
         => UpsertTowerAsync(tower, ct);
@@ -943,6 +991,9 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
     
     Task<Zone?> IZoneRepository.GetByIdAsync(string id, CancellationToken ct)
         => GetZoneByIdAsync(id, ct);
+
+    Task<IReadOnlyList<Zone>> IZoneRepository.GetAllAsync(CancellationToken ct)
+        => GetAllZonesAsync(ct);
     
     Task<IReadOnlyList<Zone>> IZoneRepository.GetBySiteAsync(string siteId, CancellationToken ct)
         => GetZonesBySiteAsync(siteId, ct);

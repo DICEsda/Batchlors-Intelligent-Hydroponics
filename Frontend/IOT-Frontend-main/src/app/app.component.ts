@@ -1,10 +1,14 @@
 import { Component } from '@angular/core';
 import { MainLayoutComponent } from './components/layout';
+import { ConfirmDialogComponent } from './components/ui/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-root',
-  imports: [MainLayoutComponent],
-  template: '<app-main-layout />',
+  imports: [MainLayoutComponent, ConfirmDialogComponent],
+  template: `
+    <app-main-layout />
+    <app-confirm-dialog />
+  `,
   styles: [`
     :host {
       display: block;

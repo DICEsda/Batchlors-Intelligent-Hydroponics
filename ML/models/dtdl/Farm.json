@@ -1,0 +1,46 @@
+{
+  "@context": "dtmi:dtdl:context;2",
+  "@id": "dtmi:iot:hydroponics:Farm;1",
+  "@type": "Interface",
+  "displayName": "Hydroponic Farm",
+  "description": "A hydroponic farm containing coordinators and towers",
+  "contents": [
+    {
+      "@type": "Property",
+      "name": "name",
+      "displayName": "Farm Name",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "location",
+      "displayName": "Location",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "latitude", "schema": "double" },
+          { "name": "longitude", "schema": "double" },
+          { "name": "address", "schema": "string" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "timezone",
+      "displayName": "Timezone",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "created_at",
+      "displayName": "Created At",
+      "schema": "dateTime"
+    },
+    {
+      "@type": "Relationship",
+      "name": "hasCoordinator",
+      "displayName": "Has Coordinator",
+      "target": "dtmi:iot:hydroponics:Coordinator;1"
+    }
+  ]
+}

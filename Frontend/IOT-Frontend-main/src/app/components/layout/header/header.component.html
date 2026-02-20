@@ -1,6 +1,6 @@
 <header class="top-header">
   <div class="header-left">
-    <button class="sidebar-toggle">
+    <button class="sidebar-toggle" (click)="toggleSidebar()">
       <ng-icon name="lucidePanelLeft" size="18" />
     </button>
     
@@ -24,9 +24,227 @@
       <input 
         type="text" 
         class="search-input" 
-        placeholder="Type to search..."
+        placeholder="Search devices, farms... (Cmd+K)"
         [(ngModel)]="searchQuery"
+        (input)="onSearchInput($any($event.target).value)"
+        aria-label="Search"
       />
     </div>
+
+    <!-- Status Badges -->
+    <div class="status-badges">
+      @if (usingMockData()) {
+        <app-status-badge status="info" [showLabel]="true" />
+      }
+      <app-status-badge 
+        [status]="wsConnected() ? 'online' : 'offline'" 
+        [showLabel]="true"
+      />
+      <button hlmBtn variant="outline" size="sm" (click)="refreshData()" class="refresh-btn">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+      </button>
+      <button 
+        hlmBtn 
+        variant="destructive" 
+        size="sm" 
+        (click)="testToast()" 
+        class="test-toast-btn"
+        title="Test Toast Notifications (cycles through all types)"
+      >
+        <ng-icon hlmIcon name="lucideFlaskConical" size="sm" />
+        Test Toast
+      </button>
+    </div>
+
+    <!-- Notifications Dropdown -->
+    <app-notifications-dropdown />
+    
+    <!-- Theme Toggle Button -->
+    <button 
+      class="theme-toggle"
+      (click)="toggleTheme()"
+      (contextmenu)="cycleTheme(); $event.preventDefault()"
+      [title]="themeTooltip + ' (right-click to cycle)'"
+    >
+      <div class="theme-icon-wrapper">
+        <ng-icon 
+          [name]="themeIcon" 
+          size="18"
+          class="theme-icon"
+        />
+      </div>
+    </button>
   </div>
 </header>
+
+<!-- Coordinator Registration Dialog -->
+<hlm-dialog [isOpen]="showRegistrationDialog()" [size]="'lg'" (closed)="closeRegistrationDialog()">
+  <div class="registration-dialog">
+    <button hlmDialogClose (click)="closeRegistrationDialog()" class="dialog-close-btn">
+      <ng-icon name="lucideX" size="20" />
+    </button>
+
+    <div hlmDialogHeader>
+      <div class="dialog-icon">
+        <ng-icon name="lucideRadioTower" size="32" />
+      </div>
+      <h2 hlmDialogTitle>Register New Coordinator</h2>
+      <p hlmDialogDescription>
+        @if (selectedRegistration(); as reg) {
+          Coordinator <strong>{{ reg.coordId }}</strong> is requesting to join your farm. Configure its settings below.
+        }
+      </p>
+    </div>
+
+    <div class="dialog-body">
+      @if (selectedRegistration(); as reg) {
+        <!-- Device Info Section -->
+        <div class="device-info-section">
+          <h3 class="section-title">Device Information</h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Coordinator ID</span>
+              <span class="info-value mono">{{ reg.coordId }}</span>
+            </div>
+            @if (reg.ip) {
+              <div class="info-item">
+                <span class="info-label">IP Address</span>
+                <span class="info-value mono">{{ reg.ip }}</span>
+              </div>
+            }
+            <div class="info-item">
+              <span class="info-label">WiFi Signal</span>
+              <span class="info-value">{{ reg.wifiRssi }} dBm ({{ formatRssi(reg.wifiRssi) }})</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Free Heap</span>
+              <span class="info-value">{{ formatBytes(reg.freeHeap) }}</span>
+            </div>
+            @if (reg.fwVersion) {
+              <div class="info-item">
+                <span class="info-label">Firmware</span>
+                <span class="info-value">{{ reg.fwVersion }}</span>
+              </div>
+            }
+            @if (reg.chipModel) {
+              <div class="info-item">
+                <span class="info-label">Chip Model</span>
+                <span class="info-value">{{ reg.chipModel }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Registration Form -->
+        <div class="registration-form">
+          <h3 class="section-title">Configuration</h3>
+
+          <div class="form-group">
+            <label hlmLabel for="reg-farm-id">Farm ID *</label>
+            <input
+              hlmInput
+              id="reg-farm-id"
+              type="text"
+              placeholder="e.g., farm-001"
+              [value]="regFormFarmId()"
+              (input)="regFormFarmId.set($any($event.target).value)"
+            />
+            <span class="form-hint">The farm this coordinator belongs to</span>
+          </div>
+
+          <div class="form-group">
+            <label hlmLabel for="reg-name">Coordinator Name *</label>
+            <input
+              hlmInput
+              id="reg-name"
+              type="text"
+              placeholder="e.g., Greenhouse Alpha"
+              [value]="regFormName()"
+              (input)="regFormName.set($any($event.target).value)"
+            />
+            <span class="form-hint">A friendly name for this coordinator</span>
+          </div>
+
+          <div class="form-group">
+            <label hlmLabel for="reg-description">Description</label>
+            <input
+              hlmInput
+              id="reg-description"
+              type="text"
+              placeholder="e.g., Main greenhouse controller"
+              [value]="regFormDescription()"
+              (input)="regFormDescription.set($any($event.target).value)"
+            />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label hlmLabel for="reg-color">Color</label>
+              <div class="color-input-wrapper">
+                <input
+                  id="reg-color"
+                  type="color"
+                  [value]="regFormColor()"
+                  (input)="regFormColor.set($any($event.target).value)"
+                  class="color-picker"
+                />
+                <span class="color-value">{{ regFormColor() }}</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label hlmLabel for="reg-location">Location</label>
+              <input
+                hlmInput
+                id="reg-location"
+                type="text"
+                placeholder="e.g., Building A, Room 3"
+                [value]="regFormLocation()"
+                (input)="regFormLocation.set($any($event.target).value)"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label hlmLabel for="reg-tags">Tags</label>
+            <input
+              hlmInput
+              id="reg-tags"
+              type="text"
+              placeholder="e.g., production, lettuce, zone-a"
+              [value]="regFormTags()"
+              (input)="regFormTags.set($any($event.target).value)"
+            />
+            <span class="form-hint">Comma-separated tags for organizing</span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div hlmDialogFooter>
+      <button hlmBtn variant="outline" (click)="closeRegistrationDialog()" [disabled]="isSubmitting()">
+        Cancel
+      </button>
+      @if (selectedRegistration()) {
+        <button
+          hlmBtn
+          variant="destructive"
+          (click)="rejectCoordinator(selectedRegistration()!.coordId)"
+          [disabled]="isSubmitting()"
+        >
+          <ng-icon name="lucideX" size="16" />
+          Reject
+        </button>
+      }
+      <button hlmBtn variant="default" (click)="approveCoordinator()" [disabled]="isSubmitting()">
+        @if (isSubmitting()) {
+          <ng-icon name="lucideRefreshCw" size="16" class="animate-spin" />
+          Registering...
+        } @else {
+          <ng-icon name="lucideCheck" size="16" />
+          Approve & Register
+        }
+      </button>
+    </div>
+  </div>
+</hlm-dialog>

@@ -309,7 +309,7 @@ bool Reservoir::begin() {
         this->onMmWaveEvent(event);
     });
 
-    thermal->registerThermalAlertCallback([this](const String& towerId, const TowerThermalData& data) {
+    thermal->registerThermalAlertCallback([this](const String& towerId, const NodeThermalData& data) {
         this->onThermalEvent(towerId, data);
     });
 
@@ -432,7 +432,7 @@ void Reservoir::onMmWaveEvent(const MmWaveEvent& event) {
     }
 }
 
-void Reservoir::onThermalEvent(const String& towerId, const TowerThermalData& data) {
+void Reservoir::onThermalEvent(const String& towerId, const NodeThermalData& data) {
     // Guard against null pointers
     if (!mqtt || !towers || !zones || !espNow) {
         Logger::error("Cannot process thermal event: components not initialized");
@@ -555,17 +555,17 @@ void Reservoir::handleTowerMessage(const String& towerId, const uint8_t* data, s
     Logger::info("[Tower %d] %s %s | %d bytes", 
                  idx >= 0 ? idx + 1 : 0,
                  towerId.c_str(),
-                 mt == MessageType::TOWER_STATUS ? "STATUS" : "MESSAGE", 
+                 mt == MessageType::NODE_STATUS ? "STATUS" : "MESSAGE", 
                  (int)len);
 
     // Mark last seen on status and log sensor data
-    if (mt == MessageType::TOWER_STATUS && towers) {
+    if (mt == MessageType::NODE_STATUS && towers) {
         towers->updateTowerStatus(towerId, 0);
         
         // Parse and log sensor data from telemetry
         EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::TOWER_STATUS) {
-            TowerStatusMessage* statusMsg = static_cast<TowerStatusMessage*>(msg);
+        if (msg && msg->type == MessageType::NODE_STATUS) {
+            NodeStatusMessage* statusMsg = static_cast<NodeStatusMessage*>(msg);
             updateTowerTelemetryCache(towerId, *statusMsg);
             
             // Log temperature if available
@@ -662,7 +662,7 @@ void Reservoir::handleTowerMessage(const String& towerId, const uint8_t* data, s
             // Send join accept response
             TowerJoinAcceptMessage accept;
             accept.tower_id = assignedTowerId;
-            accept.coord_id = mqtt->getReservoirId();  // Use new method name
+            accept.coord_id = mqtt->getCoordinatorId();
             accept.farm_id = mqtt->getFarmId();
             accept.lmk = "";  // TODO: implement secure pairing with LMK
             
@@ -1071,7 +1071,7 @@ void Reservoir::startPairingWindow(uint32_t durationMs, const char* reason) {
     statusLed.pulse(0, 0, 180, 500);
 }
 
-void Reservoir::updateTowerTelemetryCache(const String& towerId, const TowerStatusMessage& statusMsg) {
+void Reservoir::updateTowerTelemetryCache(const String& towerId, const NodeStatusMessage& statusMsg) {
     TowerTelemetrySnapshot snapshot;
     snapshot.avgR = statusMsg.avg_r;
     snapshot.avgG = statusMsg.avg_g;
@@ -1083,7 +1083,7 @@ void Reservoir::updateTowerTelemetryCache(const String& towerId, const TowerStat
     towerTelemetry[towerId] = snapshot;
 
     if (mqtt) {
-        mqtt->publishTowerStatus(statusMsg);
+        mqtt->publishNodeStatus(statusMsg);
     }
 }
 
@@ -1126,7 +1126,8 @@ void Reservoir::refreshReservoirSensors() {
     }
 
     if (mqtt) {
-        mqtt->publishReservoirTelemetry(reservoirSensors);
+        // TODO: Convert ReservoirSensorSnapshot to ReservoirTelemetryMessage
+        // mqtt->publishReservoirTelemetry(reservoirSensors);
     }
 }
 

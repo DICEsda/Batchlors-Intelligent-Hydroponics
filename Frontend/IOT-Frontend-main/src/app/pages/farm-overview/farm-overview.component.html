@@ -100,7 +100,7 @@
       </div>
     </div>
 
-    <!-- Large Bottom Card -->
+    <!-- Main Content Card -->
     <div class="bottom-row">
       <div class="dashboard-card large-card">
         <div class="card-inner">
@@ -108,35 +108,6 @@
             <hlm-skeleton class="full-skeleton" />
           } @else {
             <div class="large-card-content">
-              <!-- Header Section -->
-              <div class="section-header">
-                <h3 class="section-title">Smart Tile System Overview</h3>
-                <div class="section-actions">
-                  @if (usingMockData()) {
-                    <span hlmBadge variant="secondary" class="connection-badge">
-                      <ng-icon hlmIcon name="lucideActivity" size="sm" />
-                      Demo Mode
-                    </span>
-                  }
-                  <span
-                    hlmBadge
-                    [variant]="wsConnected() ? 'default' : 'destructive'"
-                    class="connection-badge"
-                  >
-                    <ng-icon
-                      hlmIcon
-                      [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'"
-                      size="sm"
-                    />
-                    {{ wsConnected() ? 'Connected' : 'Disconnected' }}
-                  </span>
-                  <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
-                    <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
-                    Refresh
-                  </button>
-                </div>
-              </div>
-
               @if (error()) {
                 <div class="error-banner">
                   <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
@@ -148,18 +119,52 @@
               @if (coordinators().length === 0 && nodes().length === 0) {
                 <div class="empty-state">
                   <ng-icon hlmIcon name="lucideServer" size="xl" />
-                  <h3>No Devices Found</h3>
-                  <p>Add reservoirs and towers to start monitoring your hydroponic system.</p>
-                  <button hlmBtn variant="default">
-                    <ng-icon hlmIcon name="lucidePlus" size="sm" />
-                    Add Device
-                  </button>
+                  <h3>Welcome to Your Hydroponic Farm</h3>
+                  <p>Get started by adding your first coordinator and towers to monitor your system in real-time.</p>
+                  <div class="empty-state-actions">
+                    <button hlmBtn variant="default" routerLink="/reservoirs">
+                      <ng-icon hlmIcon name="lucidePlus" size="sm" />
+                      Add Coordinator
+                    </button>
+                    <button hlmBtn variant="outline" routerLink="/settings">
+                      <ng-icon hlmIcon name="lucideInfo" size="sm" />
+                      Setup Guide
+                    </button>
+                  </div>
                 </div>
               } @else {
-                <div class="devices-overview">
-                  <!-- Reservoirs List -->
+                <!-- Devices Overview - Horizontal Layout -->
+                <div class="devices-overview-inline">
+                  <!-- Farms Column -->
+                  @if (zones().length > 0) {
+                    <div class="device-column">
+                      <h4 class="device-section-title">Farms</h4>
+                      <div class="device-list">
+                        @for (zone of zones().slice(0, 4); track zone._id) {
+                          <a [routerLink]="['/farms', zone._id]" class="device-item">
+                            <div class="device-info">
+                              <span class="device-name">{{ zone.name }}</span>
+                              <span class="device-meta">
+                                <ng-icon hlmIcon name="lucideMapPin" size="sm" />
+                                {{ zone.site_id ? 'Site configured' : 'No site' }}
+                              </span>
+                            </div>
+                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+                          </a>
+                        }
+                        @if (zones().length > 4) {
+                          <a routerLink="/farms" class="view-all-link">
+                            View all {{ zones().length }} farms
+                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+                          </a>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Reservoirs Column -->
                   @if (coordinators().length > 0) {
-                    <div class="device-section">
+                    <div class="device-column">
                       <h4 class="device-section-title">Reservoirs</h4>
                       <div class="device-list">
                         @for (coord of coordinators(); track trackByCoordinatorId($index, coord)) {
@@ -172,7 +177,7 @@
                                 {{ coord.temp_c !== undefined ? coord.temp_c.toFixed(1) : '--' }}°C
                               </span>
                             </div>
-                            <span hlmBadge [variant]="getStatusBadgeVariant(coord.status)" size="sm">
+                            <span hlmBadge [variant]="getStatusBadgeVariant(coord.status)" size="sm" [class]="'status-' + coord.status">
                               {{ coord.status }}
                             </span>
                           </a>
@@ -181,9 +186,9 @@
                     </div>
                   }
 
-                  <!-- Towers List -->
+                  <!-- Towers Column -->
                   @if (nodes().length > 0) {
-                    <div class="device-section">
+                    <div class="device-column">
                       <h4 class="device-section-title">Towers</h4>
                       <div class="device-list">
                         @for (node of nodes().slice(0, 6); track trackByNodeId($index, node)) {
@@ -196,7 +201,7 @@
                                 {{ formatLastSeen(node.last_seen) }}
                               </span>
                             </div>
-                            <span hlmBadge [variant]="getStatusBadgeVariant(node.status_mode)" size="sm">
+                            <span hlmBadge [variant]="getStatusBadgeVariant(node.status_mode)" size="sm" [class]="'status-' + node.status_mode">
                               {{ getNodeStatusDisplay(node.status_mode) }}
                             </span>
                           </a>
@@ -210,60 +215,6 @@
                       </div>
                     </div>
                   }
-
-                  <!-- Zones Summary -->
-                  @if (zones().length > 0) {
-                    <div class="device-section">
-                      <h4 class="device-section-title">Zones</h4>
-                      <div class="device-list">
-                        @for (zone of zones().slice(0, 4); track zone._id) {
-                          <a [routerLink]="['/zones', zone._id]" class="device-item">
-                            <div class="device-info">
-                              <span class="device-name">{{ zone.name }}</span>
-                              <span class="device-meta">
-                                <ng-icon hlmIcon name="lucideMapPin" size="sm" />
-                                {{ zone.site_id ? 'Site configured' : 'No site' }}
-                              </span>
-                            </div>
-                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-                          </a>
-                        }
-                        @if (zones().length > 4) {
-                          <a routerLink="/zones" class="view-all-link">
-                            View all {{ zones().length }} zones
-                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-                          </a>
-                        }
-                      </div>
-                    </div>
-                  }
-                </div>
-              }
-
-              <!-- Active Alerts -->
-              @if (activeAlerts().length > 0) {
-                <div class="alerts-section">
-                  <h4 class="device-section-title">Recent Alerts</h4>
-                  <div class="alerts-list">
-                    @for (alert of activeAlerts().slice(0, 3); track trackByAlertId($index, alert)) {
-                      <div class="alert-item" [class]="'alert-' + alert.severity">
-                        <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
-                        <div class="alert-info">
-                          <span class="alert-message">{{ alert.message }}</span>
-                          <span class="alert-meta">{{ alert.source.name }} - {{ formatTimestamp(alert.createdAt) }}</span>
-                        </div>
-                        <span hlmBadge [variant]="getAlertBadgeVariant(alert.severity)" size="sm">
-                          {{ alert.severity }}
-                        </span>
-                      </div>
-                    }
-                  </div>
-                  @if (activeAlerts().length > 3) {
-                    <a routerLink="/alerts" class="view-all-link">
-                      View all {{ activeAlerts().length }} alerts
-                      <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-                    </a>
-                  }
                 </div>
               }
             </div>
@@ -272,4 +223,38 @@
       </div>
     </div>
   </section>
+
+  <!-- Alerts Section - Outside Card -->
+  @if (activeAlerts().length > 0) {
+    <section class="alerts-section-standalone">
+      <div class="alerts-header">
+        <h4 class="alerts-title">
+          <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+          Recent Alerts
+        </h4>
+        @if (activeAlerts().length > 5) {
+          <a routerLink="/alerts" class="view-all-alerts">
+            View all {{ activeAlerts().length }}
+            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+          </a>
+        }
+      </div>
+      <div class="alerts-scroll-container">
+        <div class="alerts-scroll-content">
+          @for (alert of activeAlerts(); track trackByAlertId($index, alert)) {
+            <div class="alert-item" [class]="'alert-' + alert.severity">
+              <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+              <div class="alert-info">
+                <span class="alert-message">{{ alert.message }}</span>
+                <span class="alert-meta">{{ alert.source.name }} - {{ formatTimestamp(alert.createdAt) }}</span>
+              </div>
+              <span hlmBadge [variant]="getAlertBadgeVariant(alert.severity)" size="sm">
+                {{ alert.severity }}
+              </span>
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+  }
 </div>

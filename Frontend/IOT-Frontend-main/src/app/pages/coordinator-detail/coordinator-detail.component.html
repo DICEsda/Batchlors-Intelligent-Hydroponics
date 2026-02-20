@@ -356,13 +356,19 @@
       @if (connectedNodes().length === 0) {
         <div class="empty-state">
           <ng-icon hlmIcon name="lucideLightbulb" size="xl" />
-          <h3>No Nodes Connected</h3>
-          <p>Put nodes into pairing mode to connect them to this coordinator.</p>
+          <h3>No Towers Connected Yet</h3>
+          <p>Start pairing mode and activate your tower devices to connect them to this coordinator. They'll appear here once paired.</p>
           @if (!isPairing()) {
-            <button hlmBtn variant="default" (click)="startPairing()">
-              <ng-icon hlmIcon name="lucideRadio" size="sm" />
-              Start Pairing Mode
-            </button>
+            <div class="empty-state-actions">
+              <button hlmBtn variant="default" (click)="startPairing()">
+                <ng-icon hlmIcon name="lucideRadio" size="sm" />
+                Start Pairing Mode
+              </button>
+              <button hlmBtn variant="outline" routerLink="/settings">
+                <ng-icon hlmIcon name="lucideInfo" size="sm" />
+                Pairing Guide
+              </button>
+            </div>
           } @else {
             <span hlmBadge variant="secondary" class="pairing-badge">
               <ng-icon hlmIcon name="lucideLoader2" size="xs" class="animate-spin" />
@@ -373,35 +379,50 @@
       } @else {
         <div class="nodes-grid">
           @for (node of connectedNodes(); track trackByNodeId($index, node)) {
-            <a [routerLink]="['/nodes', node._id]" class="card-link">
-              <div hlmCard class="node-card" [class.offline]="node.status_mode === 'error'">
-                <div hlmCardHeader>
-                  <div class="card-header-row">
+            <div hlmCard class="node-card" [class.offline]="node.status_mode === 'error'">
+              <div hlmCardHeader>
+                <div class="card-header-row">
+                  <a [routerLink]="['/nodes', node._id]" class="node-title-link">
                     <span hlmCardTitle>{{ node.name || node.light_id }}</span>
-                    <span hlmBadge [variant]="getNodeStatusBadgeVariant(node.status_mode)" size="sm">
-                      {{ node.status_mode }}
-                    </span>
-                  </div>
-                  <span hlmCardDescription>ID: {{ node.light_id }}</span>
+                  </a>
+                  <span hlmBadge [variant]="getNodeStatusBadgeVariant(node.status_mode)" size="sm">
+                    {{ node.status_mode }}
+                  </span>
                 </div>
-                <div hlmCardContent class="node-metrics">
-                  <div class="metric">
-                    <ng-icon hlmIcon name="lucideThermometer" size="xs" />
-                    <span class="metric-value">{{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C</span>
-                  </div>
-                  <div class="metric">
-                    <ng-icon hlmIcon name="lucideBattery" size="xs" />
-                    <span class="metric-value" [class]="'battery-' + getBatteryStatus(node.vbat_mv)">
-                      {{ getBatteryPercent(node.vbat_mv) }}%
-                    </span>
-                  </div>
+                <span hlmCardDescription>ID: {{ node.light_id }}</span>
+              </div>
+              <div hlmCardContent class="node-metrics">
+                <div class="metric">
+                  <ng-icon hlmIcon name="lucideThermometer" size="xs" />
+                  <span class="metric-value">{{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C</span>
                 </div>
-                <div class="card-footer">
-                  <span class="last-seen">{{ formatTimeAgo(node.last_seen) }}</span>
-                  <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+                <div class="metric">
+                  <ng-icon hlmIcon name="lucideBattery" size="xs" />
+                  <span class="metric-value" [class]="'battery-' + getBatteryStatus(node.vbat_mv)">
+                    {{ getBatteryPercent(node.vbat_mv) }}%
+                  </span>
                 </div>
               </div>
-            </a>
+              <div class="card-footer">
+                <span class="last-seen">{{ formatTimeAgo(node.last_seen) }}</span>
+                <div class="node-actions">
+                  <button 
+                    hlmBtn 
+                    variant="ghost" 
+                    size="sm" 
+                    class="forget-btn"
+                    (click)="forgetDevice(node); $event.preventDefault(); $event.stopPropagation()"
+                    title="Forget this device"
+                  >
+                    <ng-icon hlmIcon name="lucideRadio" size="xs" />
+                    Forget
+                  </button>
+                  <a [routerLink]="['/nodes', node._id]" hlmBtn variant="ghost" size="icon">
+                    <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
+                  </a>
+                </div>
+              </div>
+            </div>
           }
         </div>
       }

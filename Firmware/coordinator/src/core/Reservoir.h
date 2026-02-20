@@ -14,9 +14,6 @@
 
 class WifiManager;
 class AmbientLightSensor;
-struct TowerStatusMessage;
-
-// Forward declaration for backward compatibility
 struct NodeStatusMessage;
 struct NodeThermalData;
 
@@ -111,13 +108,13 @@ private:
     
     // Event handlers
     void onMmWaveEvent(const MmWaveEvent& event);
-    void onThermalEvent(const String& towerId, const TowerThermalData& data);
+    void onThermalEvent(const String& towerId, const NodeThermalData& data);
     void onButtonEvent(const String& buttonId, bool pressed);
     void handleTowerMessage(const String& towerId, const uint8_t* data, size_t len);
     void triggerTowerWaveTest();
     void handleMqttCommand(const String& topic, const String& payload);
     void startPairingWindow(uint32_t durationMs, const char* reason);
-    void updateTowerTelemetryCache(const String& towerId, const TowerStatusMessage& statusMsg);
+    void updateTowerTelemetryCache(const String& towerId, const NodeStatusMessage& statusMsg);
     void refreshReservoirSensors();
     void printSerialTelemetry();
     void recordBootStatus(const char* name, bool ok, const String& detail);

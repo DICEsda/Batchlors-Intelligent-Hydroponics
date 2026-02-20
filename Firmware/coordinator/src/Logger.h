@@ -7,6 +7,9 @@
 // Use Serial (USB CDC on S3 when enabled)
 #define LOG_SERIAL Serial
 
+// Forward declarations for log streaming
+void streamLogToMqtt(uint8_t level, const char* levelStr, const char* message);
+
 namespace Logger {
 	enum Level : uint8_t { DEBUG = 0, INFO = 1, WARN = 2, ERROR = 3 };
 	
@@ -28,44 +31,47 @@ namespace Logger {
 	}
 
 	// Internal helper: print a timestamped, leveled message
-	inline void printLine(const char* level, const char* msg) {
+	inline void printLine(const char* level, const char* msg, uint8_t levelNum) {
 		// Simple ms timestamp (wraps) to help ordering in logs
 		unsigned long t = millis();
 		LOG_SERIAL.printf("%10lu | %-5s | %s\n", t, level, msg);
 		LOG_SERIAL.flush();
+		
+		// Stream to MQTT if enabled
+		streamLogToMqtt(levelNum, level, msg);
 	}
 
 	inline void setMinLevel(Level lvl) { getMinLevel() = (uint8_t)lvl; }
 
-	inline void debug(const String& msg) { if (getMinLevel() <= DEBUG) printLine("DEBUG", msg.c_str()); }
-	inline void info(const String& msg)  { if (getMinLevel() <= INFO)  printLine("INFO",  msg.c_str()); }
-	inline void warn(const String& msg)  { if (getMinLevel() <= WARN)  printLine("WARN",  msg.c_str()); }
-	inline void error(const String& msg) { if (getMinLevel() <= ERROR) printLine("ERROR", msg.c_str()); }
+	inline void debug(const String& msg) { if (getMinLevel() <= DEBUG) printLine("DEBUG", msg.c_str(), DEBUG); }
+	inline void info(const String& msg)  { if (getMinLevel() <= INFO)  printLine("INFO",  msg.c_str(), INFO); }
+	inline void warn(const String& msg)  { if (getMinLevel() <= WARN)  printLine("WARN",  msg.c_str(), WARN); }
+	inline void error(const String& msg) { if (getMinLevel() <= ERROR) printLine("ERROR", msg.c_str(), ERROR); }
 
 	inline void debug(const char* fmt, ...) {
 		if (getMinLevel() > DEBUG) return;
 		char buf[320];
 		va_list args; va_start(args, fmt); vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
-		printLine("DEBUG", buf);
+		printLine("DEBUG", buf, DEBUG);
 	}
 
 	inline void info(const char* fmt, ...) {
 		if (getMinLevel() > INFO) return;
 		char buf[320];
 		va_list args; va_start(args, fmt); vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
-		printLine("INFO", buf);
+		printLine("INFO", buf, INFO);
 	}
 	inline void warn(const char* fmt, ...) {
 		if (getMinLevel() > WARN) return;
 		char buf[320];
 		va_list args; va_start(args, fmt); vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
-		printLine("WARN", buf);
+		printLine("WARN", buf, WARN);
 	}
 	inline void error(const char* fmt, ...) {
 		if (getMinLevel() > ERROR) return;
 		char buf[320];
 		va_list args; va_start(args, fmt); vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
-		printLine("ERROR", buf);
+		printLine("ERROR", buf, ERROR);
 	}
 
 	// alias used in some files
@@ -73,7 +79,7 @@ namespace Logger {
 		if (getMinLevel() > WARN) return;
 		char buf[320];
 		va_list args; va_start(args, fmt); vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
-		printLine("WARN", buf);
+		printLine("WARN", buf, WARN);
 	}
 
     // Hex dump helper (prints at DEBUG level). Max bytes limited to avoid spam.
@@ -85,7 +91,7 @@ namespace Logger {
         line[n * 3] = '\0';
         char buf[384];
         snprintf(buf, sizeof(buf), "[%s] len=%u data=%s%s", tag ? tag : "HEX", (unsigned)len, line, len > maxBytes ? " ..." : "");
-        printLine("DEBUG", buf);
+        printLine("DEBUG", buf, DEBUG);
     }
 }
 

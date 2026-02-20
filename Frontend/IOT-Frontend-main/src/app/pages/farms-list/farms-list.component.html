@@ -1,0 +1,196 @@
+<div class="farms-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <a routerLink="/overview" class="back-link">
+        <ng-icon name="lucideChevronRight" size="16" class="back-icon" />
+      </a>
+      <div class="header-text">
+        <h1>Farms</h1>
+        <p class="header-description">
+          Manage your hydroponic farms, reservoirs, and towers
+        </p>
+      </div>
+    </div>
+    <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="secondary" class="mock-badge">Mock Data</span>
+      }
+      <button hlmBtn variant="outline" size="sm" (click)="loadData()">
+        <ng-icon name="lucideRefreshCw" size="16" />
+        Refresh
+      </button>
+      <button hlmBtn variant="default" size="sm" (click)="createFarm()">
+        <ng-icon name="lucidePlus" size="16" />
+        Create Farm
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Summary -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <ng-icon name="lucideBuilding" size="20" class="stat-icon" />
+      <div class="stat-info">
+        <span class="stat-value">{{ farms().length }}</span>
+        <span class="stat-label">Total Farms</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <ng-icon name="lucideWaves" size="20" class="stat-icon reservoirs" />
+      <div class="stat-info">
+        <span class="stat-value">{{ coordinators().length }}</span>
+        <span class="stat-label">Reservoirs</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <ng-icon name="lucideLeaf" size="20" class="stat-icon towers" />
+      <div class="stat-info">
+        <span class="stat-value">{{ nodes().length }}</span>
+        <span class="stat-label">Towers</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading farms...</p>
+    </div>
+  }
+
+  <!-- Farms List -->
+  @if (!loading()) {
+    <div class="farms-list">
+      @for (farm of farmsWithData(); track farm._id) {
+        <div class="farm-card" [style.--farm-color]="farm.color || '#3b82f6'">
+          <!-- Farm Header - Clickable to expand -->
+          <div class="farm-header" (click)="toggleFarmExpand(farm._id)">
+            <div class="farm-color-indicator"></div>
+            <div class="farm-info">
+              <div class="farm-title-row">
+                <h2>{{ farm.name }}</h2>
+                <div class="farm-badges">
+                  <span hlmBadge variant="outline" size="sm">
+                    <ng-icon name="lucideWaves" size="12" />
+                    {{ farm.onlineReservoirs }}/{{ farm.reservoirs.length }} Reservoirs
+                  </span>
+                  <span hlmBadge variant="outline" size="sm">
+                    <ng-icon name="lucideLeaf" size="12" />
+                    {{ farm.onlineTowers }}/{{ farm.towers.length }} Towers
+                  </span>
+                </div>
+              </div>
+              @if (farm.description) {
+                <p class="farm-description">{{ farm.description }}</p>
+              }
+              @if (farm.location) {
+                <div class="farm-location">
+                  <ng-icon name="lucideMapPin" size="14" />
+                  <span>{{ farm.location }}</span>
+                </div>
+              }
+            </div>
+            <div class="farm-actions">
+              <button class="icon-btn" title="Edit Farm" (click)="editFarm(farm._id, $event)">
+                <ng-icon name="lucidePencil" size="16" />
+              </button>
+              <button class="icon-btn danger" title="Delete Farm" (click)="deleteFarm(farm._id, $event)">
+                <ng-icon name="lucideTrash2" size="16" />
+              </button>
+              <ng-icon 
+                [name]="isFarmExpanded(farm._id) ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                size="20" 
+                class="expand-icon"
+              />
+            </div>
+          </div>
+
+          <!-- Farm Content - Expanded View -->
+          @if (isFarmExpanded(farm._id)) {
+            <div class="farm-content">
+              <!-- Reservoirs Section -->
+              <div class="reservoirs-section">
+                <h3 class="section-title">
+                  <ng-icon name="lucideWaves" size="16" />
+                  Reservoirs
+                </h3>
+                
+                @if (farm.reservoirs.length === 0) {
+                  <div class="empty-section">
+                    <p>No reservoirs assigned to this farm</p>
+                    <button hlmBtn variant="outline" size="sm">
+                      <ng-icon name="lucidePlus" size="14" />
+                      Add Reservoir
+                    </button>
+                  </div>
+                } @else {
+                  <div class="reservoirs-grid">
+                    @for (reservoir of farm.reservoirs; track reservoir._id) {
+                      <a [routerLink]="['/reservoirs', reservoir.coord_id]" class="reservoir-card">
+                        <div class="reservoir-header">
+                          <span class="reservoir-name">{{ reservoir.name || reservoir.coord_id }}</span>
+                          <span hlmBadge 
+                                [variant]="getStatusBadgeVariant(reservoir.status)" 
+                                size="sm"
+                                [class]="'status-' + reservoir.status">
+                            {{ reservoir.status }}
+                          </span>
+                        </div>
+                        <div class="reservoir-meta">
+                          <span>{{ reservoir.light_lux || 0 }} lux</span>
+                          <span>{{ reservoir.temp_c !== undefined ? reservoir.temp_c.toFixed(1) : '--' }}°C</span>
+                        </div>
+                        
+                        <!-- Towers connected to this reservoir -->
+                        @if (getTowersForReservoir(farm.towers, reservoir.coord_id).length > 0) {
+                          <div class="reservoir-towers">
+                            <span class="towers-label">
+                              <ng-icon name="lucideLeaf" size="12" />
+                              {{ getTowersForReservoir(farm.towers, reservoir.coord_id).length }} Towers
+                            </span>
+                            <div class="tower-chips">
+                              @for (tower of getTowersForReservoir(farm.towers, reservoir.coord_id).slice(0, 3); track tower._id) {
+                                <span class="tower-chip" [class]="'status-' + tower.status_mode">
+                                  {{ tower.name || tower.light_id }}
+                                </span>
+                              }
+                              @if (getTowersForReservoir(farm.towers, reservoir.coord_id).length > 3) {
+                                <span class="tower-chip more">
+                                  +{{ getTowersForReservoir(farm.towers, reservoir.coord_id).length - 3 }}
+                                </span>
+                              }
+                            </div>
+                          </div>
+                        }
+                      </a>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <ng-icon name="lucideBuilding" size="64" />
+          <h3>No Farms Created</h3>
+          <p>Create your first farm to organize your hydroponic systems with reservoirs and towers.</p>
+          <button hlmBtn variant="default" (click)="createFarm()">
+            <ng-icon name="lucidePlus" size="18" />
+            Create Farm
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- Farm Create/Edit Dialog -->
+<app-farm-dialog 
+  [isOpen]="isDialogOpen()"
+  [editData]="editingFarm()"
+  (closed)="closeDialog()"
+  (saved)="saveFarm($event)"
+/>

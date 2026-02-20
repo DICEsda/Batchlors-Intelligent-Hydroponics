@@ -354,7 +354,7 @@
           </div>
 
           <div class="display-sections">
-            <!-- Theme Settings -->
+<!-- Theme Settings -->
             <div hlmCard class="display-card">
               <div hlmCardHeader>
                 <div class="card-title-row">
@@ -393,6 +393,20 @@
                       <ng-icon hlmIcon name="lucideMonitor" size="sm" />
                       <span>System</span>
                     </button>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <label hlmLabel>Accent Color</label>
+                  <div class="color-options">
+                    @for (color of accentColors; track color.id) {
+                      <button
+                        class="color-option color-{{ color.id }}"
+                        [class.active]="displaySettings().accentColor === color.id"
+                        (click)="updateDisplaySetting('accentColor', color.id)"
+                        [title]="color.name"
+                      ></button>
+                    }
                   </div>
                 </div>
 

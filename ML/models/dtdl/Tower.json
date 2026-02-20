@@ -1,0 +1,234 @@
+{
+  "@context": "dtmi:dtdl:context;2",
+  "@id": "dtmi:iot:hydroponics:Tower;1",
+  "@type": "Interface",
+  "displayName": "Hydroponic Tower",
+  "description": "ESP32-C3 tower node with sensors and grow lights",
+  "contents": [
+    {
+      "@type": "Property",
+      "name": "mac_address",
+      "displayName": "MAC Address",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "name",
+      "displayName": "Tower Name",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "firmware_version",
+      "displayName": "Firmware Version",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "status",
+      "displayName": "Status",
+      "schema": {
+        "@type": "Enum",
+        "valueSchema": "string",
+        "enumValues": [
+          { "name": "operational", "enumValue": "operational" },
+          { "name": "offline", "enumValue": "offline" },
+          { "name": "pairing", "enumValue": "pairing" },
+          { "name": "error", "enumValue": "error" },
+          { "name": "ota", "enumValue": "ota" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "slot_count",
+      "displayName": "Plant Slots",
+      "schema": "integer"
+    },
+    {
+      "@type": "Property",
+      "name": "crop_type",
+      "displayName": "Crop Type",
+      "schema": {
+        "@type": "Enum",
+        "valueSchema": "string",
+        "enumValues": [
+          { "name": "Lettuce", "enumValue": "Lettuce" },
+          { "name": "Basil", "enumValue": "Basil" },
+          { "name": "Spinach", "enumValue": "Spinach" },
+          { "name": "Kale", "enumValue": "Kale" },
+          { "name": "Tomato", "enumValue": "Tomato" },
+          { "name": "Pepper", "enumValue": "Pepper" },
+          { "name": "Strawberry", "enumValue": "Strawberry" },
+          { "name": "Mint", "enumValue": "Mint" },
+          { "name": "Cilantro", "enumValue": "Cilantro" },
+          { "name": "Other", "enumValue": "Other" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "planted_date",
+      "displayName": "Planted Date",
+      "schema": "date"
+    },
+    {
+      "@type": "Property",
+      "name": "signal_quality",
+      "displayName": "ESP-NOW Signal Quality",
+      "schema": "integer"
+    },
+    {
+      "@type": "Property",
+      "name": "battery_mv",
+      "displayName": "Battery Voltage",
+      "schema": "integer",
+      "unit": "millivolt"
+    },
+    {
+      "@type": "Property",
+      "name": "last_seen",
+      "displayName": "Last Seen",
+      "schema": "dateTime"
+    },
+    {
+      "@type": "Property",
+      "name": "capabilities",
+      "displayName": "Hardware Capabilities",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "dht_sensor", "schema": "boolean" },
+          { "name": "light_sensor", "schema": "boolean" },
+          { "name": "pump_relay", "schema": "boolean" },
+          { "name": "grow_light", "schema": "boolean" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "reported_state",
+      "displayName": "Reported State",
+      "description": "State reported by the physical device",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "air_temp_c", "schema": "double" },
+          { "name": "humidity_pct", "schema": "double" },
+          { "name": "light_lux", "schema": "double" },
+          { "name": "pump_on", "schema": "boolean" },
+          { "name": "light_on", "schema": "boolean" },
+          { "name": "light_brightness", "schema": "integer" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "desired_state",
+      "displayName": "Desired State",
+      "description": "Desired state to be applied to device",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "pump_on", "schema": "boolean" },
+          { "name": "light_on", "schema": "boolean" },
+          { "name": "light_brightness", "schema": "integer" },
+          { "name": "light_color_r", "schema": "integer" },
+          { "name": "light_color_g", "schema": "integer" },
+          { "name": "light_color_b", "schema": "integer" },
+          { "name": "light_color_w", "schema": "integer" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "growth_tracking",
+      "displayName": "Growth Tracking",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "last_height_cm", "schema": "double" },
+          { "name": "last_measured_at", "schema": "dateTime" },
+          { "name": "days_since_planting", "schema": "integer" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "ml_predictions",
+      "displayName": "ML Predictions",
+      "description": "Machine learning predictions for this tower",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "predicted_height_cm", "schema": "double" },
+          { "name": "predicted_harvest_date", "schema": "date" },
+          { "name": "days_to_harvest", "schema": "integer" },
+          { "name": "growth_rate_cm_per_day", "schema": "double" },
+          { "name": "health_score", "schema": "double" },
+          { "name": "anomaly_score", "schema": "double" },
+          { "name": "recommended_ph", "schema": "double" },
+          { "name": "recommended_ec", "schema": "double" },
+          { "name": "recommended_light_hours", "schema": "integer" },
+          { "name": "model_name", "schema": "string" },
+          { "name": "model_version", "schema": "string" },
+          { "name": "generated_at", "schema": "dateTime" }
+        ]
+      }
+    },
+    {
+      "@type": "Telemetry",
+      "name": "environmental",
+      "displayName": "Environmental Telemetry",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "air_temp_c", "schema": "double" },
+          { "name": "humidity_pct", "schema": "double" },
+          { "name": "light_lux", "schema": "double" }
+        ]
+      }
+    },
+    {
+      "@type": "Telemetry",
+      "name": "height_measurement",
+      "displayName": "Height Measurement",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "height_cm", "schema": "double" },
+          { "name": "slot_index", "schema": "integer" },
+          { "name": "method", "schema": "string" }
+        ]
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "setLight",
+      "displayName": "Set Grow Light",
+      "request": {
+        "name": "lightSettings",
+        "schema": {
+          "@type": "Object",
+          "fields": [
+            { "name": "on", "schema": "boolean" },
+            { "name": "brightness", "schema": "integer" },
+            { "name": "r", "schema": "integer" },
+            { "name": "g", "schema": "integer" },
+            { "name": "b", "schema": "integer" },
+            { "name": "w", "schema": "integer" }
+          ]
+        }
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "setPump",
+      "displayName": "Set Pump",
+      "request": {
+        "name": "on",
+        "schema": "boolean"
+      }
+    }
+  ]
+}

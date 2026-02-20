@@ -3,6 +3,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
 import { MockDataService } from './mock-data.service';
+import { EnvironmentService } from './environment.service';
 import {
   Site,
   SiteSummary,
@@ -32,6 +33,7 @@ import {
 export class IoTDataService {
   private readonly api = inject(ApiService);
   private readonly mockData = inject(MockDataService);
+  private readonly env = inject(EnvironmentService);
   private readonly destroy$ = new Subject<void>();
 
   // ============================================================================
@@ -152,14 +154,29 @@ export class IoTDataService {
       // Try to check health first
       await this.checkHealth();
 
-      // If health check passed, load real data
+      // Load real data - only coordinators endpoint is currently available
+      // Sites, nodes, zones, and alerts endpoints need to be implemented in backend
       await Promise.all([
-        this.loadSites(),
-        this.loadCoordinators(),
-        this.loadNodes(),
-        this.loadZones(),
-        this.loadAlerts(),
+        this.loadCoordinators().catch(err => {
+          console.warn('Failed to load coordinators, using empty array:', err);
+          this.coordinators.set([]);
+        }),
+        // Sites endpoint not yet implemented in backend
+        // this.loadSites(),
+        // Nodes endpoint not yet implemented in backend  
+        // this.loadNodes(),
+        // Zones endpoint not yet implemented in backend
+        // this.loadZones(),
+        // Alerts endpoint not yet implemented in backend
+        // this.loadAlerts(),
       ]);
+      
+      // Set empty arrays for unimplemented endpoints
+      this.sites.set([]);
+      this.nodes.set([]);
+      this.zones.set([]);
+      this.alerts.set([]);
+      
       this.usingMockData.set(false);
     } catch (err) {
       console.warn('Backend unavailable, falling back to mock data');
@@ -545,6 +562,47 @@ export class IoTDataService {
         last_seen: new Date(),
       };
       this.coordinators.set(updated);
+    }
+  }
+
+  /**
+   * Update coordinator metadata (name, description, location, etc.)
+   */
+  async updateCoordinator(coordId: string, updates: Partial<{
+    name?: string;
+    description?: string;
+    location?: string;
+    tags?: string[];
+    color?: string;
+  }>): Promise<void> {
+    try {
+      // Call backend API to update coordinator
+      const response = await fetch(`${this.env.apiUrl}/api/v1/coordinators/${coordId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update coordinator: ${response.statusText}`);
+      }
+
+      // Update local state
+      const coords = this.coordinators();
+      const idx = coords.findIndex(c => c._id === coordId || c.coord_id === coordId);
+      if (idx !== -1) {
+        const updated = [...coords];
+        updated[idx] = {
+          ...updated[idx],
+          ...updates,
+        };
+        this.coordinators.set(updated);
+      }
+    } catch (error) {
+      console.error('[IoTDataService] Failed to update coordinator:', error);
+      throw error;
     }
   }
 

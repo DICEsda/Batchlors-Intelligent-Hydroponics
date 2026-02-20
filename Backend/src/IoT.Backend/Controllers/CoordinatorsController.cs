@@ -25,136 +25,79 @@ public class CoordinatorsController : ControllerBase
     }
 
     /// <summary>
-    /// Get a coordinator by site and coordinator ID.
+    /// Get all coordinators.
+    /// Used by frontend dashboard to list all coordinators.
     /// </summary>
-    [HttpGet("{siteId}/{coordId}")]
-    public async Task<ActionResult<Coordinator>> GetCoordinator(string siteId, string coordId, CancellationToken ct)
+    [HttpGet]
+    [Route("/api/v1/coordinators")]
+    public async Task<ActionResult<IEnumerable<Coordinator>>> GetAllCoordinators(CancellationToken ct)
     {
-        var coordinator = await _coordinatorRepository.GetBySiteAndIdAsync(siteId, coordId, ct);
+        var coordinators = await _coordinatorRepository.GetAllAsync(ct);
+        return Ok(coordinators);
+    }
+
+    /// <summary>
+    /// Update coordinator metadata (name, description, location, tags, color).
+    /// Used by frontend to customize coordinator display information.
+    /// </summary>
+    [HttpPatch]
+    [Route("/api/v1/coordinators/{coordId}")]
+    public async Task<ActionResult<Coordinator>> UpdateCoordinator(
+        string coordId,
+        [FromBody] UpdateCoordinatorRequest request,
+        CancellationToken ct)
+    {
+        // Get existing coordinator
+        var coordinator = await _coordinatorRepository.GetByIdAsync(coordId, ct);
+        if (coordinator == null)
+        {
+            return NotFound(new { error = $"Coordinator {coordId} not found" });
+        }
+
+        // Update only provided fields (partial update)
+        if (request.Name != null)
+        {
+            coordinator.Name = request.Name;
+        }
+        if (request.Description != null)
+        {
+            coordinator.Description = request.Description;
+        }
+        if (request.Location != null)
+        {
+            coordinator.Location = request.Location;
+        }
+        if (request.Tags != null)
+        {
+            coordinator.Tags = request.Tags;
+        }
+        if (request.Color != null)
+        {
+            coordinator.Color = request.Color;
+        }
+
+        // Persist to database
+        await _coordinatorRepository.UpsertAsync(coordinator, ct);
+        _logger.LogInformation("Coordinator {CoordId} metadata updated: Name={Name}, Location={Location}, Tags={Tags}, Color={Color}",
+            coordId, coordinator.Name, coordinator.Location, coordinator.Tags?.Count ?? 0, coordinator.Color);
+
+        return Ok(coordinator);
+    }
+
+    /// <summary>
+    /// Get a coordinator by ID only (no site required).
+    /// Used by frontend when site is unknown.
+    /// </summary>
+    [HttpGet]
+    [Route("/coordinators/{coordId}")]
+    public async Task<ActionResult<Coordinator>> GetCoordinatorById(string coordId, CancellationToken ct)
+    {
+        var coordinator = await _coordinatorRepository.GetByIdAsync(coordId, ct);
         if (coordinator == null)
         {
             return NotFound();
         }
         return Ok(coordinator);
-    }
-
-    /// <summary>
-    /// Send command to a coordinator via MQTT.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/command")]
-    public async Task<IActionResult> SendCommand(string siteId, string coordId, [FromBody] CoordinatorCommand command, CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/cmd";
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("Sent command {Command} to coordinator {CoordId}", command.Cmd, coordId);
-        return Accepted();
-    }
-
-    /// <summary>
-    /// Trigger node discovery on coordinator.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/discover")]
-    public async Task<IActionResult> DiscoverNodes(string siteId, string coordId, CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/cmd";
-        var command = new CoordinatorCommand { Cmd = "discover" };
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("Triggered discovery on coordinator {CoordId}", coordId);
-        return Accepted();
-    }
-
-    /// <summary>
-    /// Put coordinator into pairing mode.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/pair")]
-    public async Task<IActionResult> PairMode(string siteId, string coordId, [FromBody] PairRequest? request, CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/cmd";
-        var command = new CoordinatorCommand
-        {
-            Cmd = "pair",
-            Params = new Dictionary<string, object>
-            {
-                ["duration_s"] = request?.DurationSeconds ?? 60
-            }
-        };
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("Coordinator {CoordId} entering pairing mode", coordId);
-        return Accepted();
-    }
-
-    /// <summary>
-    /// Broadcast command to all towers via coordinator.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/broadcast")]
-    public async Task<IActionResult> BroadcastToTowers(string siteId, string coordId, [FromBody] TowerCommand command, CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/broadcast";
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("Broadcast command {Command} via coordinator {CoordId}", command.Cmd, coordId);
-        return Accepted();
-    }
-
-    /// <summary>
-    /// Restart the coordinator device.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/restart")]
-    public async Task<IActionResult> RestartCoordinator(string siteId, string coordId, CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/cmd";
-        var command = new CoordinatorCommand { Cmd = "restart" };
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("Restart command sent to coordinator {CoordId}", coordId);
-        return Ok(new { status = "success", message = "Restart command sent" });
-    }
-
-    /// <summary>
-    /// Approve a tower that is requesting to pair with the coordinator.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/pairing/approve")]
-    public async Task<IActionResult> ApproveTowerPairing(
-        string siteId,
-        string coordId,
-        [FromBody] ApprovePairingRequest request,
-        CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/cmd";
-        var command = new CoordinatorCommand
-        {
-            Cmd = "approve_pairing",
-            Params = new Dictionary<string, object>
-            {
-                ["tower_id"] = request.TowerId
-            }
-        };
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("Approved pairing for tower {TowerId} on coordinator {CoordId}", request.TowerId, coordId);
-        return Ok(new { status = "success", message = "Pairing approved" });
-    }
-
-    /// <summary>
-    /// Update coordinator WiFi configuration.
-    /// </summary>
-    [HttpPost("{siteId}/{coordId}/wifi")]
-    public async Task<IActionResult> UpdateWifi(
-        string siteId,
-        string coordId,
-        [FromBody] WifiConfigRequest request,
-        CancellationToken ct)
-    {
-        var topic = $"site/{siteId}/coord/{coordId}/cmd";
-        var command = new CoordinatorCommand
-        {
-            Cmd = "wifi_config",
-            Params = new Dictionary<string, object>
-            {
-                ["ssid"] = request.Ssid,
-                ["password"] = request.Password
-            }
-        };
-        await _mqtt.PublishJsonAsync(topic, command, ct: ct);
-        _logger.LogInformation("WiFi config update sent to coordinator {CoordId}", coordId);
-        return Ok(new { status = "success", message = "WiFi configuration update sent" });
     }
 
     // ============================================================================

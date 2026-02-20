@@ -1,4 +1,4 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -33,6 +33,7 @@ import {
   lucideDownload,
   lucideUpload,
 } from '@ng-icons/lucide';
+import { ThemeService, Theme } from '../../core/services/theme.service';
 import {
   HlmCardDirective,
   HlmCardHeaderDirective,
@@ -81,6 +82,7 @@ interface NetworkSettings {
 
 interface DisplaySettings {
   theme: 'light' | 'dark' | 'system';
+  accentColor: string;
   language: string;
   temperatureUnit: 'celsius' | 'fahrenheit';
   dateFormat: string;
@@ -156,9 +158,26 @@ interface SystemInfo {
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.scss',
 })
-export class SettingsComponent {
+export class SettingsComponent implements OnInit {
+  // Inject ThemeService
+  readonly themeService = inject(ThemeService);
+  
   // Active tab
   activeTab = signal<string>('thresholds');
+
+  // Use accent colors from theme service
+  get accentColors() {
+    return this.themeService.accentColors;
+  }
+
+  ngOnInit() {
+    // Sync display settings with theme service values
+    this.displaySettings.update(settings => ({
+      ...settings,
+      theme: this.themeService.theme(),
+      accentColor: this.themeService.accentColor()
+    }));
+  }
 
   // Tabs configuration
   tabs = [
@@ -296,9 +315,10 @@ export class SettingsComponent {
     reconnectInterval: 5,
   });
 
-  // Display settings
+// Display settings
   displaySettings = signal<DisplaySettings>({
     theme: 'dark',
+    accentColor: 'stone',
     language: 'en',
     temperatureUnit: 'celsius',
     dateFormat: 'DD/MM/YYYY',
@@ -368,6 +388,16 @@ export class SettingsComponent {
     const current = this.displaySettings();
     this.displaySettings.set({ ...current, [field]: value });
     this.hasChanges.set(true);
+
+    // Apply theme immediately when changed via ThemeService
+    if (field === 'theme') {
+      this.themeService.setTheme(value as Theme);
+    }
+
+    // Apply accent color immediately when changed via ThemeService
+    if (field === 'accentColor') {
+      this.themeService.setAccentColor(value as string);
+    }
   }
 
   async saveSettings() {

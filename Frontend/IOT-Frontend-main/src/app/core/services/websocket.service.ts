@@ -7,12 +7,16 @@ import {
   Alert,
   WSMessage,
   WSMessageType,
+  WSConnectionStatusPayload,
   WSPairingStartedPayload,
   WSPairingStoppedPayload,
   WSNodeDiscoveredPayload,
   WSNodePairedPayload,
   WSPairingTimeoutPayload,
-  DiscoveredNode
+  DiscoveredNode,
+  CoordinatorLog,
+  WSCoordinatorRegistrationPayload,
+  WSCoordinatorRegisteredPayload
 } from '../models';
 
 /**
@@ -74,6 +78,11 @@ export interface WSPredictionUpdateMessage extends WSMessage {
   };
 }
 
+export interface WSCoordinatorLogMessage extends WSMessage {
+  type: 'coordinator_log';
+  payload: CoordinatorLog;
+}
+
 // ============================================================================
 // Pairing WebSocket Messages
 // ============================================================================
@@ -114,6 +123,7 @@ export type HydroponicWSMessage =
   | WSOtaProgressMessage
   | WSDigitalTwinUpdateMessage
   | WSPredictionUpdateMessage
+  | WSCoordinatorLogMessage
   | WSPairingStartedMessage
   | WSPairingStoppedMessage
   | WSNodeDiscoveredMessage
@@ -149,9 +159,11 @@ export class WebSocketService {
   private readonly towerTelemetrySubject = new Subject<TowerTelemetry>();
   private readonly alertSubject = new Subject<Alert>();
   private readonly deviceStatusSubject = new Subject<WSDeviceStatusMessage['payload']>();
+  private readonly connectionStatusSubject = new Subject<WSConnectionStatusPayload>();
   private readonly otaProgressSubject = new Subject<WSOtaProgressMessage['payload']>();
   private readonly digitalTwinSubject = new Subject<WSDigitalTwinUpdateMessage['payload']>();
   private readonly predictionSubject = new Subject<WSPredictionUpdateMessage['payload']>();
+  private readonly coordinatorLogSubject = new Subject<CoordinatorLog>();
   private readonly errorSubject = new Subject<{ message: string; error?: unknown }>();
   
   // Pairing event streams
@@ -161,15 +173,21 @@ export class WebSocketService {
   private readonly nodePairedSubject = new Subject<WSNodePairedPayload>();
   private readonly pairingTimeoutSubject = new Subject<WSPairingTimeoutPayload>();
 
+  // Coordinator registration event streams
+  private readonly coordinatorRegistrationSubject = new Subject<WSCoordinatorRegistrationPayload>();
+  private readonly coordinatorRegisteredSubject = new Subject<WSCoordinatorRegisteredPayload>();
+
   // Observable streams for consumers
   public readonly messages$ = this.messageSubject.asObservable();
   public readonly reservoirTelemetry$ = this.reservoirTelemetrySubject.asObservable();
   public readonly towerTelemetry$ = this.towerTelemetrySubject.asObservable();
   public readonly alerts$ = this.alertSubject.asObservable();
   public readonly deviceStatus$ = this.deviceStatusSubject.asObservable();
+  public readonly connectionStatus$ = this.connectionStatusSubject.asObservable();
   public readonly otaProgress$ = this.otaProgressSubject.asObservable();
   public readonly digitalTwinUpdates$ = this.digitalTwinSubject.asObservable();
   public readonly predictions$ = this.predictionSubject.asObservable();
+  public readonly coordinatorLogs$ = this.coordinatorLogSubject.asObservable();
   public readonly errors$ = this.errorSubject.asObservable();
   
   // Pairing observable streams
@@ -178,6 +196,10 @@ export class WebSocketService {
   public readonly nodeDiscovered$ = this.nodeDiscoveredSubject.asObservable();
   public readonly nodePaired$ = this.nodePairedSubject.asObservable();
   public readonly pairingTimeout$ = this.pairingTimeoutSubject.asObservable();
+
+  // Coordinator registration observable streams
+  public readonly coordinatorRegistration$ = this.coordinatorRegistrationSubject.asObservable();
+  public readonly coordinatorRegistered$ = this.coordinatorRegisteredSubject.asObservable();
 
   constructor() {
     if (this.env.isDevelopment) {
@@ -445,6 +467,22 @@ export class WebSocketService {
         }
         break;
 
+      case 'coordinator_log':
+        const logMsg = data as WSCoordinatorLogMessage;
+        this.coordinatorLogSubject.next(logMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Coordinator log:', logMsg.payload.coordId, logMsg.payload.level, logMsg.payload.message);
+        }
+        break;
+
+      case 'connection_status':
+        const connMsg = data as WSMessage<WSConnectionStatusPayload>;
+        this.connectionStatusSubject.next(connMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Connection status:', connMsg.payload.coordId, connMsg.payload.event, connMsg.payload);
+        }
+        break;
+
       case 'pong':
         // Heartbeat response - no action needed
         break;
@@ -497,6 +535,27 @@ export class WebSocketService {
         if (this.env.isDevelopment) {
           console.log('[WebSocket] Pairing timeout:', pairingTimeoutMsg.payload.coordinatorId);
         }
+        break;
+
+      // ========================================================================
+      // Coordinator Registration Events
+      // ========================================================================
+      case 'coordinator_registration_request':
+        const regMsg = data as WSMessage<WSCoordinatorRegistrationPayload>;
+        this.coordinatorRegistrationSubject.next(regMsg.payload);
+        console.log('[WebSocket] Coordinator registration request:', regMsg.payload.coordId);
+        break;
+
+      case 'coordinator_registered':
+        const regDoneMsg = data as WSMessage<WSCoordinatorRegisteredPayload>;
+        this.coordinatorRegisteredSubject.next(regDoneMsg.payload);
+        console.log('[WebSocket] Coordinator registered:', regDoneMsg.payload.coordId, regDoneMsg.payload.name);
+        break;
+
+      case 'coordinator_rejected':
+      case 'coordinator_removed':
+        // Just log, components can subscribe if needed
+        console.log('[WebSocket] Coordinator event:', data.type, data.payload);
         break;
 
       default:

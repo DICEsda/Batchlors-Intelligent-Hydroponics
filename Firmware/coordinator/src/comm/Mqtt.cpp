@@ -1,7 +1,13 @@
 #include "Mqtt.h"
 #include "MqttLogger.h"
 #include "../utils/Logger.h"
+#include "../utils/SystemWatchdog.h"
 #include <ArduinoJson.h>
+#include <Preferences.h>
+
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "1.0.0"
+#endif
 
 // Static instance pointer for callback
 static Mqtt* mqttInstance = nullptr;
@@ -75,7 +81,6 @@ namespace {
 
 Mqtt::Mqtt() 
     : mqttClient(wifiClient)
-    , config("mqtt")
     , brokerPort(DEFAULT_MQTT_PORT)
     , wifiManager(nullptr) {
     mqttInstance = this;
@@ -88,27 +93,33 @@ Mqtt::~Mqtt() {
 
 bool Mqtt::begin() {
     Logger::info("Initializing MQTT client...");
-    
-    if (!config.begin()) {
-        Logger::warn("MQTT config namespace missing; provisioning new store");
+
+    // Always derive coordId from WiFi MAC address (unique, deterministic)
+    coordId = WiFi.macAddress();
+    Logger::info("Coordinator ID set from MAC: %s", coordId.c_str());
+
+    // Load farmId from NVS; fall back to "unregistered" if not yet assigned
+    {
+        Preferences prefs;
+        prefs.begin("mqtt", true); // read-only
+        farmId = prefs.getString("farm_id", "");
+        prefs.end();
+    }
+    if (farmId.isEmpty()) {
+        farmId = "unregistered";
+        Logger::warn("No farm_id in NVS, using '%s' (awaiting backend registration)", farmId.c_str());
+    } else {
+        Logger::info("Farm ID loaded from NVS: %s", farmId.c_str());
     }
 
     if (!ensureConfigLoaded()) {
         if (brokerHost.isEmpty()) {
             brokerHost = "192.168.1.100";
         }
-        if (farmId.isEmpty()) {
-            farmId = "farm001";
-        }
         Logger::warn("Using fallback MQTT endpoint %s:%u (update via provisioning)", brokerHost.c_str(), brokerPort);
     }
 
     warnIfLoopbackHost();
-
-    if (coordId.isEmpty()) {
-        coordId = "coord001";  // Default to coord001 for frontend compatibility
-        Logger::info("No coordinator ID set, using default: coord001");
-    }
 
     // Setup MQTT client
     mqttClient.setServer(brokerHost.c_str(), brokerPort);
@@ -331,6 +342,7 @@ bool Mqtt::connectMqtt() {
     
     warnIfLoopbackHost();
     
+    // coordId is always set to WiFi.macAddress() in begin(); guard just in case
     if (coordId.isEmpty()) {
         coordId = WiFi.macAddress();
     }
@@ -347,6 +359,11 @@ bool Mqtt::connectMqtt() {
     MqttLogger::logConnect(brokerHost, brokerPort, clientId, connected);
     
     if (connected) {
+        // Subscribe to coordinator registration response
+        String regTopic = coordinatorRegisteredTopic();
+        bool regSubSuccess = mqttClient.subscribe(regTopic.c_str());
+        MqttLogger::logSubscribe(regTopic, regSubSuccess);
+        
         // Subscribe to coordinator commands (Hydroponic topics)
         String cmdTopic = coordinatorCmdTopic();
         bool subSuccess = mqttClient.subscribe(cmdTopic.c_str());
@@ -361,6 +378,9 @@ bool Mqtt::connectMqtt() {
         String nodeCmd = "farm/" + farmId + "/node/+/cmd";
         bool nodeSubSuccess = mqttClient.subscribe(nodeCmd.c_str());
         MqttLogger::logSubscribe(nodeCmd, nodeSubSuccess);
+        
+        // Publish coordinator announce so the backend can register/recognize us
+        publishAnnounce();
         
         // Publish initial telemetry
         CoordinatorSensorSnapshot snapshot;
@@ -390,9 +410,7 @@ bool Mqtt::ensureConfigLoaded() {
 
     if (!discoveryAttempted && autoDiscoverBroker()) {
         Logger::info("Discovered MQTT broker at %s", brokerHost.c_str());
-        if (farmId.isEmpty()) {
-            farmId = "farm001";
-        }
+        // farmId is now managed via NVS registration flow; don't overwrite
         persistConfig();
         configLoaded = true;
         return true;
@@ -418,24 +436,57 @@ bool Mqtt::ensureConfigLoaded() {
 }
 
 bool Mqtt::loadConfigFromStore() {
-    brokerHost = config.getString("broker_host", "");
+    // Load from unified config store
+    Config config = ConfigStore::load();
+    
+    brokerHost = config.mqtt.broker_host;
     brokerHost.trim();
-    brokerPort = static_cast<uint16_t>(config.getInt("broker_port", DEFAULT_MQTT_PORT));
+    brokerPort = config.mqtt.broker_port;
     if (brokerPort == 0) {
         brokerPort = DEFAULT_MQTT_PORT;
     }
-    brokerUsername = config.getString("broker_user", "user1");
-    brokerPassword = config.getString("broker_pass", "user1");
-    // Support both new 'farm_id' and legacy 'site_id' keys
-    farmId = config.getString("farm_id", "");
-    if (farmId.isEmpty()) {
-        farmId = config.getString("site_id", "farm001");
+    
+    // Use credentials from config, but apply defaults if empty (for migrated configs)
+    bool needsUpdate = false;
+    brokerUsername = config.mqtt.username;
+    brokerPassword = config.mqtt.password;
+    
+    if (brokerUsername.isEmpty()) {
+        brokerUsername = "user1";  // Default for Docker mosquitto
+        config.mqtt.username = "user1";
+        needsUpdate = true;
+        Logger::info("MQTT username empty, applying default: user1");
     }
-    farmId.trim();
-    coordId = config.getString("coord_id", "");
-    coordId.trim();
+    if (brokerPassword.isEmpty()) {
+        brokerPassword = "user1";  // Default for Docker mosquitto
+        config.mqtt.password = "user1";
+        needsUpdate = true;
+        Logger::info("MQTT password empty, applying default: user1");
+    }
+    
+    // Save updated config if we applied defaults
+    if (needsUpdate) {
+        Logger::info("Saving updated MQTT credentials to config");
+        ConfigStore::save(config);
+    }
+    
+    // farmId and coordId are now managed by the MAC/NVS registration flow
+    // in begin(). Only load them from ConfigStore if they haven't been set yet
+    // (e.g., if loadConfigFromStore is called before begin sets them).
+    if (coordId.isEmpty()) {
+        coordId = config.mqtt.coordinator_id;
+        coordId.trim();
+    }
+    // Don't overwrite farmId if already loaded from NVS registration
+    if (farmId.isEmpty()) {
+        String storedFarm = config.mqtt.farm_id;
+        storedFarm.trim();
+        if (!storedFarm.isEmpty()) {
+            farmId = storedFarm;
+        }
+    }
 
-    bool ready = !brokerHost.isEmpty() && !farmId.isEmpty();
+    bool ready = !brokerHost.isEmpty();
     return ready;
 }
 
@@ -490,17 +541,18 @@ bool Mqtt::runProvisioningWizard() {
 }
 
 void Mqtt::persistConfig() {
-    config.setString("broker_host", brokerHost);
-    config.setInt("broker_port", brokerPort);
-    config.setString("broker_user", brokerUsername);
-    config.setString("broker_pass", brokerPassword);
-    config.setString("farm_id", farmId);
-    // Also persist as site_id for backward compatibility
-    config.setString("site_id", farmId);
-    if (!coordId.isEmpty()) {
-        config.setString("coord_id", coordId);
-    } else {
-        config.remove("coord_id");
+    // Load current config, update MQTT settings, and save
+    Config config = ConfigStore::load();
+    
+    config.mqtt.broker_host = brokerHost;
+    config.mqtt.broker_port = brokerPort;
+    config.mqtt.username = brokerUsername;
+    config.mqtt.password = brokerPassword;
+    config.mqtt.farm_id = farmId;
+    config.mqtt.coordinator_id = coordId;
+    
+    if (!ConfigStore::save(config)) {
+        Logger::error("Failed to persist MQTT config to store");
     }
 }
 
@@ -524,6 +576,7 @@ bool Mqtt::autoDiscoverBroker() {
     // Priority 1: Try gateway (often the mobile hotspot host running Docker)
     if (gateway && (uint32_t)gateway != 0) {
         Logger::info("Trying gateway %s as MQTT broker...", gateway.toString().c_str());
+        SystemWatchdog::feed();  // Feed watchdog before network operation
         if (tryBrokerCandidate(gateway)) {
             brokerHost = gateway.toString();
             persistConfig();
@@ -537,6 +590,7 @@ bool Mqtt::autoDiscoverBroker() {
     const uint32_t hostCount = 254;
 
     Logger::info("Scanning %u nearby hosts for MQTT (this may take 15-30s)...", hostCount);
+    Logger::info("Feeding watchdog during scan to prevent timeout...");
     
     for (uint32_t i = 1; i <= hostCount; ++i) {
         IPAddress candidate = local;
@@ -545,9 +599,15 @@ bool Mqtt::autoDiscoverBroker() {
         if (candidate == local || candidate == gateway) {
             continue;
         }
+        
+        // Feed watchdog every 10 hosts to prevent timeout during long scan
+        if (i % 10 == 0) {
+            SystemWatchdog::feed();
+        }
+        
         // Provide visual feedback every 20 hosts
         if (i % 20 == 0) {
-             Logger::debug("Scanning... %s", candidate.toString().c_str());
+             Logger::debug("Scanning... %s (watchdog fed)", candidate.toString().c_str());
         }
         
         if (tryBrokerCandidate(candidate)) {
@@ -678,7 +738,7 @@ void Mqtt::handleMqttMessage(char* topic, uint8_t* payload, unsigned int length)
     // Log incoming message with detailed info
     MqttLogger::logReceive(String(topic), payload, length);
     
-    if (mqttInstance && mqttInstance->commandCallback) {
+    if (mqttInstance) {
         String topicStr = String(topic);
         String payloadStr = String((char*)payload, length);
         mqttInstance->processMessage(topicStr, payloadStr);
@@ -687,6 +747,15 @@ void Mqtt::handleMqttMessage(char* topic, uint8_t* payload, unsigned int length)
 
 void Mqtt::processMessage(const String& topic, const String& payload) {
     uint32_t startMs = millis();
+    
+    // Check if this is a registration response from the backend
+    String regTopic = coordinatorRegisteredTopic();
+    if (topic == regTopic) {
+        handleRegistrationMessage(payload);
+        MqttLogger::logProcess(topic, "Registration processed", true);
+        MqttLogger::logLatency("ProcessMessage", startMs);
+        return;
+    }
     
     if (commandCallback) {
         commandCallback(topic, payload);
@@ -910,4 +979,145 @@ void Mqtt::publishOtaStatus(const String& status, int progress, const String& me
     } else {
         Logger::warn("Failed to publish OTA status");
     }
+}
+
+// ============================================================================
+// Connection Status Topic & Event Publishing
+// ============================================================================
+
+String Mqtt::connectionStatusTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/status/connection";
+}
+
+void Mqtt::publishConnectionEvent(const String& event, const String& reason) {
+    if (!mqttClient.connected()) {
+        Logger::warn("Cannot publish connection event '%s': MQTT not connected", event.c_str());
+        return;
+    }
+    
+    StaticJsonDocument<384> doc;
+    doc["ts"] = millis() / 1000;
+    doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
+    doc["farm_id"] = farmId;
+    doc["event"] = event;
+    doc["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
+    doc["wifi_rssi"] = WiFi.RSSI();
+    doc["mqtt_connected"] = true;  // Must be true if we're publishing
+    doc["uptime_ms"] = millis();
+    doc["free_heap"] = ESP.getFreeHeap();
+    
+    if (reason.length() > 0) {
+        doc["reason"] = reason;
+    }
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = connectionStatusTopic();
+    
+    uint32_t startMs = millis();
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str(), true);  // retained=true
+    MqttLogger::logPublish(topic, payload, success, payload.length());
+    MqttLogger::logLatency("ConnectionEvent", startMs);
+    
+    if (success) {
+        Logger::info("📡 Published connection event: %s", event.c_str());
+    } else {
+        Logger::warn("Failed to publish connection event: %s", event.c_str());
+    }
+}
+
+// ============================================================================
+// Coordinator Registration / Announce
+// ============================================================================
+
+void Mqtt::publishAnnounce() {
+    if (!isConnected()) return;
+
+    StaticJsonDocument<512> doc;
+    doc["mac"] = WiFi.macAddress();
+    doc["fw_version"] = FIRMWARE_VERSION;
+    doc["chip_model"] = ESP.getChipModel();
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["wifi_rssi"] = WiFi.RSSI();
+    doc["ip"] = WiFi.localIP().toString();
+    doc["farm_id"] = farmId;  // current farm_id (may be "unregistered")
+
+    String payload;
+    serializeJson(doc, payload);
+
+    String topic = coordinatorAnnounceTopic();
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str());
+
+    if (success) {
+        announcePublished = true;
+        Logger::info("Published coordinator announce to %s", topic.c_str());
+    } else {
+        Logger::warn("Failed to publish coordinator announce");
+    }
+}
+
+void Mqtt::saveFarmId(const String& newFarmId) {
+    farmId = newFarmId;
+
+    // Persist to dedicated NVS namespace for fast boot-time retrieval
+    Preferences prefs;
+    prefs.begin("mqtt", false); // read-write
+    prefs.putString("farm_id", farmId);
+    prefs.end();
+
+    // Also update the unified ConfigStore so provisioning wizard stays in sync
+    Config config = ConfigStore::load();
+    config.mqtt.farm_id = farmId;
+    ConfigStore::save(config);
+
+    Logger::info("Farm ID saved to NVS: %s", farmId.c_str());
+}
+
+void Mqtt::handleRegistrationMessage(const String& payload) {
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (error) {
+        Logger::error("Failed to parse registration response: %s", error.c_str());
+        return;
+    }
+
+    const char* newFarmId = doc["farm_id"] | (const char*)nullptr;
+    if (!newFarmId || strlen(newFarmId) == 0) {
+        Logger::warn("Registration response missing 'farm_id' field");
+        return;
+    }
+
+    Logger::info("Received registration: farm_id=%s", newFarmId);
+    saveFarmId(String(newFarmId));
+
+    // Re-subscribe to farm-scoped topics with the new farmId
+    // Unsubscribe old topics first (PubSubClient doesn't track, but re-subscribing is safe)
+    String cmdTopic = coordinatorCmdTopic();
+    mqttClient.subscribe(cmdTopic.c_str());
+    MqttLogger::logSubscribe(cmdTopic, true);
+
+    String towerCmd = "farm/" + farmId + "/coord/" + coordId + "/tower/+/cmd";
+    mqttClient.subscribe(towerCmd.c_str());
+    MqttLogger::logSubscribe(towerCmd, true);
+
+    String nodeCmd = "farm/" + farmId + "/node/+/cmd";
+    mqttClient.subscribe(nodeCmd.c_str());
+    MqttLogger::logSubscribe(nodeCmd, true);
+
+    Logger::info("Re-subscribed to topics with new farm_id: %s", farmId.c_str());
+}
+
+// ============================================================================
+// Topic Builders - Registration / Announce
+// ============================================================================
+
+String Mqtt::coordinatorAnnounceTopic() const {
+    return "coordinator/" + coordId + "/announce";
+}
+
+String Mqtt::coordinatorRegisteredTopic() const {
+    return "coordinator/" + coordId + "/registered";
 }

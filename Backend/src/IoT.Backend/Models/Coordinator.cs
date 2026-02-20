@@ -41,6 +41,38 @@ public class Coordinator
     [BsonIgnoreIfNull]
     public string? Name { get; set; }
 
+    /// <summary>
+    /// Optional description of the coordinator/reservoir
+    /// </summary>
+    [BsonElement("description")]
+    [JsonPropertyName("description")]
+    [BsonIgnoreIfNull]
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Physical location of the coordinator (e.g., "Greenhouse A, Section 2")
+    /// </summary>
+    [BsonElement("location")]
+    [JsonPropertyName("location")]
+    [BsonIgnoreIfNull]
+    public string? Location { get; set; }
+
+    /// <summary>
+    /// Tags for categorizing/filtering coordinators
+    /// </summary>
+    [BsonElement("tags")]
+    [JsonPropertyName("tags")]
+    [BsonIgnoreIfNull]
+    public List<string>? Tags { get; set; }
+
+    /// <summary>
+    /// Display color for UI visualization (hex color code, e.g., "#3b82f6")
+    /// </summary>
+    [BsonElement("color")]
+    [JsonPropertyName("color")]
+    [BsonIgnoreIfNull]
+    public string? Color { get; set; }
+
     [BsonElement("fw_version")]
     [JsonPropertyName("fw_version")]
     public string FwVersion { get; set; } = string.Empty;

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using IoT.Backend.Models;
 using IoT.Backend.Repositories;
 using IoT.Backend.Services;
 using IoT.Backend.WebSockets;
@@ -70,6 +71,11 @@ builder.Services.AddSingleton<IOtaJobRepository>(sp => (MongoRepository)sp.GetRe
 builder.Services.AddSingleton<ISettingsRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
 builder.Services.AddSingleton<IZoneRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
 builder.Services.AddSingleton<ITelemetryRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+builder.Services.AddSingleton<IFirmwareRepository>(sp => (MongoRepository)sp.GetRequiredService<IRepository>());
+
+// Farm and Alert repositories (standalone implementations)
+builder.Services.AddSingleton<IFarmRepository, FarmRepository>();
+builder.Services.AddSingleton<IAlertRepository, AlertRepository>();
 
 // Digital Twin services
 builder.Services.AddSingleton<ITwinRepository, TwinRepository>();
@@ -83,15 +89,33 @@ builder.Services.AddSingleton<IMqttService, MqttService>();
 // WebSocket broadcaster (broadcasts telemetry to all connected clients)
 builder.Services.AddSingleton<IWsBroadcaster, WsBroadcaster>();
 
+// Alert service (monitors telemetry and generates alerts)
+builder.Services.AddSingleton<IAlertService, AlertService>();
+
 // Pairing service (manages coordinator-tower pairing workflow)
 builder.Services.AddSingleton<IPairingService, PairingService>();
 builder.Services.AddHostedService<PairingBackgroundService>();
+
+// Coordinator registration service (manages coordinator onboarding workflow)
+builder.Services.AddSingleton<ICoordinatorRegistrationService, CoordinatorRegistrationService>();
 
 // Telemetry handler (processes incoming MQTT and persists to DB)
 builder.Services.AddHostedService<TelemetryHandler>();
 
 // WebSocket handler (handles individual client connections and subscriptions)
 builder.Services.AddSingleton<IMqttBridgeHandler, MqttBridgeHandler>();
+
+// ML Service (proxies requests to the Python ML FastAPI service)
+builder.Services.Configure<MlServiceConfig>(builder.Configuration.GetSection(MlServiceConfig.Section));
+builder.Services.AddHttpClient<IMlService, MlService>();
+
+// Azure Digital Twins (optional - only used if configured)
+builder.Services.Configure<AzureDigitalTwinsConfig>(builder.Configuration.GetSection(AzureDigitalTwinsConfig.Section));
+builder.Services.AddSingleton<IAzureDigitalTwinsService, AzureDigitalTwinsService>();
+
+// ML Scheduler (periodic ML inference and prediction sync)
+builder.Services.Configure<MlSchedulerConfig>(builder.Configuration.GetSection(MlSchedulerConfig.Section));
+builder.Services.AddHostedService<MlSchedulerBackgroundService>();
 
 // Health checks
 builder.Services.AddHealthChecks()
@@ -216,3 +240,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Required for WebApplicationFactory in integration tests
+public partial class Program { }

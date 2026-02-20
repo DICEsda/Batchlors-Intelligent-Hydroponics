@@ -2,12 +2,11 @@
 $transition-fast: 150ms ease;
 $transition-normal: 200ms ease;
 
-// Status colors
-$color-success: hsl(142 76% 36%);
-$color-warning: hsl(45 93% 47%);
-$color-info: hsl(200 80% 50%);
-$color-danger: hsl(var(--destructive));
-$color-critical: hsl(0 84% 60%);
+// Status colors - using OKLCH to match styles.scss
+$color-success: oklch(0.55 0.15 145);
+$color-warning: oklch(0.75 0.15 85);
+$color-info: oklch(0.60 0.15 250);
+$color-critical: oklch(0.55 0.22 25);
 
 .settings-page {
   padding: 1.5rem;
@@ -45,19 +44,19 @@ $color-critical: hsl(0 84% 60%);
     .page-title {
       font-size: 1.875rem;
       font-weight: 700;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
       margin: 0;
     }
 
     .changes-badge {
       font-size: 0.75rem;
-      background: hsl(var(--primary) / 0.1);
-      color: hsl(var(--primary));
-      border-color: hsl(var(--primary) / 0.3);
+      background: color-mix(in oklch, var(--primary) 10%, transparent);
+      color: var(--primary);
+      border-color: color-mix(in oklch, var(--primary) 30%, transparent);
     }
 
     .page-description {
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
       margin: 0.25rem 0 0;
       font-size: 0.875rem;
     }
@@ -116,8 +115,8 @@ $color-critical: hsl(0 84% 60%);
   gap: 0.25rem;
   min-width: 200px;
   padding: 0.5rem;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
   height: fit-content;
   position: sticky;
@@ -131,7 +130,7 @@ $color-critical: hsl(0 84% 60%);
     border: none;
     border-radius: 0.5rem;
     background: transparent;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
@@ -140,13 +139,13 @@ $color-critical: hsl(0 84% 60%);
     width: 100%;
 
     &:hover {
-      background: hsl(var(--accent));
-      color: hsl(var(--foreground));
+      background: var(--accent);
+      color: var(--foreground);
     }
 
     &.active {
-      background: hsl(var(--primary));
-      color: hsl(var(--primary-foreground));
+      background: var(--primary);
+      color: var(--primary-foreground);
 
       ng-icon {
         color: inherit;
@@ -186,12 +185,12 @@ $color-critical: hsl(0 84% 60%);
   .panel-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: hsl(var(--foreground));
+    color: var(--foreground);
     margin: 0 0 0.5rem;
   }
 
   .panel-description {
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     font-size: 0.875rem;
     margin: 0;
     line-height: 1.5;
@@ -209,7 +208,7 @@ $color-critical: hsl(0 84% 60%);
   transition: all $transition-normal;
 
   &:hover {
-    border-color: hsl(var(--primary) / 0.3);
+    border-color: color-mix(in oklch, var(--primary) 30%, transparent);
   }
 
   .threshold-header {
@@ -225,9 +224,9 @@ $color-critical: hsl(0 84% 60%);
     justify-content: center;
     width: 3rem;
     height: 3rem;
-    background: hsl(var(--primary) / 0.1);
+    background: color-mix(in oklch, var(--primary) 10%, transparent);
     border-radius: 0.75rem;
-    color: hsl(var(--primary));
+    color: var(--primary);
   }
 
   .threshold-info {
@@ -276,11 +275,11 @@ $color-critical: hsl(0 84% 60%);
 
   .threshold-range {
     padding-top: 0.5rem;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid var(--border);
 
     .range-label {
       font-size: 0.75rem;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
     }
   }
 }
@@ -309,12 +308,12 @@ $color-critical: hsl(0 84% 60%);
     .notification-name {
       font-size: 0.9375rem;
       font-weight: 500;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
     }
 
     .notification-description {
       font-size: 0.8125rem;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
     }
   }
 
@@ -344,7 +343,7 @@ $color-critical: hsl(0 84% 60%);
   transition: all $transition-normal;
 
   &:hover {
-    border-color: hsl(var(--primary) / 0.3);
+    border-color: color-mix(in oklch, var(--primary) 30%, transparent);
   }
 
   .card-title-row {
@@ -353,7 +352,7 @@ $color-critical: hsl(0 84% 60%);
     gap: 1rem;
 
     .section-icon {
-      color: hsl(var(--primary));
+      color: var(--primary);
     }
   }
 }
@@ -397,29 +396,77 @@ $color-critical: hsl(0 84% 60%);
     align-items: center;
     gap: 0.5rem;
     padding: 1rem 1.5rem;
-    border: 2px solid hsl(var(--border));
+    border: 2px solid var(--border);
     border-radius: 0.75rem;
-    background: hsl(var(--card));
-    color: hsl(var(--muted-foreground));
+    background: var(--card);
+    color: var(--muted-foreground);
     cursor: pointer;
     transition: all $transition-normal;
     flex: 1;
 
     &:hover {
-      border-color: hsl(var(--primary) / 0.5);
-      color: hsl(var(--foreground));
+      border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+      color: var(--foreground);
     }
 
     &.active {
-      border-color: hsl(var(--primary));
-      background: hsl(var(--primary) / 0.1);
-      color: hsl(var(--primary));
+      border-color: var(--primary);
+      background: color-mix(in oklch, var(--primary) 10%, transparent);
+      color: var(--primary);
     }
 
     span {
       font-size: 0.8125rem;
       font-weight: 500;
     }
+  }
+}
+
+// Color Options
+.color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  .color-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border: 2px solid var(--border);
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all $transition-normal;
+    position: relative;
+
+    &:hover {
+      transform: scale(1.1);
+    }
+
+    &.active {
+      border-color: var(--foreground);
+      transform: scale(1.1);
+
+      &::after {
+        content: '';
+        position: absolute;
+        width: 0.5rem;
+        height: 0.5rem;
+        background: var(--foreground);
+        border-radius: 50%;
+      }
+    }
+
+    // Color swatches
+    &.color-stone { background: oklch(0.55 0.02 60); }
+    &.color-zinc { background: oklch(0.55 0 0); }
+    &.color-blue { background: oklch(0.55 0.15 250); }
+    &.color-green { background: oklch(0.55 0.15 145); }
+    &.color-amber { background: oklch(0.65 0.15 85); }
+    &.color-rose { background: oklch(0.55 0.15 15); }
+    &.color-violet { background: oklch(0.55 0.15 290); }
+    &.color-cyan { background: oklch(0.55 0.15 200); }
   }
 }
 
@@ -431,10 +478,10 @@ $color-critical: hsl(0 84% 60%);
   .unit-option {
     flex: 1;
     padding: 0.75rem 1rem;
-    border: 2px solid hsl(var(--border));
+    border: 2px solid var(--border);
     border-radius: 0.5rem;
-    background: hsl(var(--card));
-    color: hsl(var(--muted-foreground));
+    background: var(--card);
+    color: var(--muted-foreground);
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
@@ -442,14 +489,14 @@ $color-critical: hsl(0 84% 60%);
     text-align: center;
 
     &:hover {
-      border-color: hsl(var(--primary) / 0.5);
-      color: hsl(var(--foreground));
+      border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+      color: var(--foreground);
     }
 
     &.active {
-      border-color: hsl(var(--primary));
-      background: hsl(var(--primary) / 0.1);
-      color: hsl(var(--primary));
+      border-color: var(--primary);
+      background: color-mix(in oklch, var(--primary) 10%, transparent);
+      color: var(--primary);
     }
   }
 }
@@ -461,7 +508,7 @@ $color-critical: hsl(0 84% 60%);
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 0;
-  border-top: 1px solid hsl(var(--border));
+  border-top: 1px solid var(--border);
 
   .toggle-info {
     display: flex;
@@ -472,12 +519,12 @@ $color-critical: hsl(0 84% 60%);
   .toggle-name {
     font-size: 0.9375rem;
     font-weight: 500;
-    color: hsl(var(--foreground));
+    color: var(--foreground);
   }
 
   .toggle-description {
     font-size: 0.8125rem;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
   }
 }
 
@@ -492,13 +539,13 @@ $color-critical: hsl(0 84% 60%);
     flex-direction: column;
     gap: 0.375rem;
     padding: 0.75rem;
-    background: hsl(var(--muted) / 0.3);
+    background: color-mix(in oklch, var(--muted) 30%, transparent);
     border-radius: 0.5rem;
 
     .info-label {
       font-size: 0.75rem;
       font-weight: 500;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
       text-transform: uppercase;
       letter-spacing: 0.025em;
     }
@@ -506,7 +553,7 @@ $color-critical: hsl(0 84% 60%);
     .info-value {
       font-size: 0.9375rem;
       font-weight: 600;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
     }
   }
 }
@@ -535,18 +582,18 @@ $color-critical: hsl(0 84% 60%);
 
 // Danger Zone
 .danger-zone {
-  border-color: hsl(var(--destructive) / 0.3);
+  border-color: color-mix(in oklch, var(--destructive) 30%, transparent);
 
   &:hover {
-    border-color: hsl(var(--destructive) / 0.5);
+    border-color: color-mix(in oklch, var(--destructive) 50%, transparent);
   }
 
   .section-icon.danger {
-    color: hsl(var(--destructive));
+    color: var(--destructive);
   }
 
   .danger-title {
-    color: hsl(var(--destructive));
+    color: var(--destructive);
   }
 }
 
@@ -561,8 +608,8 @@ $color-critical: hsl(0 84% 60%);
     justify-content: space-between;
     gap: 1rem;
     padding: 1rem;
-    background: hsl(var(--destructive) / 0.05);
-    border: 1px solid hsl(var(--destructive) / 0.2);
+    background: color-mix(in oklch, var(--destructive) 5%, transparent);
+    border: 1px solid color-mix(in oklch, var(--destructive) 20%, transparent);
     border-radius: 0.5rem;
 
     .danger-info {
@@ -574,12 +621,12 @@ $color-critical: hsl(0 84% 60%);
     .danger-name {
       font-size: 0.9375rem;
       font-weight: 500;
-      color: hsl(var(--foreground));
+      color: var(--foreground);
     }
 
     .danger-description {
       font-size: 0.8125rem;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted-foreground);
     }
 
     button {
@@ -659,6 +706,10 @@ $color-critical: hsl(0 84% 60%);
       flex-direction: row;
       justify-content: center;
     }
+  }
+
+  .color-options {
+    justify-content: center;
   }
 
   .unit-options {

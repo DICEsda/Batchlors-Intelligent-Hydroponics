@@ -1,114 +1,494 @@
-<div class="list-page">
-  <header class="page-header">
-    <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
-      <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
-    </a>
+<div class="reservoirs-page">
+  <!-- Page Header -->
+  <div class="page-header">
     <div class="header-content">
-      <h1 class="page-title">Reservoirs</h1>
-      <p class="page-description">Manage your hydroponic reservoir controllers</p>
+      <a routerLink="/overview" class="back-link">
+        <ng-icon name="lucideChevronRight" size="16" class="back-icon" />
+      </a>
+      <div class="header-text">
+        <h1>Coordinators</h1>
+        <p class="header-description">
+          Manage your hydroponic coordinators and connected towers
+        </p>
+      </div>
     </div>
     <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="secondary" class="mock-badge">Mock Data</span>
+      }
       <span hlmBadge [variant]="wsConnected() ? 'default' : 'destructive'">
-        <ng-icon hlmIcon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="sm" />
-        {{ wsConnected() ? 'Connected' : 'Disconnected' }}
+        <ng-icon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="14" />
+        {{ wsConnected() ? 'Live' : 'Offline' }}
       </span>
       <button hlmBtn variant="outline" size="sm" (click)="refreshData()">
-        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        <ng-icon name="lucideRefreshCw" size="16" />
         Refresh
       </button>
-    </div>
-  </header>
-
-  <!-- Stats Summary -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <ng-icon hlmIcon name="lucideServer" class="stat-icon" />
-      <div class="stat-info">
-        <span class="stat-value">{{ onlineCount() }} / {{ totalCount() }}</span>
-        <span class="stat-label">Online Reservoirs</span>
-      </div>
     </div>
   </div>
 
   <!-- Loading State -->
   @if (loading()) {
-    <div class="device-grid">
-      @for (i of [1, 2, 3]; track i) {
-        <div hlmCard class="device-card">
-          <hlm-skeleton class="card-skeleton" />
-        </div>
-      }
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading coordinators...</p>
     </div>
   }
 
   <!-- Error State -->
   @if (error()) {
     <div class="error-banner">
-      <ng-icon hlmIcon name="lucideActivity" size="sm" />
+      <ng-icon name="lucideAlertTriangle" size="18" />
       <span>{{ error() }}</span>
       <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
     </div>
   }
 
-  <!-- Empty State -->
-  @if (!loading() && coordinators().length === 0) {
-    <div class="empty-state" hlmCard>
-      <ng-icon hlmIcon name="lucideServer" class="empty-icon" />
-      <h3>No Reservoirs Found</h3>
-      <p>Add your first reservoir controller to start monitoring your hydroponic system.</p>
-      <button hlmBtn variant="default">
-        <ng-icon hlmIcon name="lucidePlus" size="sm" />
-        Add Reservoir
-      </button>
-    </div>
-  }
+  <!-- Coordinators List -->
+  @if (!loading()) {
+    <div class="reservoirs-list">
+      @for (reservoir of coordinators(); track trackByCoordinatorId($index, reservoir)) {
+        <div class="reservoir-card" [class.expanded]="isExpanded(reservoir._id)">
+          <!-- Coordinator Header - Clickable to expand -->
+          <div class="reservoir-header" (click)="toggleExpand(reservoir._id)">
+            <div class="reservoir-color-indicator" [class]="'status-' + reservoir.status"></div>
+            <div class="reservoir-color-icon"
+                 [style.background]="getCoordinatorColor(reservoir)">
+              {{ getCoordinatorInitial(reservoir) }}
+            </div>
+            <div class="reservoir-info">
+              <div class="reservoir-title-row">
+                <h2>{{ reservoir.name || reservoir.coord_id }}</h2>
+                <div class="reservoir-badges">
+                  <span hlmBadge [variant]="getStatusBadgeVariant(reservoir.status)" size="sm">
+                    {{ reservoir.status }}
+                  </span>
+                  <span hlmBadge variant="outline" size="sm">
+                    <ng-icon name="lucideLeaf" size="12" />
+                    {{ getOnlineTowersCount(reservoir) }}/{{ getTowersForReservoir(reservoir).length }} Towers
+                  </span>
+                </div>
+              </div>
+              <div class="reservoir-meta">
+                <span class="meta-item">
+                  <ng-icon name="lucideThermometer" size="14" />
+                  {{ reservoir.temp_c !== undefined ? reservoir.temp_c.toFixed(1) : '--' }}°C
+                </span>
+                <span class="meta-item">
+                  <ng-icon name="lucideDroplet" size="14" />
+                  {{ reservoir.light_lux || '--' }} lux
+                </span>
+                <span class="meta-item id">
+                  {{ reservoir.coord_id }}
+                </span>
+              </div>
+            </div>
+            <div class="reservoir-actions">
+              <button class="icon-btn" title="Edit Coordinator" (click)="editReservoir(reservoir._id, $event)">
+                <ng-icon name="lucidePencil" size="16" />
+              </button>
+              <button class="icon-btn danger" title="Delete Coordinator" (click)="deleteReservoir(reservoir._id, $event)">
+                <ng-icon name="lucideTrash2" size="16" />
+              </button>
+              <ng-icon 
+                [name]="isExpanded(reservoir._id) ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                size="20" 
+                class="expand-icon"
+              />
+            </div>
+          </div>
 
-  <!-- Reservoirs Grid -->
-  @if (!loading() && coordinators().length > 0) {
-    <div class="device-grid">
-      @for (coord of coordinators(); track trackByCoordinatorId($index, coord)) {
-        <a [routerLink]="['/reservoirs', coord.coord_id]" hlmCard class="device-card clickable">
-          <div hlmCardHeader>
-            <div class="card-header-row">
-              <ng-icon hlmIcon name="lucideServer" class="device-icon" />
-              <span hlmBadge [variant]="getStatusBadgeVariant(coord.status)" size="sm">
-                {{ coord.status }}
-              </span>
+          <!-- Coordinator Content - Expanded View -->
+          @if (isExpanded(reservoir._id)) {
+            <div class="reservoir-content">
+              <!-- Tab Bar -->
+              <div class="tab-bar">
+                <button class="tab-btn" 
+                        [class.active]="getActiveTab(reservoir._id) === 'towers'"
+                        (click)="setActiveTab(reservoir._id, 'towers')">
+                  <ng-icon name="lucideLeaf" size="14" />
+                  Towers
+                </button>
+                <button class="tab-btn"
+                        [class.active]="getActiveTab(reservoir._id) === 'configuration'"
+                        (click)="setActiveTab(reservoir._id, 'configuration')">
+                  <ng-icon name="lucideSettings" size="14" />
+                  Configuration
+                </button>
+                <button class="tab-btn"
+                        [class.active]="getActiveTab(reservoir._id) === 'info'"
+                        (click)="setActiveTab(reservoir._id, 'info')">
+                  <ng-icon name="lucideInfo" size="14" />
+                  Info
+                </button>
+                <button class="tab-btn"
+                        [class.active]="getActiveTab(reservoir._id) === 'actions'"
+                        (click)="setActiveTab(reservoir._id, 'actions')">
+                  <ng-icon name="lucideZap" size="14" />
+                  Actions
+                </button>
+              </div>
+
+              <!-- Tab: Towers -->
+              @if (getActiveTab(reservoir._id) === 'towers') {
+                <div class="tab-content">
+                  <div class="towers-section">
+                    <h3 class="section-title">
+                      <ng-icon name="lucideLeaf" size="16" />
+                      Connected Towers
+                    </h3>
+                    
+                    @if (getTowersForReservoir(reservoir).length === 0) {
+                      <div class="empty-section">
+                        <ng-icon name="lucideLeaf" size="32" />
+                        <p>No towers connected to this coordinator</p>
+                        <button hlmBtn variant="outline" size="sm" (click)="startPairingMode(reservoir._id)">
+                          <ng-icon name="lucidePlus" size="14" />
+                          Pair Tower
+                        </button>
+                      </div>
+                    } @else {
+                      <div class="towers-grid">
+                        @for (tower of getTowersForReservoir(reservoir); track trackByNodeId($index, tower)) {
+                          <a [routerLink]="['/towers', tower._id]" class="tower-card">
+                            <div class="tower-header">
+                              <ng-icon name="lucideLeaf" size="18" class="tower-icon" />
+                              <span class="tower-name">{{ tower.name || tower.light_id }}</span>
+                              <span hlmBadge 
+                                    [variant]="getStatusBadgeVariant(tower.status_mode)" 
+                                    size="sm">
+                                {{ getNodeStatusDisplay(tower.status_mode) }}
+                              </span>
+                            </div>
+                            <div class="tower-metrics">
+                              <span class="metric">
+                                <ng-icon name="lucideThermometer" size="12" />
+                                {{ tower.temp_c !== undefined ? tower.temp_c.toFixed(1) : '--' }}°C
+                              </span>
+                              <span class="metric">
+                                <ng-icon name="lucideActivity" size="12" />
+                                {{ tower.vbat_mv || '--' }} mV
+                              </span>
+                              <span class="metric">
+                                <ng-icon name="lucideWifi" size="12" />
+                                {{ tower.avg_r || '--' }} dBm
+                              </span>
+                            </div>
+                            <div class="tower-footer">
+                              <span class="last-seen">Last seen: {{ formatLastSeen(tower.last_seen) }}</span>
+                              <ng-icon name="lucideChevronRight" size="14" class="arrow" />
+                            </div>
+                          </a>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Tab: Configuration -->
+              @if (getActiveTab(reservoir._id) === 'configuration') {
+                <div class="tab-content">
+                  <div class="config-section">
+                    <h3 class="section-title">
+                      <ng-icon name="lucideSliders" size="16" />
+                      Coordinator Configuration
+                    </h3>
+
+                    <div class="config-grid">
+                      <!-- Node Listening Toggle -->
+                      <div class="config-item">
+                        <div class="config-label-row">
+                          <label class="config-label">
+                            <ng-icon name="lucideRadio" size="14" />
+                            Node Listening
+                          </label>
+                          <span class="config-value-badge" [class.on]="getConfig(reservoir._id).node_listening">
+                            {{ getConfig(reservoir._id).node_listening ? 'ON' : 'OFF' }}
+                          </span>
+                        </div>
+                        <p class="config-description">Whether coordinator listens for new ESP-NOW nodes</p>
+                        <label class="toggle-switch">
+                          <input type="checkbox"
+                                 [ngModel]="getConfig(reservoir._id).node_listening"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'node_listening', $event)" />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      <!-- Log Publish Frequency -->
+                      <div class="config-item">
+                        <div class="config-label-row">
+                          <label class="config-label">
+                            <ng-icon name="lucideActivity" size="14" />
+                            Log Publish Frequency
+                          </label>
+                          <span class="config-value-badge">{{ getConfig(reservoir._id).log_publish_frequency }}s</span>
+                        </div>
+                        <p class="config-description">How often logs are published (0 = disabled)</p>
+                        <div class="slider-row">
+                          <input type="range" 
+                                 class="config-slider"
+                                 [min]="0" [max]="300" [step]="5"
+                                 [ngModel]="getConfig(reservoir._id).log_publish_frequency"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'log_publish_frequency', $event)" />
+                          <input type="number"
+                                 class="config-number-input"
+                                 [min]="0" [max]="300"
+                                 [ngModel]="getConfig(reservoir._id).log_publish_frequency"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'log_publish_frequency', $event)" />
+                        </div>
+                      </div>
+
+                      <!-- Status Report Interval -->
+                      <div class="config-item">
+                        <div class="config-label-row">
+                          <label class="config-label">
+                            <ng-icon name="lucideClock" size="14" />
+                            Status Report Interval
+                          </label>
+                          <span class="config-value-badge">{{ getConfig(reservoir._id).status_report_interval }}s</span>
+                        </div>
+                        <p class="config-description">How often status reports are sent (5–300s)</p>
+                        <div class="slider-row">
+                          <input type="range"
+                                 class="config-slider"
+                                 [min]="5" [max]="300" [step]="5"
+                                 [ngModel]="getConfig(reservoir._id).status_report_interval"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'status_report_interval', $event)" />
+                          <input type="number"
+                                 class="config-number-input"
+                                 [min]="5" [max]="300"
+                                 [ngModel]="getConfig(reservoir._id).status_report_interval"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'status_report_interval', $event)" />
+                        </div>
+                      </div>
+
+                      <!-- Telemetry Interval -->
+                      <div class="config-item">
+                        <div class="config-label-row">
+                          <label class="config-label">
+                            <ng-icon name="lucideSliders" size="14" />
+                            Telemetry Interval
+                          </label>
+                          <span class="config-value-badge">{{ getConfig(reservoir._id).telemetry_interval }}s</span>
+                        </div>
+                        <p class="config-description">How often telemetry data is sent (5–600s)</p>
+                        <div class="slider-row">
+                          <input type="range"
+                                 class="config-slider"
+                                 [min]="5" [max]="600" [step]="5"
+                                 [ngModel]="getConfig(reservoir._id).telemetry_interval"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'telemetry_interval', $event)" />
+                          <input type="number"
+                                 class="config-number-input"
+                                 [min]="5" [max]="600"
+                                 [ngModel]="getConfig(reservoir._id).telemetry_interval"
+                                 (ngModelChange)="updateConfig(reservoir._id, 'telemetry_interval', $event)" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="config-actions">
+                      <button hlmBtn variant="default" size="sm"
+                              (click)="saveConfiguration(reservoir._id)"
+                              [disabled]="isSavingConfig(reservoir._id)">
+                        <ng-icon name="lucideSave" size="14" />
+                        {{ isSavingConfig(reservoir._id) ? 'Saving...' : 'Save Configuration' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- Tab: Info -->
+              @if (getActiveTab(reservoir._id) === 'info') {
+                <div class="tab-content">
+                  <div class="info-section">
+                    <h3 class="section-title">
+                      <ng-icon name="lucideInfo" size="16" />
+                      Coordinator Information
+                    </h3>
+
+                    <div class="info-grid">
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideHash" size="14" />
+                          Coordinator ID
+                        </span>
+                        <span class="info-value mono">{{ reservoir.coord_id }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideServer" size="14" />
+                          Farm / Site ID
+                        </span>
+                        <span class="info-value mono">{{ getCoordinatorField(reservoir, 'farm_id') || reservoir.site_id || '--' }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideCpu" size="14" />
+                          Firmware Version
+                        </span>
+                        <span class="info-value">{{ getCoordinatorField(reservoir, 'fw_version') || '--' }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideWifi" size="14" />
+                          IP Address
+                        </span>
+                        <span class="info-value mono">{{ getCoordinatorField(reservoir, 'ip_address') || '--' }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideRadio" size="14" />
+                          WiFi Signal Strength
+                        </span>
+                        <span class="info-value">
+                          @if (reservoir.wifi_rssi !== undefined && reservoir.wifi_rssi !== null) {
+                            {{ reservoir.wifi_rssi }} dBm
+                            @if (reservoir.wifi_rssi >= -50) {
+                              <span class="signal-badge excellent">Excellent</span>
+                            } @else if (reservoir.wifi_rssi >= -60) {
+                              <span class="signal-badge good">Good</span>
+                            } @else if (reservoir.wifi_rssi >= -70) {
+                              <span class="signal-badge fair">Fair</span>
+                            } @else {
+                              <span class="signal-badge poor">Poor</span>
+                            }
+                          } @else {
+                            --
+                          }
+                        </span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideCpu" size="14" />
+                          Free Heap Memory
+                        </span>
+                        <span class="info-value">{{ formatBytes(getCoordinatorField(reservoir, 'free_heap')) }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideClock" size="14" />
+                          Uptime
+                        </span>
+                        <span class="info-value">{{ formatUptime(getCoordinatorField(reservoir, 'uptime_s')) }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideClock" size="14" />
+                          Last Seen
+                        </span>
+                        <span class="info-value">{{ formatTimestamp(reservoir.last_seen) }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideThermometer" size="14" />
+                          Temperature
+                        </span>
+                        <span class="info-value">{{ reservoir.temp_c !== undefined ? reservoir.temp_c.toFixed(1) + '°C' : '--' }}</span>
+                      </div>
+
+                      <div class="info-row">
+                        <span class="info-label">
+                          <ng-icon name="lucideDroplet" size="14" />
+                          Ambient Light
+                        </span>
+                        <span class="info-value">{{ reservoir.light_lux !== undefined ? reservoir.light_lux + ' lux' : '--' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- Tab: Actions -->
+              @if (getActiveTab(reservoir._id) === 'actions') {
+                <div class="tab-content">
+                  <div class="actions-section">
+                    <h3 class="section-title">
+                      <ng-icon name="lucideZap" size="16" />
+                      Quick Actions
+                    </h3>
+
+                    <div class="actions-grid">
+                      <div class="action-card">
+                        <div class="action-header">
+                          <div class="action-icon restart">
+                            <ng-icon name="lucideRotateCcw" size="20" />
+                          </div>
+                          <div class="action-text">
+                            <h4>Restart Coordinator</h4>
+                            <p>Send a restart command to the coordinator. It will briefly disconnect and reconnect.</p>
+                          </div>
+                        </div>
+                        <button hlmBtn variant="outline" size="sm" (click)="restartCoordinator(reservoir._id)">
+                          <ng-icon name="lucideRotateCcw" size="14" />
+                          Restart
+                        </button>
+                      </div>
+
+                      <div class="action-card">
+                        <div class="action-header">
+                          <div class="action-icon pairing">
+                            <ng-icon name="lucideRadio" size="20" />
+                          </div>
+                          <div class="action-text">
+                            <h4>Start Pairing Mode</h4>
+                            <p>Put the coordinator into pairing mode to discover and connect new towers (60s window).</p>
+                          </div>
+                        </div>
+                        <button hlmBtn variant="outline" size="sm" (click)="startPairingMode(reservoir._id)">
+                          <ng-icon name="lucidePlay" size="14" />
+                          Start Pairing
+                        </button>
+                      </div>
+
+                      <div class="action-card danger-zone">
+                        <div class="action-header">
+                          <div class="action-icon danger">
+                            <ng-icon name="lucideTrash2" size="20" />
+                          </div>
+                          <div class="action-text">
+                            <h4>Remove Coordinator</h4>
+                            <p>Permanently remove this coordinator and disconnect all associated towers. This cannot be undone.</p>
+                          </div>
+                        </div>
+                        <button hlmBtn variant="destructive" size="sm" (click)="removeCoordinator(reservoir._id)">
+                          <ng-icon name="lucideTrash2" size="14" />
+                          Remove Coordinator
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
             </div>
-            <span hlmCardTitle>{{ coord.name || coord.coord_id }}</span>
-            <span hlmCardDescription>{{ coord.coord_id }}</span>
-          </div>
-          <div hlmCardContent>
-            <div class="metric-grid">
-              <div class="metric">
-                <ng-icon hlmIcon name="lucideThermometer" size="sm" />
-                <span>{{ coord.temp_c !== undefined ? coord.temp_c.toFixed(1) : '--' }}°C</span>
-              </div>
-              <div class="metric">
-                <ng-icon hlmIcon name="lucideDroplet" size="sm" />
-                <span>{{ coord.light_lux || '--' }} lux</span>
-              </div>
-              <div class="metric">
-                <ng-icon hlmIcon name="lucideActivity" size="sm" />
-                <span>{{ coord.nodes_online || 0 }} towers</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <span class="view-link">
-              View Details
-              <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-            </span>
-          </div>
-        </a>
+          }
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <ng-icon name="lucideServer" size="64" />
+          <h3>No Coordinators Found</h3>
+          <p>Waiting for coordinators to connect via MQTT. New coordinators will appear automatically when they connect.</p>
+        </div>
       }
     </div>
   }
-
-  @if (usingMockData()) {
-    <div class="mock-banner">
-      <ng-icon hlmIcon name="lucideActivity" size="sm" />
-      <span>Displaying mock data - Backend unavailable</span>
-    </div>
-  }
 </div>
+
+<!-- Coordinator Edit Dialog -->
+<app-coordinator-dialog 
+  [isOpen]="isDialogOpen()"
+  [editData]="editingCoordinator()"
+  (closed)="closeDialog()"
+  (saved)="saveCoordinator($event)"
+/>

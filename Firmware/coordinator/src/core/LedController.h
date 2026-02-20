@@ -6,9 +6,7 @@
 #include <functional>
 #include "../utils/StatusLed.h"
 #include "../config/PinConfig.h"
-
-// Forward declaration
-struct NodeInfo;
+#include "../Models.h"  // Include Models.h for NodeInfo/TowerInfo
 
 /**
  * @brief Manages LED visualization for node status on the coordinator

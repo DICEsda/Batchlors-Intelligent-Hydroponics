@@ -25,7 +25,8 @@ import {
   lucideSun,
   lucideBattery,
   lucideLayoutGrid,
-  lucideMapPin
+  lucideMapPin,
+  lucideInfo
 } from '@ng-icons/lucide';
 
 @Component({
@@ -57,7 +58,8 @@ import {
       lucideSun,
       lucideBattery,
       lucideLayoutGrid,
-      lucideMapPin
+      lucideMapPin,
+      lucideInfo
     })
   ],
   templateUrl: './farm-overview.component.html',

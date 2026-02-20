@@ -126,6 +126,15 @@ public class TowerTwin
     [JsonPropertyName("expected_harvest_date")]
     [BsonIgnoreIfNull]
     public DateTime? ExpectedHarvestDate { get; set; }
+
+    /// <summary>
+    /// ML predictions for this tower (growth, harvest date, health score, etc.)
+    /// Updated periodically by the MlSchedulerBackgroundService.
+    /// </summary>
+    [BsonElement("ml_predictions")]
+    [JsonPropertyName("ml_predictions")]
+    [BsonIgnoreIfNull]
+    public MlPredictions? MlPredictions { get; set; }
 }
 
 /// <summary>

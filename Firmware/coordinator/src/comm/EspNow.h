@@ -8,9 +8,18 @@
 #include <algorithm>
 #include "../Models.h"
 
-// Forward declarations for ESP-NOW v2.0 friend functions
+// Forward declarations for ESP-NOW callback functions
 class EspNow;
-void staticRecvCallback(const esp_now_recv_info_t* recv_info, const uint8_t* data, int len);
+
+// Check Arduino ESP32 version for ESP-NOW API compatibility
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    // ESP-NOW v2.0 API (Arduino ESP32 3.x+)
+    void staticRecvCallback(const esp_now_recv_info_t* recv_info, const uint8_t* data, int len);
+#else
+    // ESP-NOW v1.0 API (Arduino ESP32 2.x)
+    void staticRecvCallback(const uint8_t* mac_addr, const uint8_t* data, int len);
+#endif
+
 void staticSendCallback(const uint8_t* mac, esp_now_send_status_t status);
 
 struct PeerStats {
@@ -21,8 +30,12 @@ struct PeerStats {
 };
 
 class EspNow {
-    // Declare static callback functions as friends (ESP-NOW v2.0 signatures)
+    // Declare static callback functions as friends
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     friend void staticRecvCallback(const esp_now_recv_info_t* recv_info, const uint8_t* data, int len);
+#else
+    friend void staticRecvCallback(const uint8_t* mac_addr, const uint8_t* data, int len);
+#endif
     friend void staticSendCallback(const uint8_t* mac, esp_now_send_status_t status);
     
 public:

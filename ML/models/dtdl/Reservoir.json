@@ -1,0 +1,144 @@
+{
+  "@context": "dtmi:dtdl:context;2",
+  "@id": "dtmi:iot:hydroponics:Reservoir;1",
+  "@type": "Interface",
+  "displayName": "Hydroponic Reservoir",
+  "description": "Water reservoir with pH, EC, and level monitoring",
+  "contents": [
+    {
+      "@type": "Property",
+      "name": "name",
+      "displayName": "Reservoir Name",
+      "schema": "string"
+    },
+    {
+      "@type": "Property",
+      "name": "capacity_liters",
+      "displayName": "Capacity",
+      "schema": "double",
+      "unit": "litre"
+    },
+    {
+      "@type": "Property",
+      "name": "reported_state",
+      "displayName": "Reported State",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "ph", "schema": "double" },
+          { "name": "ec_ms_cm", "schema": "double" },
+          { "name": "tds_ppm", "schema": "double" },
+          { "name": "water_temp_c", "schema": "double" },
+          { "name": "water_level_pct", "schema": "double" },
+          { "name": "water_level_cm", "schema": "double" },
+          { "name": "main_pump_on", "schema": "boolean" },
+          { "name": "dosing_pump_ph_on", "schema": "boolean" },
+          { "name": "dosing_pump_nutrient_on", "schema": "boolean" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "desired_state",
+      "displayName": "Desired State",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "main_pump_on", "schema": "boolean" },
+          { "name": "dosing_pump_ph_on", "schema": "boolean" },
+          { "name": "dosing_pump_nutrient_on", "schema": "boolean" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "setpoints",
+      "displayName": "Target Setpoints",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "ph_target", "schema": "double" },
+          { "name": "ph_tolerance", "schema": "double" },
+          { "name": "ec_target", "schema": "double" },
+          { "name": "ec_tolerance", "schema": "double" },
+          { "name": "water_level_min_pct", "schema": "double" },
+          { "name": "water_temp_target_c", "schema": "double" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "alerts",
+      "displayName": "Active Alerts",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "low_water", "schema": "boolean" },
+          { "name": "ph_out_of_range", "schema": "boolean" },
+          { "name": "ec_out_of_range", "schema": "boolean" },
+          { "name": "temp_out_of_range", "schema": "boolean" }
+        ]
+      }
+    },
+    {
+      "@type": "Property",
+      "name": "ml_predictions",
+      "displayName": "ML Predictions",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "predicted_ph_drift", "schema": "double" },
+          { "name": "predicted_ec_drift", "schema": "double" },
+          { "name": "water_change_recommended_in_days", "schema": "integer" },
+          { "name": "nutrient_top_up_recommended", "schema": "boolean" },
+          { "name": "anomaly_score", "schema": "double" },
+          { "name": "model_name", "schema": "string" },
+          { "name": "model_version", "schema": "string" },
+          { "name": "generated_at", "schema": "dateTime" }
+        ]
+      }
+    },
+    {
+      "@type": "Telemetry",
+      "name": "water_quality",
+      "displayName": "Water Quality Telemetry",
+      "schema": {
+        "@type": "Object",
+        "fields": [
+          { "name": "ph", "schema": "double" },
+          { "name": "ec_ms_cm", "schema": "double" },
+          { "name": "tds_ppm", "schema": "double" },
+          { "name": "water_temp_c", "schema": "double" },
+          { "name": "water_level_pct", "schema": "double" }
+        ]
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "setMainPump",
+      "displayName": "Set Main Pump",
+      "request": {
+        "name": "on",
+        "schema": "boolean"
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "setPhDosingPump",
+      "displayName": "Set pH Dosing Pump",
+      "request": {
+        "name": "on",
+        "schema": "boolean"
+      }
+    },
+    {
+      "@type": "Command",
+      "name": "setNutrientDosingPump",
+      "displayName": "Set Nutrient Dosing Pump",
+      "request": {
+        "name": "on",
+        "schema": "boolean"
+      }
+    }
+  ]
+}
