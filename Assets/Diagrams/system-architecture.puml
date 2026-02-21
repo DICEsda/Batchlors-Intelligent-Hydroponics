@@ -1,0 +1,125 @@
+@startuml Intelligent Hydroponics System Architecture
+
+skinparam rectangle {
+    BackgroundColor<<device>> LightBlue
+    BorderColor<<device>> DarkBlue
+    BackgroundColor<<cloud>> LightGreen
+    BorderColor<<cloud>> DarkGreen
+}
+
+skinparam node {
+    BackgroundColor<<hardware>> LightCoral
+    BorderColor<<hardware>> DarkRed
+}
+
+title Intelligent Hydroponics IoT System Architecture
+
+package "User Interface" {
+    rectangle "Angular Dashboard\n(Port 4200)" as Frontend <<cloud>> #LightYellow
+}
+
+cloud "Azure Cloud Platform" #Azure {
+    package "Application Layer" #LightBlue {
+        rectangle "ASP.NET Core\nBackend API\n(Port 8000)" as Backend <<cloud>> #LightGreen
+        rectangle "Azure Digital Twins\nVirtual Farm\nSimulation" as DigitalTwin <<cloud>> #LightGreen
+        rectangle "ML Engine\nPredictive\nAnalytics" as ML <<cloud>> #LightGreen
+    }
+    
+    package "Data Layer" #LightBlue {
+        database "MongoDB\nTime-Series\nDatabase" as MongoDB
+        rectangle "MQTT Broker\nMosquitto\n(Port 1883)" as MQTT <<cloud>> #LightGreen
+    }
+}
+
+package "Edge Layer" {
+    node "Coordinator 1\nESP32-S3" as Coord1 <<hardware>> {
+        rectangle "Reservoir\nController" as Res1 <<device>>
+    }
+    
+    node "Coordinator 2\nESP32-S3" as Coord2 <<hardware>> {
+        rectangle "Reservoir\nController" as Res2 <<device>>
+    }
+    
+    node "Coordinator N\nESP32-S3" as CoordN <<hardware>> {
+        rectangle "Reservoir\nController" as ResN <<device>>
+    }
+}
+
+package "Device Layer" {
+    rectangle "Tower Node 1\nESP32-C3" as Tower1 <<device>>
+    rectangle "Tower Node 2\nESP32-C3" as Tower2 <<device>>
+    rectangle "Tower Node N\nESP32-C3" as TowerN <<device>>
+}
+
+package "Sensors & Actuators" {
+    collections "Reservoir Sensors\n• pH\n• EC/TDS\n• Water Temp\n• Water Level" as ResSensors
+    collections "Tower Sensors\n• Air Temp\n• Humidity\n• Light Level" as TowerSensors
+    collections "Actuators\n• Pumps\n• Grow Lights\n• Dosing Pumps" as Actuators
+}
+
+' User to Cloud
+Frontend -down-> Backend : REST API\nWebSocket
+
+' Cloud Layer Connections
+Backend -down-> MongoDB : Store/Retrieve\nData
+Backend -down-> MQTT : Publish/Subscribe
+Backend -right-> DigitalTwin : Sync State\nSimulation
+Backend -right-> ML : Training Data\nPredictions
+DigitalTwin -down-> ML : Simulation\nData
+
+' Cloud to Edge
+MQTT -down-> Coord1 : MQTT\n(WiFi)
+MQTT -down-> Coord2 : MQTT\n(WiFi)
+MQTT -down-> CoordN : MQTT\n(WiFi)
+
+' Edge to Device
+Coord1 -down-> Tower1 : ESP-NOW\n(Wireless Mesh)
+Coord1 -down-> Tower2 : ESP-NOW\n(Wireless Mesh)
+Coord2 -down-> TowerN : ESP-NOW\n(Wireless Mesh)
+
+' Sensors to Edge/Device
+ResSensors -up-> Coord1
+ResSensors -up-> Coord2
+ResSensors -up-> CoordN
+
+TowerSensors -up-> Tower1
+TowerSensors -up-> Tower2
+TowerSensors -up-> TowerN
+
+Actuators -up-> Tower1
+Actuators -up-> Tower2
+Actuators -up-> TowerN
+
+' Notes
+note right of DigitalTwin
+  **Virtual Replica**
+  • Simulates farm operations
+  • "What-if" scenario testing
+  • Training environment
+  • No hardware required
+end note
+
+note bottom of MQTT
+  **Message Topics**
+  farm/{farmId}/coord/{coordId}/...
+  • reservoir/telemetry
+  • reservoir/cmd
+  • tower/{towerId}/telemetry
+  • tower/{towerId}/cmd
+end note
+
+note bottom of Coord1
+  **Manages up to 20 towers**
+  • ESP-NOW Gateway
+  • MQTT Bridge
+  • Local Intelligence
+end note
+
+legend right
+  |<#LightYellow> User Interface |
+  |<#LightGreen> Azure Cloud Services |
+  |<#LightCoral> Physical Hardware |
+  |<#LightBlue> IoT Devices |
+endlegend
+
+@enduml

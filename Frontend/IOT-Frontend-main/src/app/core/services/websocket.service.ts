@@ -61,9 +61,15 @@ export interface WSOtaProgressMessage extends WSMessage {
 export interface WSDigitalTwinUpdateMessage extends WSMessage {
   type: 'digital_twin_update';
   payload: {
-    coordinatorId?: string;
-    towerId?: string;
-    updates: Record<string, any>;
+    changeType: string;
+    deviceId: string;
+    farmId?: string;
+    coordId?: string;
+    towerTwin?: any;
+    coordinatorTwin?: any;
+    towerReported?: any;
+    coordinatorReported?: any;
+    timestamp?: string;
   };
 }
 

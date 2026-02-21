@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using IoT.Backend.Models;
+using IoT.Backend.Models.DigitalTwin;
 using IoT.Backend.Repositories;
 
 namespace IoT.Backend.Services;
@@ -14,6 +15,7 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
     private readonly ICoordinatorRepository _coordinatorRepository;
     private readonly IMqttService _mqtt;
     private readonly IWsBroadcaster _broadcaster;
+    private readonly TwinChangeChannel _changeChannel;
     private readonly ILogger<CoordinatorRegistrationService> _logger;
 
     /// <summary>
@@ -38,11 +40,13 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
         ICoordinatorRepository coordinatorRepository,
         IMqttService mqtt,
         IWsBroadcaster broadcaster,
+        TwinChangeChannel changeChannel,
         ILogger<CoordinatorRegistrationService> logger)
     {
         _coordinatorRepository = coordinatorRepository;
         _mqtt = mqtt;
         _broadcaster = broadcaster;
+        _changeChannel = changeChannel;
         _logger = logger;
     }
 
@@ -262,6 +266,26 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
         };
         await _broadcaster.BroadcastCoordinatorRegisteredAsync(wsPayload, ct);
 
+        // Emit ADT sync event — create coordinator twin + Farm→Coordinator relationship
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.CoordinatorRegistered,
+            DeviceId = request.CoordId,
+            FarmId = request.FarmId,
+            CoordinatorTwin = new CoordinatorTwin
+            {
+                Id = request.CoordId,
+                CoordId = request.CoordId,
+                FarmId = request.FarmId,
+                Name = request.Name,
+                Reported = new CoordinatorReportedState
+                {
+                    FwVersion = pending?.FwVersion ?? string.Empty,
+                    StatusMode = "operational"
+                }
+            }
+        });
+
         return coordinator;
     }
 
@@ -302,6 +326,13 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
         _registeredCache.TryRemove(coordId, out _);
 
         _logger.LogInformation("Coordinator {CoordId} removed from system", coordId);
+
+        // Emit ADT sync event — delete coordinator twin + relationships
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.CoordinatorRemoved,
+            DeviceId = coordId
+        });
 
         // Broadcast removal to WebSocket clients
         await _broadcaster.BroadcastAsync("coordinator_removed", new

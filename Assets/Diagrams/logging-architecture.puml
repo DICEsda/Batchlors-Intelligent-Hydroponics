@@ -1,0 +1,200 @@
+@startuml Logging Architecture
+
+skinparam backgroundColor white
+skinparam shadowing false
+
+title Logging Architecture - Intelligent Hydroponics IoT System
+
+' Define layers
+package "User Interface" #LightYellow {
+    [Angular App] as Frontend
+    note right of Frontend
+        **Logs:**
+        • User actions
+        • API calls
+        • WebSocket events
+        • JavaScript errors
+        
+        **Level:** INFO, ERROR
+        **Output:** Console + Backend API
+    end note
+}
+
+cloud "Azure Cloud Platform" #Azure {
+    
+    package "Backend Services" #LightBlue {
+        [ASP.NET Core\nBackend] as Backend
+        [Azure Digital\nTwins] as ADT
+        [ML Engine] as ML
+        
+        note right of Backend
+            **Logs:**
+            • HTTP requests/responses
+            • MQTT events
+            • Database operations
+            • Business logic
+            • Exceptions
+            
+            **Level:** DEBUG, INFO, WARN, ERROR
+            **Output:** File + Azure Monitor
+        end note
+    }
+    
+    package "Data Services" #LightGreen {
+        database "MongoDB" as DB
+        queue "MQTT Broker" as MQTT
+        
+        note right of MQTT
+            **Logs:**
+            • Client connections
+            • Publish/subscribe
+            • Authentication
+            • Message routing
+            
+            **Level:** INFO, WARN, ERROR
+            **Output:** File
+        end note
+        
+        note left of DB
+            **Logs:**
+            • Slow queries
+            • Connection pool
+            • Index usage
+            • Replication
+            
+            **Level:** INFO, WARN
+            **Output:** File
+        end note
+    }
+    
+    package "Log Aggregation" #LightGray {
+        [Azure Application\nInsights] as AppInsights
+        [Azure Monitor] as Monitor
+        
+        note bottom of AppInsights
+            **Centralized Logging:**
+            • All backend logs
+            • Frontend error logs
+            • Performance metrics
+            • Distributed tracing
+            • Custom alerts
+            
+            **Retention:** 90 days
+        end note
+    }
+}
+
+package "Edge Layer" #Coral {
+    node "Coordinator\n(ESP32-S3)" as Coord {
+        [Logger] as CoordLogger
+        [Circular\nBuffer] as CoordBuffer
+    }
+    
+    note right of Coord
+        **Logs:**
+        • Boot & initialization
+        • WiFi/MQTT connection
+        • ESP-NOW events
+        • Sensor readings
+        • Pump control
+        • Errors & crashes
+        
+        **Level:** INFO, WARN, ERROR, CRITICAL
+        **Output:** Serial + MQTT
+        **Buffer:** 100 entries (circular)
+    end note
+}
+
+package "Device Layer" #LightCyan {
+    component "Tower Node\n(ESP32-C3)" as Tower {
+        [Logger] as TowerLogger
+    }
+    
+    note right of Tower
+        **Logs:**
+        • Wake/sleep cycles
+        • Sensor readings
+        • ESP-NOW status
+        • Battery status
+        • Errors
+        
+        **Level:** INFO, ERROR only
+        **Output:** Serial + Coordinator
+        **Note:** Minimal (battery-powered)
+    end note
+}
+
+' Logging flow connections
+Frontend --> Backend : "Frontend logs\n(Errors only)\nHTTP POST /api/logs"
+Frontend ..> Frontend : "Console.log()\nBrowser DevTools"
+
+Backend --> AppInsights : "Structured logs\n(JSON)"
+Backend --> DB : "Store telemetry\n+ log queries"
+Backend --> MQTT : "Publish commands\n+ log events"
+Backend ..> Backend : "File logs\napp-{Date}.log"
+
+ADT --> AppInsights : "Twin update logs"
+ML --> AppInsights : "Prediction logs"
+
+MQTT --> Coord : "MQTT Topics:\nfarm/{farmId}/coord/{coordId}/..."
+MQTT ..> MQTT : "File logs\nmosquitto.log"
+
+Coord --> MQTT : "Device logs\n(ERROR, CRITICAL)\nfarm/{farmId}/coord/{coordId}/logs"
+Coord ..> CoordBuffer : "Store locally\n(100 entries)"
+Coord ..> Coord : "Serial output\nUART debug"
+
+Tower --> Coord : "ESP-NOW\nLog messages\n(Errors only)"
+Tower ..> Tower : "Serial output\nUART debug"
+
+DB ..> DB : "File logs\nmongod.log"
+
+AppInsights --> Monitor : "Metrics & Alerts"
+
+' Trace correlation
+note as TraceNote
+    **Distributed Tracing:**
+    
+    TraceID: <b>0HN7M1E4Q8D2A</b>
+    
+    1. User clicks "Start Pump" → Frontend
+    2. HTTP POST with X-Trace-Id header → Backend
+    3. Backend processes request → logs with TraceID
+    4. MQTT publish with TraceID in payload → Broker
+    5. Coordinator receives command → logs with TraceID
+    6. Pump activated → logs with TraceID
+    7. Response chain back to user
+    
+    All layers can be correlated via TraceID!
+end note
+
+TraceNote .. Frontend
+TraceNote .. Backend
+TraceNote .. Coord
+
+' Log levels legend
+legend right
+    **Log Levels:**
+    
+    <b>DEBUG</b> - Detailed info for debugging
+    <b>INFO</b> - General operational events
+    <b>WARN</b> - Warning conditions
+    <b>ERROR</b> - Error conditions
+    <b>CRITICAL</b> - System failures
+    
+    **Log Retention:**
+    
+    Device: 1 hour (circular buffer)
+    MQTT: 30 days
+    Backend: 90 days
+    Azure Insights: 90 days
+    
+    **Key Features:**
+    
+    • Structured JSON logging
+    • Distributed tracing (TraceID)
+    • Context enrichment (farmId, coordId)
+    • Centralized aggregation (Azure)
+    • Real-time monitoring & alerts
+endlegend
+
+@enduml

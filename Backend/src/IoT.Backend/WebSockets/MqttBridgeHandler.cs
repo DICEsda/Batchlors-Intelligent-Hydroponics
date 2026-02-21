@@ -43,7 +43,7 @@ public class MqttBridgeHandler : IMqttBridgeHandler
 
         _logger.LogInformation("WebSocket connected: {ConnectionId}", connectionId);
 
-        try
+        try 
         {
             var buffer = new byte[4096];
             while (webSocket.State == WebSocketState.Open && !ct.IsCancellationRequested)

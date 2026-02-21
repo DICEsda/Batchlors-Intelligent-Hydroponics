@@ -1,5 +1,3 @@
-using Azure;
-using Azure.DigitalTwins.Core;
 using IoT.Backend.Models;
 using IoT.Backend.Models.DigitalTwin;
 using IoT.Backend.Models.Ml;
@@ -41,6 +39,7 @@ public class MlSchedulerBackgroundService : BackgroundService
     private readonly ITelemetryRepository _telemetryRepository;
     private readonly IMlService _mlService;
     private readonly IAzureDigitalTwinsService _adtService;
+    private readonly AdtTwinMapper _adtMapper;
     private readonly ILogger<MlSchedulerBackgroundService> _logger;
     private readonly MlSchedulerConfig _config;
 
@@ -52,6 +51,7 @@ public class MlSchedulerBackgroundService : BackgroundService
         ITelemetryRepository telemetryRepository,
         IMlService mlService,
         IAzureDigitalTwinsService adtService,
+        AdtTwinMapper adtMapper,
         IOptions<MlSchedulerConfig> config,
         ILogger<MlSchedulerBackgroundService> logger)
     {
@@ -59,6 +59,7 @@ public class MlSchedulerBackgroundService : BackgroundService
         _telemetryRepository = telemetryRepository;
         _mlService = mlService;
         _adtService = adtService;
+        _adtMapper = adtMapper;
         _config = config.Value;
         _logger = logger;
         _currentInterval = TimeSpan.FromMinutes(_config.IntervalMinutes);
@@ -342,7 +343,8 @@ public class MlSchedulerBackgroundService : BackgroundService
     }
 
     /// <summary>
-    /// Syncs ML predictions to Azure Digital Twins using JSON Patch.
+    /// Syncs ML predictions to Azure Digital Twins using the AdtTwinMapper.
+    /// Patches the nested /ml_predictions object to match the DTDL Tower model schema.
     /// </summary>
     private async Task SyncToAzureDigitalTwinsAsync(string towerId, MlPredictions predictions, CancellationToken ct)
     {
@@ -355,44 +357,22 @@ public class MlSchedulerBackgroundService : BackgroundService
                 return;
             }
 
-            // Build ADT twin ID (format: tower-{towerId})
-            var adtTwinId = $"tower-{towerId}";
+            // Use mapper for twin ID and patch generation (ensures DTDL-compliant paths)
+            var adtTwinId = _adtMapper.GetTowerTwinId(towerId);
 
-            // Create JSON Patch document for updating ML prediction properties
-            var patch = new JsonPatchDocument();
-            
-            if (predictions.PredictedHeightCm.HasValue)
+            var mlPredictions = new TowerMlPredictions
             {
-                patch.AppendReplace("/predicted_height_cm", predictions.PredictedHeightCm.Value);
-            }
-            
-            if (predictions.ExpectedHarvestDate.HasValue)
-            {
-                patch.AppendReplace("/expected_harvest_date", predictions.ExpectedHarvestDate.Value.ToString("O"));
-            }
-            
-            if (predictions.DaysToHarvest.HasValue)
-            {
-                patch.AppendReplace("/days_to_harvest", predictions.DaysToHarvest.Value);
-            }
-            
-            if (predictions.GrowthRateCmPerDay.HasValue)
-            {
-                patch.AppendReplace("/growth_rate_cm_per_day", predictions.GrowthRateCmPerDay.Value);
-            }
-            
-            if (predictions.HealthScore.HasValue)
-            {
-                patch.AppendReplace("/health_score", predictions.HealthScore.Value);
-            }
-            
-            if (predictions.Confidence.HasValue)
-            {
-                patch.AppendReplace("/ml_confidence", predictions.Confidence.Value);
-            }
-            
-            patch.AppendReplace("/ml_last_updated", predictions.LastUpdatedAt?.ToString("O") ?? DateTime.UtcNow.ToString("O"));
+                PredictedHeightCm = predictions.PredictedHeightCm,
+                PredictedHarvestDate = predictions.ExpectedHarvestDate,
+                DaysToHarvest = predictions.DaysToHarvest,
+                GrowthRateCmPerDay = predictions.GrowthRateCmPerDay,
+                HealthScore = predictions.HealthScore,
+                ModelName = predictions.ModelName ?? "growth-predictor",
+                ModelVersion = predictions.ModelVersion ?? "1.0.0",
+                GeneratedAt = predictions.LastUpdatedAt ?? DateTime.UtcNow
+            };
 
+            var patch = _adtMapper.CreateMlPredictionsPatch(mlPredictions);
             await _adtService.UpdateTwinPropertyAsync(adtTwinId, patch, ct);
             
             _logger.LogDebug("Synced ML predictions to ADT for tower {TowerId}", towerId);

@@ -11,15 +11,21 @@ public class TwinService : ITwinService
 {
     private readonly ITwinRepository _twinRepository;
     private readonly IMqttService _mqttService;
+    private readonly TwinChangeChannel _changeChannel;
+    private readonly IWsBroadcaster _broadcaster;
     private readonly ILogger<TwinService> _logger;
 
     public TwinService(
         ITwinRepository twinRepository,
         IMqttService mqttService,
+        TwinChangeChannel changeChannel,
+        IWsBroadcaster broadcaster,
         ILogger<TwinService> logger)
     {
         _twinRepository = twinRepository;
         _mqttService = mqttService;
+        _changeChannel = changeChannel;
+        _broadcaster = broadcaster;
         _logger = logger;
     }
 
@@ -38,6 +44,23 @@ public class TwinService : ITwinService
             _logger.LogWarning("Failed to update reported state for tower {TowerId} - twin may not exist", towerId);
             return;
         }
+
+        // Emit ADT sync event (fire-and-forget via channel)
+        var twinChangeEvt = new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.TowerTelemetry,
+            DeviceId = towerId,
+            TowerReported = reported
+        };
+        _changeChannel.TryWrite(twinChangeEvt);
+
+        // Broadcast to WebSocket clients for real-time UI updates
+        _ = _broadcaster.BroadcastAsync("digital_twin_update", new
+        {
+            changeType = "TowerTelemetry",
+            deviceId = towerId,
+            towerReported = reported
+        });
 
         // Check if reported state now matches desired state
         var twin = await _twinRepository.GetTowerTwinByIdAsync(towerId, ct);
@@ -64,6 +87,20 @@ public class TwinService : ITwinService
             _logger.LogWarning("Failed to update desired state for tower {TowerId}", towerId);
             return;
         }
+
+        // Emit ADT sync event
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.TowerDesiredStateChanged,
+            DeviceId = towerId
+        });
+
+        // Broadcast to WebSocket clients
+        _ = _broadcaster.BroadcastAsync("digital_twin_update", new
+        {
+            changeType = "TowerDesiredStateChanged",
+            deviceId = towerId
+        });
 
         // Publish command to device immediately
         var twin = await _twinRepository.GetTowerTwinByIdAsync(towerId, ct);
@@ -107,6 +144,22 @@ public class TwinService : ITwinService
             return;
         }
 
+        // Emit ADT sync event
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.CoordinatorTelemetry,
+            DeviceId = coordId,
+            CoordinatorReported = reported
+        });
+
+        // Broadcast to WebSocket clients
+        _ = _broadcaster.BroadcastAsync("digital_twin_update", new
+        {
+            changeType = "CoordinatorTelemetry",
+            deviceId = coordId,
+            coordinatorReported = reported
+        });
+
         // Check if reported state now matches desired state
         var twin = await _twinRepository.GetCoordinatorTwinByIdAsync(coordId, ct);
         if (twin != null && twin.Metadata.SyncStatus == SyncStatus.Pending)
@@ -132,6 +185,20 @@ public class TwinService : ITwinService
             _logger.LogWarning("Failed to update desired state for coordinator {CoordId}", coordId);
             return;
         }
+
+        // Emit ADT sync event
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.CoordinatorDesiredStateChanged,
+            DeviceId = coordId
+        });
+
+        // Broadcast to WebSocket clients
+        _ = _broadcaster.BroadcastAsync("digital_twin_update", new
+        {
+            changeType = "CoordinatorDesiredStateChanged",
+            deviceId = coordId
+        });
 
         // Publish command to device immediately
         var twin = await _twinRepository.GetCoordinatorTwinByIdAsync(coordId, ct);

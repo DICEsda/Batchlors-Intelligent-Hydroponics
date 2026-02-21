@@ -1,222 +1,341 @@
 <div class="farm-overview">
-  <!-- Dashboard Cards - Top Row (3 cards) -->
   <section class="dashboard-grid">
+    <!-- Top Row — Compact Stat Cards -->
     <div class="top-row">
-      <!-- Card 1: Reservoirs -->
-      <div class="dashboard-card">
-        <div class="card-inner">
-          @if (loading()) {
-            <hlm-skeleton class="full-skeleton" />
-          } @else {
-            <div class="card-content">
-              <div class="card-header-section">
-                <div class="stat-icon coordinators">
-                  <ng-icon hlmIcon name="lucideServer" size="lg" />
-                </div>
-                <span hlmBadge variant="outline" class="status-badge">
-                  @if (usingMockData()) {
-                    Mock
-                  } @else {
-                    Live
-                  }
-                </span>
-              </div>
-              <div class="stat-info">
-                <span class="stat-label">Reservoirs</span>
-                <span class="stat-value">
-                  {{ systemStats().coordinators.online }} / {{ systemStats().coordinators.total }}
-                </span>
-                <span class="stat-description">Active controllers</span>
-              </div>
-            </div>
-          }
-        </div>
+      <div class="stat-card">
+        @if (loading()) {
+          <hlm-skeleton class="stat-skeleton" />
+        } @else {
+          <div class="stat-icon-sm coordinators">
+            <ng-icon hlmIcon name="lucideServer" size="sm" />
+          </div>
+          <div class="stat-body">
+            <span class="stat-value-sm">{{ coordTwins().length || systemStats().coordinators.total }}</span>
+            <span class="stat-label-sm">Reservoirs</span>
+          </div>
+          <span hlmBadge variant="outline" class="stat-badge">
+            @if (usingMockData()) { Mock } @else { Live }
+          </span>
+        }
       </div>
 
-      <!-- Card 2: Towers -->
-      <div class="dashboard-card">
-        <div class="card-inner">
-          @if (loading()) {
-            <hlm-skeleton class="full-skeleton" />
-          } @else {
-            <div class="card-content">
-              <div class="card-header-section">
-                <div class="stat-icon towers">
-                  <ng-icon hlmIcon name="lucideLayoutGrid" size="lg" />
-                </div>
-                <span hlmBadge variant="outline" class="status-badge">Active</span>
-              </div>
-              <div class="stat-info">
-                <span class="stat-label">Towers</span>
-                <span class="stat-value">
-                  {{ systemStats().nodes.online }} / {{ systemStats().nodes.total }}
-                </span>
-                <span class="stat-description">
-                  @if (systemStats().nodes.pairing > 0) {
-                    {{ systemStats().nodes.pairing }} pairing
-                  } @else if (systemStats().nodes.lowBattery > 0) {
-                    {{ systemStats().nodes.lowBattery }} low battery
-                  } @else {
-                    Connected towers
-                  }
-                </span>
-              </div>
-            </div>
-          }
-        </div>
+      <div class="stat-card">
+        @if (loading()) {
+          <hlm-skeleton class="stat-skeleton" />
+        } @else {
+          <div class="stat-icon-sm towers">
+            <ng-icon hlmIcon name="lucideLayoutGrid" size="sm" />
+          </div>
+          <div class="stat-body">
+            <span class="stat-value-sm">{{ towerTwins().length || systemStats().nodes.total }}</span>
+            <span class="stat-label-sm">Towers</span>
+          </div>
+          <span hlmBadge variant="outline" class="stat-badge">Active</span>
+        }
       </div>
 
-      <!-- Card 3: Alerts -->
-      <div class="dashboard-card" [class.has-alerts]="systemStats().alerts.critical > 0">
-        <div class="card-inner">
-          @if (loading()) {
-            <hlm-skeleton class="full-skeleton" />
+      <div class="stat-card" [class.has-alerts]="systemStats().alerts.critical > 0">
+        @if (loading()) {
+          <hlm-skeleton class="stat-skeleton" />
+        } @else {
+          <div class="stat-icon-sm alerts" [class.critical]="systemStats().alerts.critical > 0">
+            <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+          </div>
+          <div class="stat-body">
+            <span class="stat-value-sm">{{ systemStats().alerts.total }}</span>
+            <span class="stat-label-sm">Alerts</span>
+          </div>
+          @if (systemStats().alerts.critical > 0) {
+            <span hlmBadge variant="destructive" class="stat-badge">{{ systemStats().alerts.critical }} Critical</span>
           } @else {
-            <div class="card-content">
-              <div class="card-header-section">
-                <div class="stat-icon alerts" [class.critical]="systemStats().alerts.critical > 0">
-                  <ng-icon hlmIcon name="lucideAlertTriangle" size="lg" />
-                </div>
-                @if (systemStats().alerts.critical > 0) {
-                  <span hlmBadge variant="destructive" class="status-badge">Critical</span>
-                } @else {
-                  <span hlmBadge variant="outline" class="status-badge">OK</span>
-                }
-              </div>
-              <div class="stat-info">
-                <span class="stat-label">Alerts</span>
-                <span class="stat-value">{{ systemStats().alerts.total }}</span>
-                <span class="stat-description">
-                  @if (systemStats().alerts.critical > 0) {
-                    {{ systemStats().alerts.critical }} critical
-                  } @else {
-                    All systems normal
-                  }
-                </span>
-              </div>
-            </div>
+            <span hlmBadge variant="outline" class="stat-badge">OK</span>
           }
-        </div>
+        }
       </div>
     </div>
 
-    <!-- Main Content Card -->
+    <!-- Bottom Row — Two Panel: Detail Card (left) + Topology Graph (right) -->
     <div class="bottom-row">
-      <div class="dashboard-card large-card">
-        <div class="card-inner">
-          @if (loading()) {
-            <hlm-skeleton class="full-skeleton" />
-          } @else {
-            <div class="large-card-content">
-              @if (error()) {
-                <div class="error-banner">
-                  <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
-                  <span>{{ error() }}</span>
-                  <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Retry</button>
-                </div>
-              }
+      <!-- LEFT: Detail Card -->
+      <div class="dashboard-card detail-card">
+        <div class="detail-card-inner">
 
-              @if (coordinators().length === 0 && nodes().length === 0) {
-                <div class="empty-state">
-                  <ng-icon hlmIcon name="lucideServer" size="xl" />
-                  <h3>Welcome to Your Hydroponic Farm</h3>
-                  <p>Get started by adding your first coordinator and towers to monitor your system in real-time.</p>
-                  <div class="empty-state-actions">
-                    <button hlmBtn variant="default" routerLink="/reservoirs">
-                      <ng-icon hlmIcon name="lucidePlus" size="sm" />
-                      Add Coordinator
-                    </button>
-                    <button hlmBtn variant="outline" routerLink="/settings">
-                      <ng-icon hlmIcon name="lucideInfo" size="sm" />
-                      Setup Guide
-                    </button>
+          <!-- Coordinator Detail -->
+          <ng-container *ngIf="selectedCoordTwin() as coord">
+            <div class="detail-content">
+              <div class="detail-header">
+                <div class="detail-title-row">
+                  <span class="chain-dot coord-dot lg"></span>
+                  <div>
+                    <h3 class="detail-title">{{ coord.name }}</h3>
+                    <span class="detail-subtitle">{{ coord.coordId }} &middot; Reservoir</span>
                   </div>
                 </div>
-              } @else {
-                <!-- Devices Overview - Horizontal Layout -->
-                <div class="devices-overview-inline">
-                  <!-- Farms Column -->
-                  @if (zones().length > 0) {
-                    <div class="device-column">
-                      <h4 class="device-section-title">Farms</h4>
-                      <div class="device-list">
-                        @for (zone of zones().slice(0, 4); track zone._id) {
-                          <a [routerLink]="['/farms', zone._id]" class="device-item">
-                            <div class="device-info">
-                              <span class="device-name">{{ zone.name }}</span>
-                              <span class="device-meta">
-                                <ng-icon hlmIcon name="lucideMapPin" size="sm" />
-                                {{ zone.site_id ? 'Site configured' : 'No site' }}
-                              </span>
-                            </div>
-                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-                          </a>
-                        }
-                        @if (zones().length > 4) {
-                          <a routerLink="/farms" class="view-all-link">
-                            View all {{ zones().length }} farms
-                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-                          </a>
-                        }
-                      </div>
-                    </div>
-                  }
+                <button class="detail-close" (click)="clearSelection()">
+                  <ng-icon hlmIcon name="lucideX" size="sm" />
+                </button>
+              </div>
 
-                  <!-- Reservoirs Column -->
-                  @if (coordinators().length > 0) {
-                    <div class="device-column">
-                      <h4 class="device-section-title">Reservoirs</h4>
-                      <div class="device-list">
-                        @for (coord of coordinators(); track trackByCoordinatorId($index, coord)) {
-                          <a [routerLink]="['/reservoirs', coord.coord_id]" class="device-item">
-                            <div class="device-info">
-                              <span class="device-name">{{ coord.name || coord.coord_id }}</span>
-                              <span class="device-meta">
-                                {{ coord.nodes_online || 0 }} nodes |
-                                {{ coord.light_lux || 0 }} lux |
-                                {{ coord.temp_c !== undefined ? coord.temp_c.toFixed(1) : '--' }}°C
-                              </span>
-                            </div>
-                            <span hlmBadge [variant]="getStatusBadgeVariant(coord.status)" size="sm" [class]="'status-' + coord.status">
-                              {{ coord.status }}
-                            </span>
-                          </a>
-                        }
-                      </div>
-                    </div>
-                  }
+              <div class="detail-status-row">
+                <span class="detail-badge" [class]="'sync-badge ' + getSyncStatusClass(coord.metadata.syncStatus)">
+                  {{ getSyncStatusLabel(coord.metadata.syncStatus) }}
+                </span>
+                <span *ngIf="coord.metadata.isConnected" class="detail-badge connected-badge">Connected</span>
+                <span *ngIf="!coord.metadata.isConnected" class="detail-badge offline-badge">Offline</span>
+                <span class="detail-meta">v{{ coord.metadata.version }}</span>
+              </div>
 
-                  <!-- Towers Column -->
-                  @if (nodes().length > 0) {
-                    <div class="device-column">
-                      <h4 class="device-section-title">Towers</h4>
-                      <div class="device-list">
-                        @for (node of nodes().slice(0, 6); track trackByNodeId($index, node)) {
-                          <a [routerLink]="['/towers', node._id]" class="device-item">
-                            <div class="device-info">
-                              <span class="device-name">{{ node.name || node.light_id }}</span>
-                              <span class="device-meta">
-                                {{ node.temp_c !== undefined ? node.temp_c.toFixed(1) : '--' }}°C |
-                                {{ node.vbat_mv || '--' }} mV |
-                                {{ formatLastSeen(node.last_seen) }}
-                              </span>
-                            </div>
-                            <span hlmBadge [variant]="getStatusBadgeVariant(node.status_mode)" size="sm" [class]="'status-' + node.status_mode">
-                              {{ getNodeStatusDisplay(node.status_mode) }}
-                            </span>
-                          </a>
-                        }
-                        @if (nodes().length > 6) {
-                          <a routerLink="/towers" class="view-all-link">
-                            View all {{ nodes().length }} towers
-                            <ng-icon hlmIcon name="lucideChevronRight" size="sm" />
-                          </a>
-                        }
+              <div class="detail-section">
+                <h4 class="detail-section-title">Reservoir Readings</h4>
+                <div class="detail-grid">
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideBeaker" size="xs" />
+                    <span class="cell-label">pH</span>
+                    <span class="cell-value">{{ coord.reported.ph ?? '--' }}</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideZap" size="xs" />
+                    <span class="cell-label">EC</span>
+                    <span class="cell-value">{{ coord.reported.ecMsCm ?? '--' }} mS</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideDroplet" size="xs" />
+                    <span class="cell-label">TDS</span>
+                    <span class="cell-value">{{ coord.reported.tdsPpm ?? '--' }} ppm</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideThermometer" size="xs" />
+                    <span class="cell-label">Water</span>
+                    <span class="cell-value">{{ coord.reported.waterTempC ?? '--' }}&deg;C</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideArrowUpDown" size="xs" />
+                    <span class="cell-label">Level</span>
+                    <span class="cell-value">{{ coord.reported.waterLevelPct ?? '--' }}%</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideThermometer" size="xs" />
+                    <span class="cell-label">Air</span>
+                    <span class="cell-value">{{ coord.reported.tempC ?? '--' }}&deg;C</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h4 class="detail-section-title">Pumps</h4>
+                <div class="detail-grid cols-3">
+                  <div class="detail-cell pump-cell" [class.active]="coord.reported.mainPumpOn">
+                    <span class="pump-dot"></span>
+                    <span class="cell-label">Main</span>
+                  </div>
+                  <div class="detail-cell pump-cell" [class.active]="coord.reported.dosingPumpPhOn">
+                    <span class="pump-dot"></span>
+                    <span class="cell-label">pH Dose</span>
+                  </div>
+                  <div class="detail-cell pump-cell" [class.active]="coord.reported.dosingPumpNutrientOn">
+                    <span class="pump-dot"></span>
+                    <span class="cell-label">Nutrient</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h4 class="detail-section-title">System</h4>
+                <div class="detail-kv">
+                  <div class="kv-row"><span>Firmware</span><span>{{ coord.reported.fwVersion ?? '--' }}</span></div>
+                  <div class="kv-row"><span>Uptime</span><span>{{ formatUptime(coord.reported.uptimeS) }}</span></div>
+                  <div class="kv-row"><span>WiFi</span><span>{{ coord.reported.wifiRssi ?? '--' }} dBm</span></div>
+                  <div class="kv-row"><span>Quality</span><span>{{ coord.metadata.connectionQuality }}%</span></div>
+                  <div class="kv-row"><span>Towers Online</span><span>{{ coord.reported.towersOnline }}</span></div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- Tower Detail -->
+          <ng-container *ngIf="selectedTowerTwin() as tower">
+            <div class="detail-content">
+              <div class="detail-header">
+                <div class="detail-title-row">
+                  <span class="chain-dot tower-dot lg"></span>
+                  <div>
+                    <h3 class="detail-title">{{ tower.name }}</h3>
+                    <span class="detail-subtitle">{{ tower.towerId }} &middot; Tower</span>
+                  </div>
+                </div>
+                <button class="detail-close" (click)="clearSelection()">
+                  <ng-icon hlmIcon name="lucideX" size="sm" />
+                </button>
+              </div>
+
+              <div class="detail-status-row">
+                <span class="detail-badge" [class]="'sync-badge ' + getSyncStatusClass(tower.metadata.syncStatus)">
+                  {{ getSyncStatusLabel(tower.metadata.syncStatus) }}
+                </span>
+                <span *ngIf="tower.metadata.isConnected" class="detail-badge connected-badge">Connected</span>
+                <span *ngIf="!tower.metadata.isConnected" class="detail-badge offline-badge">Offline</span>
+                <span *ngIf="tower.cropType" class="detail-badge crop-badge">
+                  <ng-icon hlmIcon name="lucideLeaf" size="xs" />
+                  {{ getCropName(tower.cropType) }}
+                </span>
+              </div>
+
+              <div class="detail-section">
+                <h4 class="detail-section-title">Sensors</h4>
+                <div class="detail-grid">
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideThermometer" size="xs" />
+                    <span class="cell-label">Temp</span>
+                    <span class="cell-value">{{ tower.reported.airTempC ?? '--' }}&deg;C</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideDroplet" size="xs" />
+                    <span class="cell-label">Humidity</span>
+                    <span class="cell-value">{{ tower.reported.humidityPct ?? '--' }}%</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideSun" size="xs" />
+                    <span class="cell-label">Light</span>
+                    <span class="cell-value">{{ tower.reported.lightLux ?? '--' }} lx</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideBattery" size="xs" />
+                    <span class="cell-label">Battery</span>
+                    <span class="cell-value">{{ tower.reported.vbatMv ?? '--' }} mV</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideSignal" size="xs" />
+                    <span class="cell-label">Signal</span>
+                    <span class="cell-value">{{ tower.reported.signalQuality ?? '--' }}%</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideClock" size="xs" />
+                    <span class="cell-label">Uptime</span>
+                    <span class="cell-value">{{ formatUptime(tower.reported.uptimeS) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h4 class="detail-section-title">Controls</h4>
+                <div class="detail-grid cols-3">
+                  <div class="detail-cell pump-cell" [class.active]="tower.reported.pumpOn">
+                    <span class="pump-dot"></span>
+                    <span class="cell-label">Pump</span>
+                  </div>
+                  <div class="detail-cell pump-cell" [class.active]="tower.reported.lightOn">
+                    <span class="pump-dot"></span>
+                    <span class="cell-label">Light</span>
+                  </div>
+                  <div class="detail-cell">
+                    <ng-icon hlmIcon name="lucideSun" size="xs" />
+                    <span class="cell-label">Brightness</span>
+                    <span class="cell-value">{{ tower.reported.lightBrightness ?? '--' }}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <ng-container *ngIf="tower.mlPredictions">
+                <div class="detail-section">
+                  <h4 class="detail-section-title">Growth Predictions</h4>
+                  <div class="detail-kv">
+                    <div class="kv-row"><span>Health Score</span><span class="kv-highlight">{{ formatHealthScore(tower.mlPredictions.healthScore) }}/100</span></div>
+                    <div class="kv-row"><span>Height</span><span>{{ tower.lastHeightCm ?? '--' }} cm</span></div>
+                    <div class="kv-row"><span>Predicted</span><span>{{ tower.mlPredictions.predictedHeightCm ?? '--' }} cm</span></div>
+                    <div class="kv-row"><span>Growth Rate</span><span>{{ tower.mlPredictions.growthRateCmPerDay ?? '--' }} cm/d</span></div>
+                    <div class="kv-row"><span>Days to Harvest</span><span>{{ tower.mlPredictions.daysToHarvest ?? '--' }}</span></div>
+                    <div class="kv-row"><span>Confidence</span><span>{{ tower.mlPredictions.confidence ? (tower.mlPredictions.confidence * 100).toFixed(0) + '%' : '--' }}</span></div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <div class="detail-section">
+                <h4 class="detail-section-title">System</h4>
+                <div class="detail-kv">
+                  <div class="kv-row"><span>Firmware</span><span>{{ tower.reported.fwVersion ?? '--' }}</span></div>
+                  <div class="kv-row"><span>Coordinator</span><span>{{ tower.coordId }}</span></div>
+                  <div class="kv-row"><span>Quality</span><span>{{ tower.metadata.connectionQuality }}%</span></div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- Empty State (no selection) -->
+          <ng-container *ngIf="!hasSelection()">
+            <div class="detail-empty">
+              <ng-icon hlmIcon name="lucideCircleDot" size="lg" />
+              <span class="detail-empty-title">Select a device</span>
+              <span class="detail-empty-hint">Click a reservoir or tower in the topology to view its details</span>
+            </div>
+          </ng-container>
+
+        </div>
+      </div>
+
+      <!-- RIGHT: Topology Graph Card -->
+      <div class="dashboard-card graph-card">
+        <div class="graph-card-inner">
+          @if (twinLoading()) {
+            <hlm-skeleton class="full-skeleton" />
+          } @else if (twinsByCoordinator().length === 0) {
+            <div class="graph-empty">
+              <ng-icon hlmIcon name="lucideGitBranch" size="lg" />
+              <span>No twin data available</span>
+              <button hlmBtn variant="ghost" size="sm" (click)="refreshData()">Refresh</button>
+            </div>
+          } @else {
+            <!-- Farm Group — rendered as linked list -->
+            <div class="farm-group">
+              <span class="farm-group-label">Hydro Farm Alpha</span>
+
+              @for (group of twinsByCoordinator(); track group.coordinator.coordId) {
+                <div class="coord-chain">
+                  <!-- Coordinator node -->
+                  <button
+                    class="chain-node coord"
+                    [class.selected]="isNodeSelected('coordinator', group.coordinator.coordId)"
+                    [class.connected]="group.coordinator.metadata.isConnected"
+                    (click)="selectNode('coordinator', group.coordinator.coordId)">
+                    <span class="chain-dot coord-dot"></span>
+                    <span class="chain-name">{{ group.coordinator.name }}</span>
+                  </button>
+
+                  <!-- Arrow connector -->
+                  <div class="chain-connector">
+                    <svg viewBox="0 0 32 2" class="connector-line"><line x1="0" y1="1" x2="32" y2="1" /></svg>
+                  </div>
+
+                  <!-- Tower nodes -->
+                  @for (tower of group.towers; track tower.towerId; let last = $last) {
+                    <button
+                      class="chain-node tower"
+                      [class.selected]="isNodeSelected('tower', tower.towerId)"
+                      [class.connected]="tower.metadata.isConnected"
+                      (click)="selectNode('tower', tower.towerId)">
+                      <span class="chain-dot tower-dot"></span>
+                      <span class="chain-name">{{ tower.name }}</span>
+                    </button>
+                    @if (!last) {
+                      <div class="chain-connector sibling">
+                        <svg viewBox="0 0 20 2" class="connector-line sibling"><line x1="0" y1="1" x2="20" y2="1" /></svg>
                       </div>
-                    </div>
+                    }
                   }
                 </div>
               }
+            </div>
+
+            <!-- Infra pills -->
+            <div class="infra-overlay">
+              <div class="infra-pill" [class.online]="!usingMockData()">
+                <ng-icon hlmIcon name="lucideServer" size="xs" /><span>API</span>
+              </div>
+              <div class="infra-pill" [class.online]="!usingMockData()">
+                <ng-icon hlmIcon name="lucideDatabase" size="xs" /><span>DB</span>
+              </div>
+              <div class="infra-pill" [class.online]="wsConnected()">
+                <ng-icon hlmIcon name="lucideRadio" size="xs" /><span>MQTT</span>
+              </div>
             </div>
           }
         </div>
@@ -224,7 +343,7 @@
     </div>
   </section>
 
-  <!-- Alerts Section - Outside Card -->
+  <!-- Alerts Section -->
   @if (activeAlerts().length > 0) {
     <section class="alerts-section-standalone">
       <div class="alerts-header">

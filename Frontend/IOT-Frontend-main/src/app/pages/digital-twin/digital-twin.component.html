@@ -1,48 +1,197 @@
-<div class="placeholder-page">
+<div class="digital-twin-page">
+  <!-- Header -->
   <header class="page-header">
     <a routerLink="/overview" hlmBtn variant="ghost" size="icon" class="back-btn">
       <ng-icon hlmIcon name="lucideArrowLeft" size="sm" />
     </a>
     <div class="header-content">
       <h1 class="page-title">Digital Twin</h1>
-      <p class="page-description">3D visualization of your hydroponic farm</p>
+      <p class="page-description">Real-time twin state of your hydroponic farm</p>
     </div>
-    <span hlmBadge variant="secondary">Coming Soon</span>
+    <div class="header-actions">
+      <button hlmBtn variant="outline" size="sm" (click)="refresh()" [disabled]="isLoading()">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" [class.spinning]="isLoading()" />
+        Refresh
+      </button>
+    </div>
   </header>
 
-  <div class="placeholder-content">
-    <div class="placeholder-card" hlmCard>
-      <div hlmCardHeader>
-        <ng-icon hlmIcon name="lucideFlower2" class="placeholder-icon" />
-        <span hlmCardTitle>3D Digital Twin</span>
-        <span hlmCardDescription>
-          Interactive 3D visualization powered by BabylonJS/Three.js
-        </span>
-      </div>
-      <div hlmCardContent>
-        <ul class="feature-list">
-          <li>
-            <ng-icon hlmIcon name="lucideBox" size="sm" />
-            <span>Real-time 3D model of the entire farm</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideSprout" size="sm" />
-            <span>Animated plant growth visualization</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideSun" size="sm" />
-            <span>LED status and spectrum visualization</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideDroplet" size="sm" />
-            <span>Water flow animation in reservoir</span>
-          </li>
-          <li>
-            <ng-icon hlmIcon name="lucideMousePointer" size="sm" />
-            <span>Interactive click-to-inspect elements</span>
-          </li>
-        </ul>
-      </div>
+  <!-- Error Banner -->
+  @if (error()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>{{ error() }}</span>
     </div>
-  </div>
+  }
+
+  <!-- Coordinator Twins -->
+  @if (isLoading() && coordTwins().length === 0) {
+    <div class="loading-message">
+      <ng-icon hlmIcon name="lucideRefreshCw" size="lg" class="spinning" />
+      <span>Loading digital twins...</span>
+    </div>
+  } @else if (coordTwins().length === 0 && !isLoading()) {
+    <div class="empty-message">
+      <ng-icon hlmIcon name="lucideServer" size="lg" />
+      <span>No coordinator twins found. Register a coordinator to see its digital twin.</span>
+    </div>
+  } @else {
+    <section class="twin-list">
+      @for (coord of coordTwins(); track coord.coordId) {
+        <div class="coordinator-card" hlmCard [class.expanded]="isCoordExpanded(coord.coordId)">
+          <!-- Clickable Header -->
+          <button class="coord-toggle" (click)="toggleCoord(coord.coordId)">
+            <div class="coord-toggle-left">
+              <ng-icon hlmIcon
+                [name]="isCoordExpanded(coord.coordId) ? 'lucideChevronDown' : 'lucideChevronRight'"
+                size="sm"
+                class="chevron-icon" />
+              <ng-icon hlmIcon name="lucideServer" size="sm" />
+              <span class="coord-name">{{ coord.name || coord.coordId }}</span>
+              <span class="coord-id">{{ coord.coordId }}</span>
+            </div>
+            <div class="coord-toggle-right">
+              <!-- Compact sensor summary (always visible) -->
+              <div class="coord-summary">
+                @if (coord.reported.ph != null) {
+                  <span class="summary-chip">pH {{ formatNumber(coord.reported.ph) }}</span>
+                }
+                @if (coord.reported.ecMsCm != null) {
+                  <span class="summary-chip">EC {{ formatNumber(coord.reported.ecMsCm) }}</span>
+                }
+                @if (coord.reported.waterLevelPct != null) {
+                  <span class="summary-chip">{{ formatPercent(coord.reported.waterLevelPct) }}</span>
+                }
+              </div>
+              <div class="coord-badges">
+                <span hlmBadge [variant]="coord.metadata.isConnected ? 'default' : 'outline'" class="connection-badge">
+                  <ng-icon hlmIcon [name]="coord.metadata.isConnected ? 'lucideWifi' : 'lucideWifiOff'" size="xs" />
+                  {{ coord.metadata.isConnected ? 'Online' : 'Offline' }}
+                </span>
+                @if (coord.metadata.syncStatus) {
+                  <span hlmBadge [variant]="getSyncBadgeVariant(coord.metadata.syncStatus)">
+                    {{ formatSyncLabel(coord.metadata.syncStatus) }}
+                  </span>
+                }
+                <span class="tower-count-badge">
+                  <ng-icon hlmIcon name="lucideLayoutGrid" size="xs" />
+                  {{ getTowersForCoord(coord.coordId).length }}
+                </span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Collapsible Content -->
+          @if (isCoordExpanded(coord.coordId)) {
+            <div class="coord-body">
+              <!-- Coordinator Reported State -->
+              <div class="sensor-grid">
+                @if (coord.reported.ph != null) {
+                  <div class="sensor-item">
+                    <ng-icon hlmIcon name="lucideDroplet" size="sm" />
+                    <span class="sensor-label">pH</span>
+                    <span class="sensor-value">{{ formatNumber(coord.reported.ph) }}</span>
+                  </div>
+                }
+                @if (coord.reported.ecMsCm != null) {
+                  <div class="sensor-item">
+                    <ng-icon hlmIcon name="lucideActivity" size="sm" />
+                    <span class="sensor-label">EC</span>
+                    <span class="sensor-value">{{ formatNumber(coord.reported.ecMsCm) }} mS</span>
+                  </div>
+                }
+                @if (coord.reported.waterTempC != null) {
+                  <div class="sensor-item">
+                    <ng-icon hlmIcon name="lucideThermometer" size="sm" />
+                    <span class="sensor-label">Water</span>
+                    <span class="sensor-value">{{ formatTemp(coord.reported.waterTempC) }}&deg;C</span>
+                  </div>
+                }
+                @if (coord.reported.waterLevelPct != null) {
+                  <div class="sensor-item">
+                    <ng-icon hlmIcon name="lucideGauge" size="sm" />
+                    <span class="sensor-label">Level</span>
+                    <span class="sensor-value">{{ formatPercent(coord.reported.waterLevelPct) }}</span>
+                  </div>
+                }
+              </div>
+
+              <!-- Tower Twins for this Coordinator -->
+              @if (getTowersForCoord(coord.coordId).length > 0) {
+                <div class="towers-section">
+                  <h4 class="towers-heading">
+                    <ng-icon hlmIcon name="lucideLayoutGrid" size="sm" />
+                    Towers ({{ getTowersForCoord(coord.coordId).length }})
+                  </h4>
+                  <div class="tower-list-scroll">
+                    @for (tower of getTowersForCoord(coord.coordId); track tower.towerId) {
+                      <div class="tower-item">
+                        <div class="tower-header">
+                          <span class="tower-name">{{ tower.name || tower.towerId }}</span>
+                          <div class="tower-badges">
+                            <span hlmBadge [variant]="tower.metadata.isConnected ? 'default' : 'outline'" class="connection-badge sm">
+                              {{ tower.metadata.isConnected ? 'On' : 'Off' }}
+                            </span>
+                            @if (tower.metadata.syncStatus) {
+                              <span hlmBadge [variant]="getSyncBadgeVariant(tower.metadata.syncStatus)" class="sm">
+                                {{ formatSyncLabel(tower.metadata.syncStatus) }}
+                              </span>
+                            }
+                          </div>
+                        </div>
+                        <div class="tower-sensors">
+                          @if (tower.reported.airTempC != null) {
+                            <span class="mini-sensor">
+                              <ng-icon hlmIcon name="lucideThermometer" size="xs" />
+                              {{ formatTemp(tower.reported.airTempC) }}&deg;C
+                            </span>
+                          }
+                          @if (tower.reported.humidityPct != null) {
+                            <span class="mini-sensor">
+                              <ng-icon hlmIcon name="lucideDroplet" size="xs" />
+                              {{ formatPercent(tower.reported.humidityPct) }}
+                            </span>
+                          }
+                          @if (tower.reported.lightLux != null) {
+                            <span class="mini-sensor">
+                              <ng-icon hlmIcon name="lucideSun" size="xs" />
+                              {{ formatNumber(tower.reported.lightLux, 0) }} lx
+                            </span>
+                          }
+                          @if (tower.reported.vbatMv != null) {
+                            <span class="mini-sensor">
+                              <ng-icon hlmIcon name="lucideBattery" size="xs" />
+                              {{ formatNumber(tower.reported.vbatMv, 0) }} mV
+                            </span>
+                          }
+                          @if (tower.mlPredictions?.healthScore != null) {
+                            <span class="mini-sensor health-score">
+                              <ng-icon hlmIcon name="lucideLeaf" size="xs" />
+                              {{ formatHealthScore(tower.mlPredictions!.healthScore) }}
+                            </span>
+                          }
+                        </div>
+                        @if (tower.cropType) {
+                          <div class="tower-crop">
+                            <ng-icon hlmIcon name="lucideFlower2" size="xs" />
+                            <span>{{ tower.cropType }}</span>
+                            @if (tower.mlPredictions?.daysToHarvest != null) {
+                              <span class="harvest-eta">
+                                <ng-icon hlmIcon name="lucideClock" size="xs" />
+                                {{ tower.mlPredictions!.daysToHarvest }}d to harvest
+                              </span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
 </div>

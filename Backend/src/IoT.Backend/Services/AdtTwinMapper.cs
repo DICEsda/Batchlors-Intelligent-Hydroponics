@@ -351,6 +351,52 @@ public class AdtTwinMapper
         return $"{GetCoordinatorTwinId(coordId)}-hasTower-{GetTowerTwinId(towerId)}";
     }
 
+    /// <summary>
+    /// Generates the ADT twin ID for a farm.
+    /// </summary>
+    public string GetFarmTwinId(string farmId)
+    {
+        return SanitizeTwinId($"farm-{farmId}");
+    }
+
+    /// <summary>
+    /// Generates the relationship ID for a farm-coordinator relationship.
+    /// </summary>
+    public string GetHasCoordinatorRelationshipId(string farmId, string coordId)
+    {
+        return $"{GetFarmTwinId(farmId)}-hasCoordinator-{GetCoordinatorTwinId(coordId)}";
+    }
+
+    /// <summary>
+    /// Maps a Farm model to a BasicDigitalTwin for Azure Digital Twins.
+    /// </summary>
+    /// <param name="farm">The source farm from MongoDB</param>
+    /// <returns>A BasicDigitalTwin ready for ADT upsert</returns>
+    public BasicDigitalTwin MapFarmTwin(Farm farm)
+    {
+        var twin = new BasicDigitalTwin
+        {
+            Id = GetFarmTwinId(farm.FarmId),
+            Metadata = { ModelId = FarmModelId },
+            Contents = new Dictionary<string, object>
+            {
+                ["name"] = farm.Name,
+                ["created_at"] = farm.CreatedAt
+            }
+        };
+
+        // Add timezone if we have location info (placeholder)
+        if (!string.IsNullOrEmpty(farm.Location))
+        {
+            twin.Contents["location"] = new Dictionary<string, object>
+            {
+                ["address"] = farm.Location
+            };
+        }
+
+        return twin;
+    }
+
     private Dictionary<string, object> BuildMlPredictions(TowerTwin tower)
     {
         var predictions = new Dictionary<string, object>

@@ -52,7 +52,7 @@ export interface PairingSession {
 /**
  * Tower capabilities reported during pairing
  */
-export interface TowerCapabilities {
+export interface TowerPairingCapabilities {
   has_pump: boolean;
   has_light: boolean;
   slot_count: number;
@@ -86,7 +86,7 @@ export interface TowerPairingRequest {
   fw_version?: string;
   
   /** Hardware capabilities reported by the tower */
-  capabilities?: TowerCapabilities;
+  capabilities?: TowerPairingCapabilities;
   
   /** Signal strength (RSSI) during the pairing request */
   rssi?: number;

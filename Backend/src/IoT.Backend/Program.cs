@@ -5,8 +5,28 @@ using IoT.Backend.Repositories;
 using IoT.Backend.Services;
 using IoT.Backend.WebSockets;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using Serilog;
+
+// Allow the MongoDB driver to truncate BSON double values into C# float (Single)
+// without throwing TruncationException. This is needed because mongosh and many
+// tools store all numbers as 64-bit doubles, while our C# models use float.
+// The try-catch guard prevents BsonSerializationException when
+// WebApplicationFactory re-enters Program.Main during integration tests.
+#pragma warning disable CS0618
+try
+{
+    BsonSerializer.RegisterSerializer(new SingleSerializer(
+        MongoDB.Bson.BsonType.Double,
+        new MongoDB.Bson.Serialization.Options.RepresentationConverter(allowOverflow: true, allowTruncation: true)));
+}
+catch (MongoDB.Bson.BsonSerializationException)
+{
+    // Serializer already registered (e.g. from a previous WebApplicationFactory instance in tests)
+}
+#pragma warning restore CS0618
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -112,6 +132,9 @@ builder.Services.AddHttpClient<IMlService, MlService>();
 // Azure Digital Twins (optional - only used if configured)
 builder.Services.Configure<AzureDigitalTwinsConfig>(builder.Configuration.GetSection(AzureDigitalTwinsConfig.Section));
 builder.Services.AddSingleton<IAzureDigitalTwinsService, AzureDigitalTwinsService>();
+builder.Services.AddSingleton<AdtTwinMapper>();
+builder.Services.AddSingleton<TwinChangeChannel>();
+builder.Services.AddHostedService<AdtSyncService>();
 
 // ML Scheduler (periodic ML inference and prediction sync)
 builder.Services.Configure<MlSchedulerConfig>(builder.Configuration.GetSection(MlSchedulerConfig.Section));

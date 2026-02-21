@@ -1,0 +1,122 @@
+@startuml Intelligent Hydroponics System Architecture
+
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam shadowing false
+
+title Intelligent Hydroponics IoT System Architecture
+
+package "User Interface" #LightYellow {
+    [Angular Dashboard\nWeb Application] as Frontend
+}
+
+cloud "Azure Cloud Platform" #Azure {
+    
+    package "Application Services" #LightBlue {
+        [ASP.NET Core\nBackend API\n(Port 8000)] as Backend
+        [Azure Digital Twins\nVirtual Farm\nSimulation] as DigitalTwin
+        [Machine Learning\nPredictive Analytics] as ML
+    }
+    
+    package "Data Services" #LightGreen {
+        database "MongoDB\nTime-Series\nDatabase" as MongoDB
+        queue "MQTT Broker\nMosquitto\n(Port 1883)" as MQTT
+    }
+}
+
+package "Edge Gateway Layer" #Coral {
+    node "Coordinator 1\n(ESP32-S3)" as Coord1 {
+        [Reservoir Controller\npH, EC, TDS, Temp\nWater Level] as Res1
+    }
+    
+    node "Coordinator 2\n(ESP32-S3)" as Coord2 {
+        [Reservoir Controller\npH, EC, TDS, Temp\nWater Level] as Res2
+    }
+    
+    node "Coordinator N\n(ESP32-S3)" as CoordN {
+        [Reservoir Controller\npH, EC, TDS, Temp\nWater Level] as ResN
+    }
+}
+
+package "IoT Device Layer" #LightCyan {
+    component "Tower Node 1\n(ESP32-C3)\nAir Temp, Humidity\nLight, Pump, Grow Light" as Tower1
+    component "Tower Node 2\n(ESP32-C3)\nAir Temp, Humidity\nLight, Pump, Grow Light" as Tower2
+    component "Tower Node N\n(ESP32-C3)\nAir Temp, Humidity\nLight, Pump, Grow Light" as TowerN
+}
+
+' User Interface Connections
+Frontend -down-> Backend : "REST API\nWebSocket\n(Real-time)"
+
+' Cloud Internal Connections
+Backend -down-> MongoDB : "Store/Query\nTelemetry Data"
+Backend -down-> MQTT : "Publish/Subscribe\nCommands & Events"
+Backend -right-> DigitalTwin : "Sync Physical\nto Virtual State"
+Backend -right-> ML : "Training Data\nPredictions"
+DigitalTwin ..> ML : "Simulation\nScenarios"
+
+' Cloud to Edge
+MQTT -down-> Coord1 : "MQTT over WiFi\nQoS 0/1"
+MQTT -down-> Coord2 : "MQTT over WiFi\nQoS 0/1"
+MQTT -down-> CoordN : "MQTT over WiFi\nQoS 0/1"
+
+' Edge to Device
+Coord1 -down-> Tower1 : "ESP-NOW\n<10ms latency"
+Coord1 -down-> Tower2 : "ESP-NOW\n<10ms latency"
+Coord2 -down-> TowerN : "ESP-NOW\n<10ms latency"
+
+' Annotations
+note right of DigitalTwin
+  <b>Azure Digital Twins Features:</b>
+  • Virtual replica of physical farm
+  • Real-time state synchronization
+  • "What-if" scenario testing
+  • Training without hardware
+  • Design validation
+end note
+
+note bottom of MQTT
+  <b>MQTT Topics:</b>
+  farm/{farmId}/coord/{coordId}/
+    • reservoir/telemetry
+    • reservoir/cmd
+    • tower/{towerId}/telemetry
+    • tower/{towerId}/cmd
+end note
+
+note bottom of Coord1
+  <b>Coordinator Capabilities:</b>
+  • Manages up to 20 tower nodes
+  • ESP-NOW to MQTT gateway
+  • Local decision making
+  • Sensor aggregation
+end note
+
+note bottom of Tower1
+  <b>Tower Node Features:</b>
+  • Battery powered
+  • Deep sleep optimization
+  • Wireless mesh networking
+  • Edge processing
+end note
+
+legend right
+  <b>System Layers:</b>
+  |<#LightYellow> User Interface |
+  |<#Azure> Azure Cloud Services |
+  |<#Coral> Edge Gateway (Coordinators) |
+  |<#LightCyan> IoT Devices (Tower Nodes) |
+  
+  <b>Communication Protocols:</b>
+  • REST/WebSocket: Frontend ↔ Cloud
+  • MQTT: Cloud ↔ Edge (over WiFi)
+  • ESP-NOW: Edge ↔ Devices (mesh)
+  
+  <b>Key Technologies:</b>
+  • Frontend: Angular 18 + TypeScript
+  • Backend: ASP.NET Core 8 (C#)
+  • Cloud: Azure Digital Twins
+  • Database: MongoDB 7.0
+  • Hardware: ESP32-S3, ESP32-C3
+endlegend
+
+@enduml

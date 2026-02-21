@@ -26,3 +26,6 @@ export * from './ota.service';
 
 // Alert and notification management service
 export * from './alert.service';
+
+// Digital Twin state management service
+export * from './twin.service';

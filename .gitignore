@@ -7,6 +7,10 @@
 google-service-account.json
 **/google-service-account.json
 
+# Azure / .NET secrets (local overrides with real credentials)
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+
 # Docker
 docker-compose.override.yml
 

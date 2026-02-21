@@ -47,9 +47,14 @@ import {
   PredictionRequest,
   BatchPredictionRequest,
   MLModelInfo,
-  // Digital Twin
-  FarmTopology,
-  DigitalTwinState,
+  // Digital Twin (REST API contract types)
+  FarmTwinsResponse,
+  TowerTwin,
+  CoordinatorTwin,
+  TowerDesiredState,
+  CoordinatorDesiredState,
+  TowerDeltaResponse,
+  CoordinatorDeltaResponse,
   // Pairing
   PairingSession,
   TowerPairingRequest,
@@ -152,9 +157,9 @@ export class ApiService {
    */
   startPairing(farmId: string, coordId: string, durationSeconds = 60): Observable<PairingSession> {
     return this.post<PairingSession>('/api/pairing/start', {
-      farm_id: farmId,
-      coord_id: coordId,
-      duration_seconds: durationSeconds
+      farmId,
+      coordId,
+      durationSeconds
     });
   }
 
@@ -164,8 +169,8 @@ export class ApiService {
    */
   stopPairing(farmId: string, coordId: string): Observable<PairingSession> {
     return this.post<PairingSession>('/api/pairing/stop', {
-      farm_id: farmId,
-      coord_id: coordId
+      farmId,
+      coordId
     });
   }
 
@@ -197,9 +202,9 @@ export class ApiService {
    */
   approveNode(farmId: string, coordId: string, towerId: string): Observable<Tower> {
     return this.post<Tower>('/api/pairing/approve', {
-      farm_id: farmId,
-      coord_id: coordId,
-      tower_id: towerId
+      farmId,
+      coordId,
+      towerId
     });
   }
 
@@ -209,9 +214,9 @@ export class ApiService {
    */
   rejectNode(farmId: string, coordId: string, towerId: string): Observable<ApiResponse<void>> {
     return this.post<ApiResponse<void>>('/api/pairing/reject', {
-      farm_id: farmId,
-      coord_id: coordId,
-      tower_id: towerId
+      farmId,
+      coordId,
+      towerId
     });
   }
 
@@ -222,9 +227,9 @@ export class ApiService {
    */
   forgetDevice(farmId: string, coordId: string, towerId: string): Observable<ApiResponse<void>> {
     return this.post<ApiResponse<void>>('/api/pairing/forget', {
-      farm_id: farmId,
-      coord_id: coordId,
-      tower_id: towerId
+      farmId,
+      coordId,
+      towerId
     });
   }
 
@@ -312,7 +317,7 @@ export class ApiService {
    * Turn off node LED
    */
   turnOffNode(nodeId: string): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/node/off', { node_id: nodeId });
+    return this.post<ApiResponse<void>>('/api/v1/node/off', { nodeId });
   }
 
   /**
@@ -532,15 +537,61 @@ export class ApiService {
   }
 
   // ============================================================================
-  // Digital Twin API (if available)
+  // Farms API
   // ============================================================================
 
-  getFarmTopology(): Observable<FarmTopology> {
-    return this.get<FarmTopology>('/api/v1/digital-twin/topology');
+  /** Get all farms. */
+  getFarms(): Observable<any[]> {
+    return this.get<any[]>('/api/v1/farms');
   }
 
-  getDigitalTwinState(): Observable<DigitalTwinState> {
-    return this.get<DigitalTwinState>('/api/v1/digital-twin/state');
+  // ============================================================================
+  // Digital Twin API (/api/twins/*)
+  // ============================================================================
+
+  /** Get all twins for a farm (coordinators + towers in one call). */
+  getFarmTwins(farmId: string): Observable<FarmTwinsResponse> {
+    return this.get<FarmTwinsResponse>(`/api/twins/farms/${farmId}`);
+  }
+
+  /** Get a single tower twin by ID. */
+  getTowerTwin(towerId: string): Observable<TowerTwin> {
+    return this.get<TowerTwin>(`/api/twins/towers/${towerId}`);
+  }
+
+  /** Get tower twins for a coordinator (requires farmId + coordId). */
+  getTowerTwins(farmId: string, coordId: string): Observable<TowerTwin[]> {
+    return this.get<TowerTwin[]>('/api/twins/towers', { farmId, coordId });
+  }
+
+  /** Set desired state for a tower. */
+  setTowerDesiredState(towerId: string, desired: Partial<TowerDesiredState>): Observable<void> {
+    return this.put<void>(`/api/twins/towers/${towerId}/desired`, desired);
+  }
+
+  /** Get the desired vs reported delta for a tower. */
+  getTowerDelta(towerId: string): Observable<TowerDeltaResponse> {
+    return this.get<TowerDeltaResponse>(`/api/twins/towers/${towerId}/delta`);
+  }
+
+  /** Get a single coordinator twin by ID. */
+  getCoordinatorTwin(coordId: string): Observable<CoordinatorTwin> {
+    return this.get<CoordinatorTwin>(`/api/twins/coordinators/${coordId}`);
+  }
+
+  /** Get coordinator twins for a farm. */
+  getCoordinatorTwins(farmId: string): Observable<CoordinatorTwin[]> {
+    return this.get<CoordinatorTwin[]>('/api/twins/coordinators', { farmId });
+  }
+
+  /** Set desired state for a coordinator. */
+  setCoordinatorDesiredState(coordId: string, desired: Partial<CoordinatorDesiredState>): Observable<void> {
+    return this.put<void>(`/api/twins/coordinators/${coordId}/desired`, desired);
+  }
+
+  /** Get the desired vs reported delta for a coordinator. */
+  getCoordinatorDelta(coordId: string): Observable<CoordinatorDeltaResponse> {
+    return this.get<CoordinatorDeltaResponse>(`/api/twins/coordinators/${coordId}/delta`);
   }
 
   // ============================================================================
@@ -558,24 +609,15 @@ export class ApiService {
    * Approve a pending coordinator registration
    */
   approveCoordinatorRegistration(request: ApproveCoordinatorRequest): Observable<any> {
-    // Backend expects snake_case JSON (PropertyNamingPolicy.SnakeCaseLower)
-    const body = {
-      coord_id: request.coordId,
-      farm_id: request.farmId,
-      name: request.name,
-      description: request.description,
-      color: request.color,
-      tags: request.tags,
-      location: request.location
-    };
-    return this.post('/api/coordinators/register/approve', body);
+    // The snakeCaseInterceptor converts camelCase keys to snake_case automatically
+    return this.post('/api/coordinators/register/approve', request);
   }
 
   /**
    * Reject a pending coordinator registration
    */
   rejectCoordinatorRegistration(coordId: string): Observable<any> {
-    return this.post('/api/coordinators/register/reject', { coord_id: coordId });
+    return this.post('/api/coordinators/register/reject', { coordId });
   }
 
   /**

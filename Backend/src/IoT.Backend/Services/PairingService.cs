@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using IoT.Backend.Models;
+using IoT.Backend.Models.DigitalTwin;
 using IoT.Backend.Repositories;
 
 namespace IoT.Backend.Services;
@@ -13,6 +14,7 @@ public class PairingService : IPairingService
     private readonly ITowerRepository _towerRepository;
     private readonly IMqttService _mqtt;
     private readonly IWsBroadcaster _broadcaster;
+    private readonly TwinChangeChannel _changeChannel;
     private readonly ILogger<PairingService> _logger;
     
     // In-memory cache of active sessions for fast lookup
@@ -22,11 +24,13 @@ public class PairingService : IPairingService
         ITowerRepository towerRepository,
         IMqttService mqtt,
         IWsBroadcaster broadcaster,
+        TwinChangeChannel changeChannel,
         ILogger<PairingService> logger)
     {
         _towerRepository = towerRepository;
         _mqtt = mqtt;
         _broadcaster = broadcaster;
+        _changeChannel = changeChannel;
         _logger = logger;
     }
 
@@ -295,6 +299,29 @@ public class PairingService : IPairingService
 
         await _towerRepository.UpsertAsync(tower, ct);
 
+        // Emit ADT sync event — create tower twin + coordinator→tower relationship
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.TowerPaired,
+            DeviceId = towerId,
+            FarmId = farmId,
+            CoordId = coordId,
+            TowerTwin = new TowerTwin
+            {
+                Id = tower.Id,
+                TowerId = towerId,
+                CoordId = coordId,
+                FarmId = farmId,
+                Name = tower.Name,
+                Capabilities = tower.Capabilities,
+                Reported = new TowerReportedState
+                {
+                    StatusMode = "pairing",
+                    FwVersion = tower.FwVersion
+                }
+            }
+        });
+
         // Broadcast to WebSocket clients
         await _broadcaster.BroadcastAsync("pairing_approved", new
         {
@@ -536,6 +563,15 @@ public class PairingService : IPairingService
         _logger.LogInformation(
             "Deleted tower {TowerId} from {FarmId}/{CoordId}",
             towerId, farmId, coordId);
+
+        // Emit ADT sync event — delete tower twin + relationships
+        _changeChannel.TryWrite(new TwinChangeEvent
+        {
+            ChangeType = TwinChangeType.TowerRemoved,
+            DeviceId = towerId,
+            FarmId = farmId,
+            CoordId = coordId
+        });
 
         // Broadcast to WebSocket clients
         await _broadcaster.BroadcastAsync("device_forgotten", new

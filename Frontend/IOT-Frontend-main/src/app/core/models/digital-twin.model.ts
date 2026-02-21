@@ -1,77 +1,217 @@
 /**
  * Digital Twin Models for Hydroponic Farm System
- * System topology, real-time state, and 3D visualization
+ *
+ * These interfaces use camelCase property names (Angular convention).
+ * The snake_case REST API responses are automatically transformed
+ * by the snakeCaseInterceptor (see core/snake-case.interceptor.ts).
+ *
+ * Backend source: Backend/src/IoT.Backend/Models/DigitalTwin/
  */
 
 // ============================================================================
-// Farm Topology
+// Enums
 // ============================================================================
 
-export interface FarmTopology {
-  farmId: string;
-  farmName: string;
-  
-  // Coordinators with their towers
-  coordinators: CoordinatorNode[];
-  
-  // Connections (for graph visualization)
-  connections: TopologyConnection[];
-  
-  // Metadata
-  lastUpdated: Date;
+/** Sync status values — stored lowercase in MongoDB, serialized lowercase by REST */
+/** Backend serializes InSync as "insync" (no underscore). Accept both forms. */
+export type SyncStatus = 'in_sync' | 'insync' | 'pending' | 'stale' | 'conflict' | 'offline';
+
+// ============================================================================
+// Twin Metadata
+// ============================================================================
+
+export interface TwinMetadata {
+  version: number;
+  syncStatus: SyncStatus;
+  lastReportedAt: string | null;
+  lastDesiredAt: string | null;
+  lastSyncAttempt: string | null;
+  syncRetryCount: number;
+  createdAt: string;
+  updatedAt: string;
+  isConnected: boolean;
+  connectionQuality: number;
 }
 
-export interface CoordinatorNode {
-  coordId: string;
-  name: string;
-  status: 'online' | 'offline' | 'warning' | 'error';
-  position?: Position3D;
-  
-  // Quick stats
-  ph: number;
-  ec: number;
-  waterLevel: number;
-  
-  // Connected towers
-  towers: TowerNode[];
+// ============================================================================
+// Tower Twin (matches TowerTwin.cs)
+// ============================================================================
+
+export interface TowerReportedState {
+  airTempC: number | null;
+  humidityPct: number | null;
+  lightLux: number | null;
+  pumpOn: boolean | null;
+  lightOn: boolean | null;
+  lightBrightness: number | null;
+  statusMode: string | null;
+  vbatMv: number | null;
+  fwVersion: string | null;
+  uptimeS: number | null;
+  signalQuality: number | null;
 }
 
-export interface TowerNode {
+export interface TowerDesiredState {
+  pumpOn: boolean | null;
+  lightOn: boolean | null;
+  lightBrightness: number | null;
+  statusMode: string | null;
+}
+
+export interface TowerCapabilities {
+  slotCount: number;
+  hasPump: boolean;
+  hasLight: boolean;
+  hasTemperatureSensor: boolean;
+  hasHumiditySensor: boolean;
+  hasLightSensor: boolean;
+}
+
+export interface MlPredictions {
+  predictedHeightCm: number | null;
+  expectedHarvestDate: string | null;
+  daysToHarvest: number | null;
+  growthRateCmPerDay: number | null;
+  healthScore: number | null;
+  confidence: number | null;
+  modelName: string | null;
+  modelVersion: string | null;
+  lastUpdatedAt: string | null;
+  inputAvgTempC: number | null;
+  inputAvgHumidityPct: number | null;
+  inputAvgLightLux: number | null;
+}
+
+export interface TowerTwin {
+  _id: string;
   towerId: string;
-  name: string;
   coordId: string;
-  status: 'online' | 'offline' | 'warning' | 'error';
-  position?: Position3D;
-  
-  // Quick stats
-  occupiedSlots: number;
-  totalSlots: number;
-  averageHealthScore: number;
-  
-  // Plant slots for 3D visualization
-  slots: SlotNode[];
-}
-
-export interface SlotNode {
-  slotIndex: number;
-  isEmpty: boolean;
-  plantType?: string;
-  heightCm?: number;
-  healthScore?: number;
-  position?: Position3D;
-}
-
-export interface TopologyConnection {
-  sourceId: string;
-  sourceType: 'farm' | 'coordinator' | 'tower';
-  targetId: string;
-  targetType: 'coordinator' | 'tower' | 'slot';
-  connectionType: 'control' | 'data' | 'power';
-  status: 'active' | 'inactive' | 'error';
+  farmId: string;
+  name: string;
+  reported: TowerReportedState;
+  desired: TowerDesiredState;
+  metadata: TwinMetadata;
+  capabilities: TowerCapabilities | null;
+  cropType: string | null;
+  plantingDate: string | null;
+  lastHeightCm: number | null;
+  lastHeightAt: string | null;
+  predictedHeightCm: number | null;
+  expectedHarvestDate: string | null;
+  mlPredictions: MlPredictions | null;
 }
 
 // ============================================================================
-// 3D Positioning
+// Coordinator Twin (matches CoordinatorTwin.cs)
+// ============================================================================
+
+export interface CoordinatorReportedState {
+  fwVersion: string | null;
+  towersOnline: number;
+  nodesOnline: number;
+  wifiRssi: number | null;
+  statusMode: string | null;
+  uptimeS: number | null;
+  lightLux: number | null;
+  tempC: number | null;
+  // Reservoir sensors
+  ph: number | null;
+  ecMsCm: number | null;
+  tdsPpm: number | null;
+  waterTempC: number | null;
+  waterLevelPct: number | null;
+  waterLevelCm: number | null;
+  lowWaterAlert: boolean | null;
+  // Actuators
+  mainPumpOn: boolean | null;
+  dosingPumpPhOn: boolean | null;
+  dosingPumpNutrientOn: boolean | null;
+}
+
+export interface ReservoirSetpoints {
+  phTarget: number;
+  phTolerance: number;
+  ecTarget: number;
+  ecTolerance: number;
+  waterLevelMinPct: number;
+  waterTempTargetC: number;
+}
+
+export interface CoordinatorDesiredState {
+  mainPumpOn: boolean | null;
+  dosingPumpPhOn: boolean | null;
+  dosingPumpNutrientOn: boolean | null;
+  statusMode: string | null;
+  setpoints: ReservoirSetpoints | null;
+}
+
+export interface CoordinatorCapabilities {
+  phSensor: boolean;
+  ecSensor: boolean;
+  waterTempSensor: boolean;
+  waterLevelSensor: boolean;
+  mainPump: boolean;
+  phDosingPump: boolean;
+  nutrientDosingPump: boolean;
+  maxTowers: number;
+  lightSensor: boolean;
+}
+
+export interface CoordinatorTwin {
+  _id: string;
+  coordId: string;
+  siteId: string;
+  farmId: string;
+  name: string;
+  reported: CoordinatorReportedState;
+  desired: CoordinatorDesiredState;
+  metadata: TwinMetadata;
+  capabilities: CoordinatorCapabilities | null;
+}
+
+// ============================================================================
+// API Response Types (matches Responses.cs)
+// ============================================================================
+
+export interface FarmTwinsResponse {
+  farmId: string;
+  coordinators: CoordinatorTwin[];
+  towers: TowerTwin[];
+}
+
+export interface TowerDeltaResponse {
+  towerId: string;
+  syncStatus: SyncStatus;
+  isInSync: boolean;
+  delta: TowerDesiredState | null;
+}
+
+export interface CoordinatorDeltaResponse {
+  coordId: string;
+  syncStatus: SyncStatus;
+  isInSync: boolean;
+  delta: CoordinatorDesiredState | null;
+}
+
+// ============================================================================
+// WebSocket Event Payload (matches backend WsBroadcaster camelCase shape)
+// NOTE: WebSocket already uses camelCase (WsBroadcaster uses CamelCase policy)
+// ============================================================================
+
+export interface TwinUpdatePayload {
+  changeType: string;
+  deviceId: string;
+  farmId?: string;
+  coordId?: string;
+  towerTwin?: TowerTwin;
+  coordinatorTwin?: CoordinatorTwin;
+  towerReported?: TowerReportedState;
+  coordinatorReported?: CoordinatorReportedState;
+  timestamp?: string;
+}
+
+// ============================================================================
+// 3D Positioning (for future 3D visualization)
 // ============================================================================
 
 export interface Position3D {
@@ -81,9 +221,9 @@ export interface Position3D {
 }
 
 export interface Rotation3D {
-  x: number;                // Pitch
-  y: number;                // Yaw
-  z: number;                // Roll
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface Transform3D {
@@ -93,82 +233,18 @@ export interface Transform3D {
 }
 
 // ============================================================================
-// Digital Twin State
-// ============================================================================
-
-export interface DigitalTwinState {
-  timestamp: Date;
-  
-  // Farm-level state
-  farmStatus: 'normal' | 'warning' | 'critical';
-  activeAlertCount: number;
-  
-  // Aggregated metrics
-  metrics: {
-    totalCoordinators: number;
-    onlineCoordinators: number;
-    totalTowers: number;
-    onlineTowers: number;
-    totalPlants: number;
-    averageHealthScore: number;
-  };
-  
-  // Device states (keyed by device ID)
-  coordinatorStates: Map<string, CoordinatorTwinState>;
-  towerStates: Map<string, TowerTwinState>;
-}
-
-export interface CoordinatorTwinState {
-  coordId: string;
-  status: 'online' | 'offline' | 'warning' | 'error';
-  reservoir: {
-    ph: number;
-    ec: number;
-    temperature: number;
-    waterLevel: number;
-  };
-  lastUpdate: Date;
-}
-
-export interface TowerTwinState {
-  towerId: string;
-  coordId: string;
-  status: 'online' | 'offline' | 'warning' | 'error';
-  sensors: {
-    ambientTemp: number;
-    humidity: number;
-    lightLevel: number;
-  };
-  ledsActive: boolean;
-  slotStates: SlotTwinState[];
-  lastUpdate: Date;
-}
-
-export interface SlotTwinState {
-  slotIndex: number;
-  isEmpty: boolean;
-  plantType?: string;
-  heightCm?: number;
-  healthScore?: number;
-}
-
-// ============================================================================
-// 3D Model Configuration
+// 3D Model Configuration (for future 3D visualization)
 // ============================================================================
 
 export interface TowerModelConfig {
   slotCount: number;
-  slotSpacing: number;      // Vertical spacing in units
+  slotSpacing: number;
   towerRadius: number;
   towerHeight: number;
   baseHeight: number;
-  
-  // Materials
   towerMaterial: string;
   slotMaterial: string;
   plantMaterials: Record<string, string>;
-  
-  // Animation
   rotationSpeed?: number;
   highlightOnHover: boolean;
 }
@@ -183,7 +259,7 @@ export interface FarmLayoutConfig {
 }
 
 // ============================================================================
-// Visualization Events
+// Visualization Events (for future 3D visualization)
 // ============================================================================
 
 export interface VisualizationEvent {

@@ -425,6 +425,8 @@ public class AzureDigitalTwinsService : IAzureDigitalTwinsService
 
     private CancellationTokenSource CreateTimeoutCts(CancellationToken ct)
     {
-        return CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(_config.TimeoutSeconds));
+        return cts;
     }
 }
