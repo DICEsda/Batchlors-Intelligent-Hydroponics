@@ -104,4 +104,41 @@ public class MlPredictions
     [JsonPropertyName("input_avg_light_lux")]
     [BsonIgnoreIfNull]
     public double? InputAvgLightLux { get; set; }
+
+    // ========================================================================
+    // Clustering-derived Recommendations
+    // ========================================================================
+
+    /// <summary>
+    /// Recommended pH for this crop based on clustering analysis.
+    /// </summary>
+    [BsonElement("recommended_ph")]
+    [JsonPropertyName("recommended_ph")]
+    [BsonIgnoreIfNull]
+    public double? RecommendedPh { get; set; }
+
+    /// <summary>
+    /// Recommended EC (mS/cm) for this crop based on clustering analysis.
+    /// </summary>
+    [BsonElement("recommended_ec")]
+    [JsonPropertyName("recommended_ec")]
+    [BsonIgnoreIfNull]
+    public double? RecommendedEc { get; set; }
+
+    /// <summary>
+    /// Recommended daily light hours for this crop based on clustering analysis.
+    /// </summary>
+    [BsonElement("recommended_light_hours")]
+    [JsonPropertyName("recommended_light_hours")]
+    [BsonIgnoreIfNull]
+    public double? RecommendedLightHours { get; set; }
+
+    /// <summary>
+    /// Compatibility cluster ID this tower's crop belongs to.
+    /// Towers in the same cluster can share a reservoir.
+    /// </summary>
+    [BsonElement("compatibility_cluster")]
+    [JsonPropertyName("compatibility_cluster")]
+    [BsonIgnoreIfNull]
+    public int? CompatibilityCluster { get; set; }
 }

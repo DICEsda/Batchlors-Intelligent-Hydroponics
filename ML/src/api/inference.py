@@ -20,105 +20,226 @@ from ..config import config
 
 CROP_CONFIG = {
     "Lettuce": {
-        "temp_min_c": 15, "temp_max_c": 21, "temp_optimal_c": 18,
-        "humidity_min_pct": 50, "humidity_max_pct": 70, "humidity_optimal_pct": 60,
-        "light_min_lux": 10000, "light_max_lux": 15000, "light_hours_per_day": 14,
-        "ph_min": 5.5, "ph_max": 6.5, "ph_optimal": 6.0,
-        "ec_min_ms_cm": 0.8, "ec_max_ms_cm": 1.2, "ec_optimal_ms_cm": 1.0,
-        "expected_days_to_harvest": 45, "expected_height_cm": 25,
+        "temp_min_c": 15,
+        "temp_max_c": 21,
+        "temp_optimal_c": 18,
+        "humidity_min_pct": 50,
+        "humidity_max_pct": 70,
+        "humidity_optimal_pct": 60,
+        "light_min_lux": 10000,
+        "light_max_lux": 15000,
+        "light_hours_per_day": 14,
+        "ph_min": 5.5,
+        "ph_max": 6.5,
+        "ph_optimal": 6.0,
+        "ec_min_ms_cm": 0.8,
+        "ec_max_ms_cm": 1.2,
+        "ec_optimal_ms_cm": 1.0,
+        "expected_days_to_harvest": 45,
+        "expected_height_cm": 25,
         "growth_rate_cm_per_day": 0.6,
     },
     "Basil": {
-        "temp_min_c": 18, "temp_max_c": 30, "temp_optimal_c": 24,
-        "humidity_min_pct": 40, "humidity_max_pct": 60, "humidity_optimal_pct": 50,
-        "light_min_lux": 12000, "light_max_lux": 20000, "light_hours_per_day": 16,
-        "ph_min": 5.5, "ph_max": 6.5, "ph_optimal": 6.0,
-        "ec_min_ms_cm": 1.0, "ec_max_ms_cm": 1.6, "ec_optimal_ms_cm": 1.3,
-        "expected_days_to_harvest": 30, "expected_height_cm": 30,
+        "temp_min_c": 18,
+        "temp_max_c": 30,
+        "temp_optimal_c": 24,
+        "humidity_min_pct": 40,
+        "humidity_max_pct": 60,
+        "humidity_optimal_pct": 50,
+        "light_min_lux": 12000,
+        "light_max_lux": 20000,
+        "light_hours_per_day": 16,
+        "ph_min": 5.5,
+        "ph_max": 6.5,
+        "ph_optimal": 6.0,
+        "ec_min_ms_cm": 1.0,
+        "ec_max_ms_cm": 1.6,
+        "ec_optimal_ms_cm": 1.3,
+        "expected_days_to_harvest": 30,
+        "expected_height_cm": 30,
         "growth_rate_cm_per_day": 1.0,
     },
     "Spinach": {
-        "temp_min_c": 10, "temp_max_c": 20, "temp_optimal_c": 15,
-        "humidity_min_pct": 45, "humidity_max_pct": 65, "humidity_optimal_pct": 55,
-        "light_min_lux": 8000, "light_max_lux": 12000, "light_hours_per_day": 12,
-        "ph_min": 6.0, "ph_max": 7.0, "ph_optimal": 6.5,
-        "ec_min_ms_cm": 1.8, "ec_max_ms_cm": 2.3, "ec_optimal_ms_cm": 2.0,
-        "expected_days_to_harvest": 40, "expected_height_cm": 20,
+        "temp_min_c": 10,
+        "temp_max_c": 20,
+        "temp_optimal_c": 15,
+        "humidity_min_pct": 45,
+        "humidity_max_pct": 65,
+        "humidity_optimal_pct": 55,
+        "light_min_lux": 8000,
+        "light_max_lux": 12000,
+        "light_hours_per_day": 12,
+        "ph_min": 6.0,
+        "ph_max": 7.0,
+        "ph_optimal": 6.5,
+        "ec_min_ms_cm": 1.8,
+        "ec_max_ms_cm": 2.3,
+        "ec_optimal_ms_cm": 2.0,
+        "expected_days_to_harvest": 40,
+        "expected_height_cm": 20,
         "growth_rate_cm_per_day": 0.5,
     },
     "Kale": {
-        "temp_min_c": 7, "temp_max_c": 24, "temp_optimal_c": 16,
-        "humidity_min_pct": 45, "humidity_max_pct": 65, "humidity_optimal_pct": 55,
-        "light_min_lux": 10000, "light_max_lux": 15000, "light_hours_per_day": 14,
-        "ph_min": 6.0, "ph_max": 7.5, "ph_optimal": 6.5,
-        "ec_min_ms_cm": 1.0, "ec_max_ms_cm": 1.5, "ec_optimal_ms_cm": 1.25,
-        "expected_days_to_harvest": 55, "expected_height_cm": 35,
+        "temp_min_c": 7,
+        "temp_max_c": 24,
+        "temp_optimal_c": 16,
+        "humidity_min_pct": 45,
+        "humidity_max_pct": 65,
+        "humidity_optimal_pct": 55,
+        "light_min_lux": 10000,
+        "light_max_lux": 15000,
+        "light_hours_per_day": 14,
+        "ph_min": 6.0,
+        "ph_max": 7.5,
+        "ph_optimal": 6.5,
+        "ec_min_ms_cm": 1.0,
+        "ec_max_ms_cm": 1.5,
+        "ec_optimal_ms_cm": 1.25,
+        "expected_days_to_harvest": 55,
+        "expected_height_cm": 35,
         "growth_rate_cm_per_day": 0.65,
     },
     "Strawberry": {
-        "temp_min_c": 15, "temp_max_c": 26, "temp_optimal_c": 20,
-        "humidity_min_pct": 60, "humidity_max_pct": 80, "humidity_optimal_pct": 70,
-        "light_min_lux": 15000, "light_max_lux": 25000, "light_hours_per_day": 12,
-        "ph_min": 5.5, "ph_max": 6.5, "ph_optimal": 6.0,
-        "ec_min_ms_cm": 1.0, "ec_max_ms_cm": 1.5, "ec_optimal_ms_cm": 1.2,
-        "expected_days_to_harvest": 90, "expected_height_cm": 20,
+        "temp_min_c": 15,
+        "temp_max_c": 26,
+        "temp_optimal_c": 20,
+        "humidity_min_pct": 60,
+        "humidity_max_pct": 80,
+        "humidity_optimal_pct": 70,
+        "light_min_lux": 15000,
+        "light_max_lux": 25000,
+        "light_hours_per_day": 12,
+        "ph_min": 5.5,
+        "ph_max": 6.5,
+        "ph_optimal": 6.0,
+        "ec_min_ms_cm": 1.0,
+        "ec_max_ms_cm": 1.5,
+        "ec_optimal_ms_cm": 1.2,
+        "expected_days_to_harvest": 90,
+        "expected_height_cm": 20,
         "growth_rate_cm_per_day": 0.2,
     },
     "Tomato": {
-        "temp_min_c": 18, "temp_max_c": 29, "temp_optimal_c": 24,
-        "humidity_min_pct": 50, "humidity_max_pct": 70, "humidity_optimal_pct": 60,
-        "light_min_lux": 20000, "light_max_lux": 40000, "light_hours_per_day": 16,
-        "ph_min": 5.5, "ph_max": 6.8, "ph_optimal": 6.2,
-        "ec_min_ms_cm": 2.0, "ec_max_ms_cm": 5.0, "ec_optimal_ms_cm": 3.5,
-        "expected_days_to_harvest": 80, "expected_height_cm": 150,
+        "temp_min_c": 18,
+        "temp_max_c": 29,
+        "temp_optimal_c": 24,
+        "humidity_min_pct": 50,
+        "humidity_max_pct": 70,
+        "humidity_optimal_pct": 60,
+        "light_min_lux": 20000,
+        "light_max_lux": 40000,
+        "light_hours_per_day": 16,
+        "ph_min": 5.5,
+        "ph_max": 6.8,
+        "ph_optimal": 6.2,
+        "ec_min_ms_cm": 2.0,
+        "ec_max_ms_cm": 5.0,
+        "ec_optimal_ms_cm": 3.5,
+        "expected_days_to_harvest": 80,
+        "expected_height_cm": 150,
         "growth_rate_cm_per_day": 1.9,
     },
     "Pepper": {
-        "temp_min_c": 18, "temp_max_c": 30, "temp_optimal_c": 25,
-        "humidity_min_pct": 50, "humidity_max_pct": 70, "humidity_optimal_pct": 60,
-        "light_min_lux": 20000, "light_max_lux": 35000, "light_hours_per_day": 14,
-        "ph_min": 6.0, "ph_max": 6.8, "ph_optimal": 6.4,
-        "ec_min_ms_cm": 2.0, "ec_max_ms_cm": 3.5, "ec_optimal_ms_cm": 2.5,
-        "expected_days_to_harvest": 75, "expected_height_cm": 80,
+        "temp_min_c": 18,
+        "temp_max_c": 30,
+        "temp_optimal_c": 25,
+        "humidity_min_pct": 50,
+        "humidity_max_pct": 70,
+        "humidity_optimal_pct": 60,
+        "light_min_lux": 20000,
+        "light_max_lux": 35000,
+        "light_hours_per_day": 14,
+        "ph_min": 6.0,
+        "ph_max": 6.8,
+        "ph_optimal": 6.4,
+        "ec_min_ms_cm": 2.0,
+        "ec_max_ms_cm": 3.5,
+        "ec_optimal_ms_cm": 2.5,
+        "expected_days_to_harvest": 75,
+        "expected_height_cm": 80,
         "growth_rate_cm_per_day": 1.1,
     },
     "Mint": {
-        "temp_min_c": 15, "temp_max_c": 25, "temp_optimal_c": 20,
-        "humidity_min_pct": 50, "humidity_max_pct": 70, "humidity_optimal_pct": 60,
-        "light_min_lux": 8000, "light_max_lux": 15000, "light_hours_per_day": 14,
-        "ph_min": 6.0, "ph_max": 7.0, "ph_optimal": 6.5,
-        "ec_min_ms_cm": 1.5, "ec_max_ms_cm": 2.4, "ec_optimal_ms_cm": 2.0,
-        "expected_days_to_harvest": 30, "expected_height_cm": 40,
+        "temp_min_c": 15,
+        "temp_max_c": 25,
+        "temp_optimal_c": 20,
+        "humidity_min_pct": 50,
+        "humidity_max_pct": 70,
+        "humidity_optimal_pct": 60,
+        "light_min_lux": 8000,
+        "light_max_lux": 15000,
+        "light_hours_per_day": 14,
+        "ph_min": 6.0,
+        "ph_max": 7.0,
+        "ph_optimal": 6.5,
+        "ec_min_ms_cm": 1.5,
+        "ec_max_ms_cm": 2.4,
+        "ec_optimal_ms_cm": 2.0,
+        "expected_days_to_harvest": 30,
+        "expected_height_cm": 40,
         "growth_rate_cm_per_day": 1.3,
     },
     "Cilantro": {
-        "temp_min_c": 10, "temp_max_c": 24, "temp_optimal_c": 18,
-        "humidity_min_pct": 40, "humidity_max_pct": 60, "humidity_optimal_pct": 50,
-        "light_min_lux": 10000, "light_max_lux": 15000, "light_hours_per_day": 12,
-        "ph_min": 6.0, "ph_max": 7.0, "ph_optimal": 6.5,
-        "ec_min_ms_cm": 1.2, "ec_max_ms_cm": 1.8, "ec_optimal_ms_cm": 1.5,
-        "expected_days_to_harvest": 25, "expected_height_cm": 25,
+        "temp_min_c": 10,
+        "temp_max_c": 24,
+        "temp_optimal_c": 18,
+        "humidity_min_pct": 40,
+        "humidity_max_pct": 60,
+        "humidity_optimal_pct": 50,
+        "light_min_lux": 10000,
+        "light_max_lux": 15000,
+        "light_hours_per_day": 12,
+        "ph_min": 6.0,
+        "ph_max": 7.0,
+        "ph_optimal": 6.5,
+        "ec_min_ms_cm": 1.2,
+        "ec_max_ms_cm": 1.8,
+        "ec_optimal_ms_cm": 1.5,
+        "expected_days_to_harvest": 25,
+        "expected_height_cm": 25,
         "growth_rate_cm_per_day": 1.0,
     },
     "Microgreens": {
-        "temp_min_c": 18, "temp_max_c": 24, "temp_optimal_c": 21,
-        "humidity_min_pct": 40, "humidity_max_pct": 60, "humidity_optimal_pct": 50,
-        "light_min_lux": 5000, "light_max_lux": 10000, "light_hours_per_day": 12,
-        "ph_min": 5.5, "ph_max": 6.5, "ph_optimal": 6.0,
-        "ec_min_ms_cm": 0.5, "ec_max_ms_cm": 1.0, "ec_optimal_ms_cm": 0.75,
-        "expected_days_to_harvest": 14, "expected_height_cm": 8,
+        "temp_min_c": 18,
+        "temp_max_c": 24,
+        "temp_optimal_c": 21,
+        "humidity_min_pct": 40,
+        "humidity_max_pct": 60,
+        "humidity_optimal_pct": 50,
+        "light_min_lux": 5000,
+        "light_max_lux": 10000,
+        "light_hours_per_day": 12,
+        "ph_min": 5.5,
+        "ph_max": 6.5,
+        "ph_optimal": 6.0,
+        "ec_min_ms_cm": 0.5,
+        "ec_max_ms_cm": 1.0,
+        "ec_optimal_ms_cm": 0.75,
+        "expected_days_to_harvest": 14,
+        "expected_height_cm": 8,
         "growth_rate_cm_per_day": 0.6,
     },
 }
 
 # Default for unknown crops
 DEFAULT_CROP_CONFIG = {
-    "temp_min_c": 15, "temp_max_c": 25, "temp_optimal_c": 20,
-    "humidity_min_pct": 50, "humidity_max_pct": 70, "humidity_optimal_pct": 60,
-    "light_min_lux": 10000, "light_max_lux": 20000, "light_hours_per_day": 14,
-    "ph_min": 5.5, "ph_max": 7.0, "ph_optimal": 6.2,
-    "ec_min_ms_cm": 1.0, "ec_max_ms_cm": 2.0, "ec_optimal_ms_cm": 1.5,
-    "expected_days_to_harvest": 45, "expected_height_cm": 25,
+    "temp_min_c": 15,
+    "temp_max_c": 25,
+    "temp_optimal_c": 20,
+    "humidity_min_pct": 50,
+    "humidity_max_pct": 70,
+    "humidity_optimal_pct": 60,
+    "light_min_lux": 10000,
+    "light_max_lux": 20000,
+    "light_hours_per_day": 14,
+    "ph_min": 5.5,
+    "ph_max": 7.0,
+    "ph_optimal": 6.2,
+    "ec_min_ms_cm": 1.0,
+    "ec_max_ms_cm": 2.0,
+    "ec_optimal_ms_cm": 1.5,
+    "expected_days_to_harvest": 45,
+    "expected_height_cm": 25,
     "growth_rate_cm_per_day": 0.6,
 }
 
@@ -127,27 +248,28 @@ DEFAULT_CROP_CONFIG = {
 # Model Manager
 # =============================================================================
 
+
 class ModelManager:
     """
     Manages loading and caching of ML models.
     Falls back to rule-based predictions when models aren't available.
     """
-    
+
     MODEL_VERSION = "1.0.0"
-    
+
     def __init__(self, model_dir: Optional[Path] = None):
         self.model_dir = model_dir or config.ml.model_dir
         self._models: dict[str, Any] = {}
         self._load_models()
-    
+
     def _load_models(self) -> None:
         """Load all available models from disk."""
         model_dir = Path(self.model_dir)
-        
+
         if not model_dir.exists():
             logger.warning(f"Model directory {model_dir} does not exist")
             return
-        
+
         # Try to load growth model
         growth_model_path = model_dir / "growth_predictor.pkl"
         if growth_model_path.exists():
@@ -157,7 +279,7 @@ class ModelManager:
                 logger.success(f"Loaded growth model from {growth_model_path}")
             except Exception as e:
                 logger.error(f"Failed to load growth model: {e}")
-        
+
         # Try to load anomaly model
         anomaly_model_path = model_dir / "anomaly_detector.pkl"
         if anomaly_model_path.exists():
@@ -167,16 +289,16 @@ class ModelManager:
                 logger.success(f"Loaded anomaly model from {anomaly_model_path}")
             except Exception as e:
                 logger.error(f"Failed to load anomaly model: {e}")
-    
+
     @property
     def loaded_models(self) -> list[str]:
         """List of loaded model names."""
         return list(self._models.keys())
-    
+
     def has_model(self, name: str) -> bool:
         """Check if a model is loaded."""
         return name in self._models
-    
+
     def get_model(self, name: str) -> Optional[Any]:
         """Get a loaded model by name."""
         return self._models.get(name)
@@ -186,14 +308,15 @@ class ModelManager:
 # Growth Predictor
 # =============================================================================
 
+
 class GrowthPredictor:
     """
     Predicts plant growth metrics using ML models or rule-based fallback.
     """
-    
+
     def __init__(self, model_manager: ModelManager):
         self.model_manager = model_manager
-    
+
     def predict(
         self,
         tower_id: str,
@@ -208,7 +331,7 @@ class GrowthPredictor:
     ) -> dict:
         """
         Generate growth predictions for a plant.
-        
+
         Returns dict with:
             - predicted_height_cm
             - predicted_harvest_date
@@ -219,29 +342,46 @@ class GrowthPredictor:
         """
         # Get crop-specific config
         crop_config = CROP_CONFIG.get(crop_type, DEFAULT_CROP_CONFIG)
-        
+
         # Calculate health score based on environmental conditions
         health_score = self._calculate_health_score(
-            crop_config, avg_temp_c, avg_humidity_pct, avg_light_lux, avg_ph, avg_ec_ms_cm
+            crop_config,
+            avg_temp_c,
+            avg_humidity_pct,
+            avg_light_lux,
+            avg_ph,
+            avg_ec_ms_cm,
         )
-        
+
         # Try ML model first
         if self.model_manager.has_model("growth"):
             try:
                 return self._ml_predict(
-                    tower_id, crop_type, current_height_cm, days_since_planting,
-                    health_score, crop_config, avg_temp_c, avg_humidity_pct, 
-                    avg_light_lux, avg_ph, avg_ec_ms_cm
+                    tower_id,
+                    crop_type,
+                    current_height_cm,
+                    days_since_planting,
+                    health_score,
+                    crop_config,
+                    avg_temp_c,
+                    avg_humidity_pct,
+                    avg_light_lux,
+                    avg_ph,
+                    avg_ec_ms_cm,
                 )
             except Exception as e:
                 logger.warning(f"ML prediction failed, falling back to rules: {e}")
-        
+
         # Rule-based fallback
         return self._rule_based_predict(
-            tower_id, crop_type, current_height_cm, days_since_planting,
-            health_score, crop_config
+            tower_id,
+            crop_type,
+            current_height_cm,
+            days_since_planting,
+            health_score,
+            crop_config,
         )
-    
+
     def _ml_predict(
         self,
         tower_id: str,
@@ -258,37 +398,45 @@ class GrowthPredictor:
     ) -> dict:
         """Use ML model for prediction."""
         model = self.model_manager.get_model("growth")
-        
+
         # Build feature vector
-        features = np.array([[
-            days_since_planting,
-            current_height_cm,
-            avg_temp_c or crop_config["temp_optimal_c"],
-            avg_humidity_pct or crop_config["humidity_optimal_pct"],
-            avg_light_lux or crop_config["light_max_lux"],
-            avg_ph or crop_config["ph_optimal"],
-            avg_ec_ms_cm or crop_config["ec_optimal_ms_cm"],
-        ]])
-        
+        features = np.array(
+            [
+                [
+                    days_since_planting,
+                    current_height_cm,
+                    avg_temp_c or crop_config["temp_optimal_c"],
+                    avg_humidity_pct or crop_config["humidity_optimal_pct"],
+                    avg_light_lux or crop_config["light_max_lux"],
+                    avg_ph or crop_config["ph_optimal"],
+                    avg_ec_ms_cm or crop_config["ec_optimal_ms_cm"],
+                ]
+            ]
+        )
+
         # Predict future height (e.g., 7 days from now)
         predicted_height = model.predict(features)[0]
-        
+
         # Calculate growth rate
         if days_since_planting > 0:
             growth_rate = current_height_cm / days_since_planting
         else:
             growth_rate = crop_config["growth_rate_cm_per_day"]
-        
+
         # Adjust by health score
         effective_growth_rate = growth_rate * health_score
-        
+
         # Estimate days to harvest
         target_height = crop_config["expected_height_cm"]
         remaining_height = max(0, target_height - current_height_cm)
-        days_to_harvest = int(remaining_height / effective_growth_rate) if effective_growth_rate > 0 else 30
-        
+        days_to_harvest = (
+            int(remaining_height / effective_growth_rate)
+            if effective_growth_rate > 0
+            else 30
+        )
+
         harvest_date = datetime.utcnow() + timedelta(days=days_to_harvest)
-        
+
         return {
             "tower_id": tower_id,
             "crop_type": crop_type,
@@ -302,7 +450,7 @@ class GrowthPredictor:
             "model_version": self.model_manager.MODEL_VERSION,
             "generated_at": datetime.utcnow().isoformat(),
         }
-    
+
     def _rule_based_predict(
         self,
         tower_id: str,
@@ -315,19 +463,25 @@ class GrowthPredictor:
         """Rule-based fallback prediction."""
         base_growth_rate = crop_config["growth_rate_cm_per_day"]
         effective_growth_rate = base_growth_rate * health_score
-        
+
         # Predict height in 7 days
         predicted_height = current_height_cm + (effective_growth_rate * 7)
-        
+
         # Estimate days to harvest
         target_height = crop_config["expected_height_cm"]
         remaining_height = max(0, target_height - current_height_cm)
-        days_to_harvest = int(remaining_height / effective_growth_rate) if effective_growth_rate > 0 else 30
-        
+        days_to_harvest = (
+            int(remaining_height / effective_growth_rate)
+            if effective_growth_rate > 0
+            else 30
+        )
+
         # Cap at reasonable bounds
-        days_to_harvest = min(days_to_harvest, crop_config["expected_days_to_harvest"] * 2)
+        days_to_harvest = min(
+            days_to_harvest, crop_config["expected_days_to_harvest"] * 2
+        )
         harvest_date = datetime.utcnow() + timedelta(days=days_to_harvest)
-        
+
         return {
             "tower_id": tower_id,
             "crop_type": crop_type,
@@ -341,7 +495,7 @@ class GrowthPredictor:
             "model_version": self.model_manager.MODEL_VERSION,
             "generated_at": datetime.utcnow().isoformat(),
         }
-    
+
     def _calculate_health_score(
         self,
         crop_config: dict,
@@ -355,37 +509,58 @@ class GrowthPredictor:
         Calculate health score (0-1) based on how close conditions are to optimal.
         """
         scores = []
-        
+
         if temp is not None:
-            temp_score = self._range_score(temp, crop_config["temp_min_c"], 
-                                           crop_config["temp_max_c"], crop_config["temp_optimal_c"])
+            temp_score = self._range_score(
+                temp,
+                crop_config["temp_min_c"],
+                crop_config["temp_max_c"],
+                crop_config["temp_optimal_c"],
+            )
             scores.append(temp_score)
-        
+
         if humidity is not None:
-            humidity_score = self._range_score(humidity, crop_config["humidity_min_pct"],
-                                               crop_config["humidity_max_pct"], crop_config["humidity_optimal_pct"])
+            humidity_score = self._range_score(
+                humidity,
+                crop_config["humidity_min_pct"],
+                crop_config["humidity_max_pct"],
+                crop_config["humidity_optimal_pct"],
+            )
             scores.append(humidity_score)
-        
+
         if light is not None:
-            light_score = self._range_score(light, crop_config["light_min_lux"],
-                                            crop_config["light_max_lux"], 
-                                            (crop_config["light_min_lux"] + crop_config["light_max_lux"]) / 2)
+            light_score = self._range_score(
+                light,
+                crop_config["light_min_lux"],
+                crop_config["light_max_lux"],
+                (crop_config["light_min_lux"] + crop_config["light_max_lux"]) / 2,
+            )
             scores.append(light_score)
-        
+
         if ph is not None:
-            ph_score = self._range_score(ph, crop_config["ph_min"], 
-                                         crop_config["ph_max"], crop_config["ph_optimal"])
+            ph_score = self._range_score(
+                ph,
+                crop_config["ph_min"],
+                crop_config["ph_max"],
+                crop_config["ph_optimal"],
+            )
             scores.append(ph_score)
-        
+
         if ec is not None:
-            ec_score = self._range_score(ec, crop_config["ec_min_ms_cm"],
-                                         crop_config["ec_max_ms_cm"], crop_config["ec_optimal_ms_cm"])
+            ec_score = self._range_score(
+                ec,
+                crop_config["ec_min_ms_cm"],
+                crop_config["ec_max_ms_cm"],
+                crop_config["ec_optimal_ms_cm"],
+            )
             scores.append(ec_score)
-        
+
         # Average all available scores, default to 0.85 if no env data
         return np.mean(scores) if scores else 0.85
-    
-    def _range_score(self, value: float, min_val: float, max_val: float, optimal: float) -> float:
+
+    def _range_score(
+        self, value: float, min_val: float, max_val: float, optimal: float
+    ) -> float:
         """Calculate score based on how close value is to optimal range."""
         if min_val <= value <= max_val:
             # Within acceptable range - score based on distance from optimal
@@ -405,11 +580,12 @@ class GrowthPredictor:
 # Anomaly Detector
 # =============================================================================
 
+
 class AnomalyDetector:
     """
     Detects anomalies in sensor telemetry using ML or rule-based thresholds.
     """
-    
+
     # Absolute safe ranges for sensors
     SAFE_RANGES = {
         "air_temp_c": (5, 40),
@@ -421,7 +597,7 @@ class AnomalyDetector:
         "water_temp_c": (10, 35),
         "water_level_pct": (10, 100),
     }
-    
+
     # Warning ranges (tighter than safe)
     WARNING_RANGES = {
         "air_temp_c": (12, 32),
@@ -433,10 +609,10 @@ class AnomalyDetector:
         "water_temp_c": (15, 28),
         "water_level_pct": (25, 95),
     }
-    
+
     def __init__(self, model_manager: ModelManager):
         self.model_manager = model_manager
-    
+
     def detect(
         self,
         tower_id: Optional[str],
@@ -445,34 +621,43 @@ class AnomalyDetector:
     ) -> dict:
         """
         Detect anomalies in telemetry data.
-        
+
         Returns dict with:
             - is_anomalous: bool
             - anomaly_score: float (0-1)
             - anomalies: list of AnomalyResult dicts
         """
         anomalies = []
-        
+
         # Check each sensor value against thresholds
         for feature, (safe_min, safe_max) in self.SAFE_RANGES.items():
             value = telemetry.get(feature)
             if value is None:
                 continue
-            
+
             warn_min, warn_max = self.WARNING_RANGES.get(feature, (safe_min, safe_max))
-            
-            result = self._check_value(feature, value, safe_min, safe_max, warn_min, warn_max)
+
+            result = self._check_value(
+                feature, value, safe_min, safe_max, warn_min, warn_max
+            )
             if result:
                 anomalies.append(result)
-        
+
         # Calculate overall anomaly score
         if anomalies:
-            severity_weights = {"low": 0.25, "medium": 0.5, "high": 0.75, "critical": 1.0}
-            total_weight = sum(severity_weights.get(a["severity"], 0.5) for a in anomalies)
+            severity_weights = {
+                "low": 0.25,
+                "medium": 0.5,
+                "high": 0.75,
+                "critical": 1.0,
+            }
+            total_weight = sum(
+                severity_weights.get(a["severity"], 0.5) for a in anomalies
+            )
             anomaly_score = min(1.0, total_weight / 4)  # Normalize to 0-1
         else:
             anomaly_score = 0.0
-        
+
         return {
             "tower_id": tower_id,
             "coord_id": coord_id,
@@ -483,7 +668,7 @@ class AnomalyDetector:
             "model_version": ModelManager.MODEL_VERSION,
             "generated_at": datetime.utcnow().isoformat(),
         }
-    
+
     def _check_value(
         self,
         feature: str,
@@ -504,26 +689,34 @@ class AnomalyDetector:
             "water_temp_c": "Water Temperature",
             "water_level_pct": "Water Level",
         }
-        
+
         label = feature_labels.get(feature, feature)
-        
+
         # Critical: outside safe range
         if value < safe_min:
             severity = "critical"
-            message = f"{label} is critically low at {value:.1f} (safe minimum: {safe_min})"
+            message = (
+                f"{label} is critically low at {value:.1f} (safe minimum: {safe_min})"
+            )
         elif value > safe_max:
             severity = "critical"
-            message = f"{label} is critically high at {value:.1f} (safe maximum: {safe_max})"
+            message = (
+                f"{label} is critically high at {value:.1f} (safe maximum: {safe_max})"
+            )
         # High: just outside warning range
         elif value < warn_min:
             severity = "high" if value < (safe_min + warn_min) / 2 else "medium"
-            message = f"{label} is low at {value:.1f} (optimal range: {warn_min}-{warn_max})"
+            message = (
+                f"{label} is low at {value:.1f} (optimal range: {warn_min}-{warn_max})"
+            )
         elif value > warn_max:
             severity = "high" if value > (safe_max + warn_max) / 2 else "medium"
-            message = f"{label} is high at {value:.1f} (optimal range: {warn_min}-{warn_max})"
+            message = (
+                f"{label} is high at {value:.1f} (optimal range: {warn_min}-{warn_max})"
+            )
         else:
             return None  # Within acceptable range
-        
+
         return {
             "feature": feature,
             "value": round(value, 2),
@@ -538,12 +731,13 @@ class AnomalyDetector:
 # Optimal Conditions Provider
 # =============================================================================
 
+
 def get_optimal_conditions(crop_type: str, growth_stage: str = "vegetative") -> dict:
     """
     Get optimal growing conditions for a crop type and growth stage.
     """
     config = CROP_CONFIG.get(crop_type, DEFAULT_CROP_CONFIG)
-    
+
     # Adjust for growth stage
     stage_adjustments = {
         "seedling": {
@@ -571,17 +765,21 @@ def get_optimal_conditions(crop_type: str, growth_stage: str = "vegetative") -> 
             "ec_factor": 1.2,
         },
     }
-    
+
     adj = stage_adjustments.get(growth_stage, stage_adjustments["vegetative"])
-    
+
     return {
         "crop_type": crop_type,
         "growth_stage": growth_stage,
         "temp_min_c": config["temp_min_c"] + adj["temp_offset"],
         "temp_max_c": config["temp_max_c"] + adj["temp_offset"],
         "temp_optimal_c": config["temp_optimal_c"] + adj["temp_offset"],
-        "humidity_min_pct": max(30, config["humidity_min_pct"] + adj["humidity_offset"]),
-        "humidity_max_pct": min(90, config["humidity_max_pct"] + adj["humidity_offset"]),
+        "humidity_min_pct": max(
+            30, config["humidity_min_pct"] + adj["humidity_offset"]
+        ),
+        "humidity_max_pct": min(
+            90, config["humidity_max_pct"] + adj["humidity_offset"]
+        ),
         "humidity_optimal_pct": config["humidity_optimal_pct"] + adj["humidity_offset"],
         "light_min_lux": config["light_min_lux"] * adj["light_factor"],
         "light_max_lux": config["light_max_lux"] * adj["light_factor"],
@@ -598,9 +796,300 @@ def get_optimal_conditions(crop_type: str, growth_stage: str = "vegetative") -> 
 
 
 # =============================================================================
+# Drift Forecaster
+# =============================================================================
+
+
+class DriftForecaster:
+    """
+    Predicts future reservoir pH, EC, and water level using the trained
+    multi-output drift model, or falls back to simple linear extrapolation.
+    """
+
+    # Thresholds for "time to out-of-range" estimation
+    METRIC_THRESHOLDS = {
+        "ph": (5.5, 7.0),
+        "ec_ms_cm": (0.5, 4.0),
+        "water_temp_c": (15.0, 28.0),
+        "water_level_pct": (20.0, 100.0),
+    }
+
+    def __init__(self, mgr: ModelManager):
+        self.model_manager = mgr
+
+    def predict(
+        self,
+        coord_id: str,
+        features: dict,
+        current_values: dict,
+    ) -> dict:
+        """
+        Generate drift forecasts.
+
+        Parameters
+        ----------
+        coord_id : str
+        features : dict
+            Feature vector built by FeatureEngineer.build_drift_features
+            (single row as dict).
+        current_values : dict
+            Latest observed values keyed by metric name.
+
+        Returns
+        -------
+        dict matching DriftPredictionResponse schema.
+        """
+        from ..training.feature_engineering import RESERVOIR_METRICS
+
+        if self.model_manager.has_model("drift_forecaster"):
+            try:
+                return self._ml_predict(coord_id, features, current_values)
+            except Exception as e:
+                logger.warning(f"Drift ML prediction failed, falling back: {e}")
+
+        return self._rule_based_predict(coord_id, current_values)
+
+    def _ml_predict(self, coord_id: str, features: dict, current_values: dict) -> dict:
+        model = self.model_manager.get_model("drift_forecaster")
+        from ..training.feature_engineering import RESERVOIR_METRICS
+
+        # The model expects a 2-D array with the same feature columns used in training
+        meta = self.model_manager._models.get("drift_forecaster")
+        # We rely on the model accepting a dict-ordered feature vector
+        X = np.array([[features.get(k, 0.0) for k in features]])
+        preds = model.predict(X)[0]
+
+        # Map predictions back to metric/horizon
+        idx = 0
+        forecasts = []
+        for metric in RESERVOIR_METRICS:
+            current = current_values.get(metric)
+            pred_1h = float(preds[idx]) if idx < len(preds) else None
+            pred_6h = float(preds[idx + 1]) if idx + 1 < len(preds) else None
+            pred_24h = float(preds[idx + 2]) if idx + 2 < len(preds) else None
+            idx += 3
+
+            tth = self._time_to_threshold(current, pred_1h, pred_24h, metric)
+
+            forecasts.append(
+                {
+                    "metric": metric,
+                    "current_value": round(current, 3) if current is not None else None,
+                    "predicted_1h": round(pred_1h, 3) if pred_1h is not None else None,
+                    "predicted_6h": round(pred_6h, 3) if pred_6h is not None else None,
+                    "predicted_24h": round(pred_24h, 3)
+                    if pred_24h is not None
+                    else None,
+                    "time_to_threshold_hours": round(tth, 1)
+                    if tth is not None
+                    else None,
+                }
+            )
+
+        return {
+            "coord_id": coord_id,
+            "forecasts": forecasts,
+            "model_name": "drift_forecaster",
+            "model_version": self.model_manager.MODEL_VERSION,
+            "confidence": 0.80,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    def _rule_based_predict(self, coord_id: str, current_values: dict) -> dict:
+        """Simple linear extrapolation fallback."""
+        from ..training.feature_engineering import RESERVOIR_METRICS
+
+        forecasts = []
+        for metric in RESERVOIR_METRICS:
+            current = current_values.get(metric)
+            forecasts.append(
+                {
+                    "metric": metric,
+                    "current_value": round(current, 3) if current is not None else None,
+                    "predicted_1h": None,
+                    "predicted_6h": None,
+                    "predicted_24h": None,
+                    "time_to_threshold_hours": None,
+                }
+            )
+
+        return {
+            "coord_id": coord_id,
+            "forecasts": forecasts,
+            "model_name": "rule_based_drift",
+            "model_version": self.model_manager.MODEL_VERSION,
+            "confidence": 0.30,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    def _time_to_threshold(
+        self,
+        current: Optional[float],
+        pred_1h: Optional[float],
+        pred_24h: Optional[float],
+        metric: str,
+    ) -> Optional[float]:
+        """Estimate hours until metric crosses its acceptable range."""
+        if current is None or pred_1h is None:
+            return None
+        lo, hi = self.METRIC_THRESHOLDS.get(metric, (None, None))
+        if lo is None:
+            return None
+
+        hourly_rate = pred_1h - current
+        if abs(hourly_rate) < 1e-6:
+            return None  # Effectively stable
+
+        if hourly_rate < 0:
+            hours = (lo - current) / hourly_rate
+        else:
+            hours = (hi - current) / hourly_rate
+
+        return max(0.0, hours) if hours > 0 else None
+
+
+# =============================================================================
+# Consumption Predictor
+# =============================================================================
+
+
+class ConsumptionPredictor:
+    """
+    Predicts nutrient and water depletion rates using the trained
+    consumption model, or falls back to rule-based estimates.
+    """
+
+    # Critical thresholds for "hours until critical" estimate
+    CRITICAL_THRESHOLDS = {
+        "ph_delta": 5.0,  # pH below 5.0 is critical
+        "ec_ms_cm_delta": 0.3,  # EC below 0.3 is critically low
+        "water_temp_c_delta": 10.0,  # Water temp below 10C is critical
+        "water_level_pct_delta": 15.0,  # Water below 15% is critical
+    }
+
+    def __init__(self, mgr: ModelManager):
+        self.model_manager = mgr
+
+    def predict(
+        self,
+        coord_id: str,
+        features: dict,
+        current_values: dict,
+    ) -> dict:
+        """
+        Generate consumption rate predictions.
+
+        Parameters
+        ----------
+        coord_id : str
+        features : dict
+            Feature row from FeatureEngineer.build_consumption_features.
+        current_values : dict
+            Current reservoir metric values.
+
+        Returns
+        -------
+        dict matching ConsumptionPredictionResponse schema.
+        """
+        if self.model_manager.has_model("consumption_predictor"):
+            try:
+                return self._ml_predict(coord_id, features, current_values)
+            except Exception as e:
+                logger.warning(f"Consumption ML prediction failed, falling back: {e}")
+
+        return self._rule_based_predict(coord_id, current_values)
+
+    def _ml_predict(self, coord_id: str, features: dict, current_values: dict) -> dict:
+        model = self.model_manager.get_model("consumption_predictor")
+        from ..training.feature_engineering import RESERVOIR_METRICS
+
+        X = np.array([[features.get(k, 0.0) for k in features]])
+        preds = model.predict(X)[0]
+
+        rates = []
+        for i, metric in enumerate(RESERVOIR_METRICS):
+            rate = float(preds[i]) if i < len(preds) else 0.0
+            current = current_values.get(metric)
+            hours_critical = self._hours_until_critical(
+                metric,
+                current,
+                rate,
+            )
+            rates.append(
+                {
+                    "metric": metric,
+                    "rate_per_hour": round(rate, 6),
+                    "hours_until_critical": round(hours_critical, 1)
+                    if hours_critical
+                    else None,
+                }
+            )
+
+        # Derive high-level recommendations
+        wl_rate = next((r for r in rates if r["metric"] == "water_level_pct"), None)
+        ec_rate = next((r for r in rates if r["metric"] == "ec_ms_cm"), None)
+
+        water_change_days = None
+        if wl_rate and wl_rate["rate_per_hour"] < 0:
+            hours_to_empty = abs(
+                current_values.get("water_level_pct", 50) / wl_rate["rate_per_hour"]
+            )
+            water_change_days = round(hours_to_empty / 24, 1)
+
+        nutrient_topup = False
+        if ec_rate and ec_rate["rate_per_hour"] < -0.01:
+            nutrient_topup = True
+
+        return {
+            "coord_id": coord_id,
+            "rates": rates,
+            "water_change_recommended_in_days": water_change_days,
+            "nutrient_top_up_recommended": nutrient_topup,
+            "model_name": "consumption_predictor",
+            "model_version": self.model_manager.MODEL_VERSION,
+            "confidence": 0.75,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    def _rule_based_predict(self, coord_id: str, current_values: dict) -> dict:
+        """Fallback: return zeroed rates with no confidence."""
+        from ..training.feature_engineering import RESERVOIR_METRICS
+
+        rates = [
+            {"metric": m, "rate_per_hour": 0.0, "hours_until_critical": None}
+            for m in RESERVOIR_METRICS
+        ]
+        return {
+            "coord_id": coord_id,
+            "rates": rates,
+            "water_change_recommended_in_days": None,
+            "nutrient_top_up_recommended": False,
+            "model_name": "rule_based_consumption",
+            "model_version": self.model_manager.MODEL_VERSION,
+            "confidence": 0.20,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    def _hours_until_critical(
+        self,
+        metric: str,
+        current: Optional[float],
+        rate: float,
+    ) -> Optional[float]:
+        delta_key = f"{metric}_delta"
+        threshold = self.CRITICAL_THRESHOLDS.get(delta_key)
+        if current is None or threshold is None or abs(rate) < 1e-8:
+            return None
+        hours = (threshold - current) / rate
+        return hours if hours > 0 else None
+
+
+# =============================================================================
 # Singleton instances
 # =============================================================================
 
 model_manager = ModelManager()
 growth_predictor = GrowthPredictor(model_manager)
 anomaly_detector = AnomalyDetector(model_manager)
+drift_forecaster = DriftForecaster(model_manager)
+consumption_predictor = ConsumptionPredictor(model_manager)

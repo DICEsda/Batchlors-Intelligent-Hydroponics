@@ -73,6 +73,15 @@ public class CoordinatorTwin
     [JsonPropertyName("capabilities")]
     [BsonIgnoreIfNull]
     public CoordinatorCapabilities? Capabilities { get; set; }
+
+    /// <summary>
+    /// ML predictions for the reservoir: drift forecasts, consumption rates,
+    /// and maintenance recommendations. Updated by the ML scheduler.
+    /// </summary>
+    [BsonElement("reservoir_ml_predictions")]
+    [JsonPropertyName("reservoir_ml_predictions")]
+    [BsonIgnoreIfNull]
+    public ReservoirMlPredictions? ReservoirMlPredictions { get; set; }
 }
 
 /// <summary>
