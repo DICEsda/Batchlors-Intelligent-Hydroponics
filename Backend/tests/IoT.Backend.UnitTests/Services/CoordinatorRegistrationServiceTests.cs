@@ -14,6 +14,7 @@ namespace IoT.Backend.UnitTests.Services;
 public class CoordinatorRegistrationServiceTests
 {
     private readonly ICoordinatorRepository _coordinatorRepo;
+    private readonly ITwinRepository _twinRepo;
     private readonly IMqttService _mqtt;
     private readonly IWsBroadcaster _broadcaster;
     private readonly TwinChangeChannel _changeChannel;
@@ -22,12 +23,14 @@ public class CoordinatorRegistrationServiceTests
     public CoordinatorRegistrationServiceTests()
     {
         _coordinatorRepo = Substitute.For<ICoordinatorRepository>();
+        _twinRepo = Substitute.For<ITwinRepository>();
         _mqtt = Substitute.For<IMqttService>();
         _broadcaster = Substitute.For<IWsBroadcaster>();
         _changeChannel = new TwinChangeChannel(NullLogger<TwinChangeChannel>.Instance);
 
         _sut = new CoordinatorRegistrationService(
             _coordinatorRepo,
+            _twinRepo,
             _mqtt,
             _broadcaster,
             _changeChannel,

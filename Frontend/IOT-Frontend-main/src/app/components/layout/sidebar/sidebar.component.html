@@ -140,6 +140,54 @@
         </a>
       }
     </div>
+
+    <!-- Diagnostics Section -->
+    <div class="nav-section">
+      @if (!collapsed()) {
+        <span class="nav-section-title">Diagnostics</span>
+      }
+      
+      @for (item of diagnosticsItems(); track item.label) {
+        @if (item.children) {
+          <div class="nav-item-group">
+            <button 
+              class="nav-item expandable"
+              [class.expanded]="item.expanded"
+              (click)="toggleExpand(item)"
+              (mouseenter)="onNavItemHover(item, $event)"
+              (mouseleave)="onNavItemLeave()"
+            >
+              <ng-icon [name]="item.icon" size="18" />
+              @if (!collapsed()) {
+                <span class="nav-label">{{ item.label }}</span>
+                <ng-icon 
+                  [name]="item.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                  size="16" 
+                  class="chevron"
+                />
+              }
+            </button>
+            
+            @if (item.expanded && !collapsed()) {
+              <div class="nav-children">
+                @for (child of item.children; track child.label) {
+                  <a 
+                    [routerLink]="child.route" 
+                    routerLinkActive="active"
+                    class="nav-item child"
+                  >
+                    <ng-icon [name]="child.icon" size="16" />
+                    @if (!collapsed()) {
+                      <span class="nav-label">{{ child.label }}</span>
+                    }
+                  </a>
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
   </nav>
 
   <!-- Bottom Section - System Status & User Account -->

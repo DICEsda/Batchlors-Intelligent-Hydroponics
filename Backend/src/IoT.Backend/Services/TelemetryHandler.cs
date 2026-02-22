@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using IoT.Backend.Models;
 using IoT.Backend.Models.DigitalTwin;
@@ -19,6 +20,7 @@ public class TelemetryHandler : BackgroundService
     private readonly ITwinService _twinService;
     private readonly IPairingService _pairingService;
     private readonly ICoordinatorRegistrationService _registrationService;
+    private readonly IDiagnosticsService _diagnostics;
     private readonly ILogger<TelemetryHandler> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -31,6 +33,7 @@ public class TelemetryHandler : BackgroundService
         ITwinService twinService,
         IPairingService pairingService,
         ICoordinatorRegistrationService registrationService,
+        IDiagnosticsService diagnostics,
         ILogger<TelemetryHandler> logger)
     {
         _mqtt = mqtt;
@@ -41,6 +44,7 @@ public class TelemetryHandler : BackgroundService
         _twinService = twinService;
         _pairingService = pairingService;
         _registrationService = registrationService;
+        _diagnostics = diagnostics;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -283,6 +287,7 @@ public class TelemetryHandler : BackgroundService
     /// </summary>
     private async Task HandleReservoirTelemetry(string topic, byte[] payload)
     {
+        var swTotal = Stopwatch.StartNew();
         try
         {
             var coordId = ExtractCoordIdFromTopic(topic);
@@ -323,7 +328,10 @@ public class TelemetryHandler : BackgroundService
                 WifiRssi = telemetry.WifiRssi,
                 TowersOnline = telemetry.TowersOnline
             };
+
+            var swMongo = Stopwatch.StartNew();
             await _telemetryRepository.InsertReservoirTelemetryAsync(reservoirTelemetry);
+            swMongo.Stop();
 
             // 2. Create reported state from telemetry for Digital Twin
             var reportedState = new CoordinatorReportedState
@@ -353,12 +361,19 @@ public class TelemetryHandler : BackgroundService
             };
 
             // 3. Update Digital Twin reported state
-            await _twinService.ProcessCoordinatorTelemetryAsync(coordId, reportedState);
+            var swTwin = Stopwatch.StartNew();
+            await _twinService.ProcessCoordinatorTelemetryAsync(coordId, farmId, reportedState);
+            swTwin.Stop();
+
+            swTotal.Stop();
+            _diagnostics.RecordReservoirMessage(swTotal.Elapsed, swMongo.Elapsed, swTwin.Elapsed, TimeSpan.Zero);
 
             _logger.LogDebug("Updated coordinator twin {CoordId} with reservoir telemetry", coordId);
         }
         catch (Exception ex)
         {
+            swTotal.Stop();
+            _diagnostics.RecordError("processing");
             _logger.LogError(ex, "Error handling reservoir telemetry from {Topic}", topic);
         }
     }
@@ -369,6 +384,7 @@ public class TelemetryHandler : BackgroundService
     /// </summary>
     private async Task HandleTowerTelemetry(string topic, byte[] payload)
     {
+        var swTotal = Stopwatch.StartNew();
         try
         {
             var coordId = ExtractCoordIdFromTopic(topic);
@@ -409,7 +425,10 @@ public class TelemetryHandler : BackgroundService
                 SignalQuality = telemetry.SignalQuality,
                 StatusMode = telemetry.StatusMode
             };
+
+            var swMongo = Stopwatch.StartNew();
             await _telemetryRepository.InsertTowerTelemetryAsync(towerTelemetryRecord);
+            swMongo.Stop();
 
             // 2. Create reported state from telemetry for Digital Twin
             var reportedState = new TowerReportedState
@@ -433,7 +452,9 @@ public class TelemetryHandler : BackgroundService
             };
 
             // 3. Update Digital Twin reported state
-            await _twinService.ProcessTowerTelemetryAsync(towerId, reportedState);
+            var swTwin = Stopwatch.StartNew();
+            await _twinService.ProcessTowerTelemetryAsync(towerId, coordId, farmId, reportedState);
+            swTwin.Stop();
 
             _logger.LogDebug("Updated tower twin {TowerId} with telemetry", towerId);
 
@@ -456,10 +477,18 @@ public class TelemetryHandler : BackgroundService
                     AvgW = telemetry.LightBrightness
                 }
             };
+
+            var swWs = Stopwatch.StartNew();
             await _broadcaster.BroadcastTowerTelemetryAsync(broadcastPayload);
+            swWs.Stop();
+
+            swTotal.Stop();
+            _diagnostics.RecordTowerMessage(swTotal.Elapsed, swMongo.Elapsed, swTwin.Elapsed, swWs.Elapsed);
         }
         catch (Exception ex)
         {
+            swTotal.Stop();
+            _diagnostics.RecordError("processing");
             _logger.LogError(ex, "Error handling tower telemetry from {Topic}", topic);
         }
     }
@@ -501,7 +530,7 @@ public class TelemetryHandler : BackgroundService
                     StatusMode = status.StatusMode
                 };
 
-                await _twinService.ProcessTowerTelemetryAsync(towerId, reportedState);
+            await _twinService.ProcessTowerTelemetryAsync(towerId, coordId, farmId, reportedState);
             }
 
             // If this is an acknowledgment of a command sync, mark it successful

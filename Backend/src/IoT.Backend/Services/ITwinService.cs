@@ -12,9 +12,10 @@ public interface ITwinService
     // ============================================================================
 
     /// <summary>
-    /// Process incoming telemetry and update the tower's reported state
+    /// Process incoming telemetry and update the tower's reported state.
+    /// If the twin does not yet exist, it is auto-created from the first telemetry message.
     /// </summary>
-    Task ProcessTowerTelemetryAsync(string towerId, TowerReportedState reported, CancellationToken ct = default);
+    Task ProcessTowerTelemetryAsync(string towerId, string coordId, string farmId, TowerReportedState reported, CancellationToken ct = default);
 
     /// <summary>
     /// Set the desired state for a tower and trigger sync
@@ -42,9 +43,10 @@ public interface ITwinService
     // ============================================================================
 
     /// <summary>
-    /// Process incoming telemetry and update the coordinator's reported state
+    /// Process incoming telemetry and update the coordinator's reported state.
+    /// If the twin does not yet exist, it is auto-created from the first telemetry message.
     /// </summary>
-    Task ProcessCoordinatorTelemetryAsync(string coordId, CoordinatorReportedState reported, CancellationToken ct = default);
+    Task ProcessCoordinatorTelemetryAsync(string coordId, string farmId, CoordinatorReportedState reported, CancellationToken ct = default);
 
     /// <summary>
     /// Set the desired state for a coordinator and trigger sync

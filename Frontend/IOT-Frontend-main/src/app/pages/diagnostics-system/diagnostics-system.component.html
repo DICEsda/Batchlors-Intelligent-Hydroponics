@@ -1,0 +1,212 @@
+<div class="diagnostics-page">
+  <!-- ====================================================================== -->
+  <!-- Page Header                                                            -->
+  <!-- ====================================================================== -->
+  <header class="page-header">
+    <div class="header-left">
+      <div class="header-content">
+        <div class="title-row">
+          <h1 class="page-title">System Diagnostics</h1>
+          <!-- Connection status badge -->
+          @if (wsConnected()) {
+            <span hlmBadge variant="success" class="connection-badge">
+              <ng-icon hlmIcon name="lucideWifi" size="xs" />
+              Live
+            </span>
+          } @else if (wsConnecting()) {
+            <span hlmBadge variant="warning" class="connection-badge">
+              <ng-icon hlmIcon name="lucideWifi" size="xs" />
+              Connecting
+            </span>
+          } @else {
+            <span hlmBadge variant="error" class="connection-badge">
+              <ng-icon hlmIcon name="lucideWifi" size="xs" />
+              Disconnected
+            </span>
+          }
+        </div>
+        <p class="page-description">
+          Backend pipeline performance &mdash; updated every 2 seconds via WebSocket
+        </p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      @if (snapshot(); as snap) {
+        <span class="uptime-label">Uptime: {{ uptime() }}</span>
+      }
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        (click)="resetCounters()"
+      >
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+        <span>Reset Counters</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ====================================================================== -->
+  <!-- Stat Cards Grid                                                        -->
+  <!-- ====================================================================== -->
+  <div class="stat-grid">
+    <!-- Messages/sec -->
+    <div hlmCard class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Messages / sec</span>
+        <ng-icon hlmIcon name="lucideZap" size="sm" class="stat-icon" />
+      </div>
+      <div class="stat-value">{{ messagesPerSec() }}</div>
+      @if (snapshot(); as snap) {
+        <div class="stat-sub">
+          Tower: {{ snap.towerMessagesPerSecond.toFixed(1) }}
+          &middot; Reservoir: {{ snap.reservoirMessagesPerSecond.toFixed(1) }}
+        </div>
+      }
+    </div>
+
+    <!-- Total Messages -->
+    <div hlmCard class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Total Messages</span>
+        <ng-icon hlmIcon name="lucideActivity" size="sm" class="stat-icon" />
+      </div>
+      <div class="stat-value">{{ totalMessages() | number }}</div>
+      @if (snapshot(); as snap) {
+        <div class="stat-sub">
+          Tower: {{ snap.towerMessagesTotal | number }}
+          &middot; Reservoir: {{ snap.reservoirMessagesTotal | number }}
+        </div>
+      }
+    </div>
+
+    <!-- Avg Latency -->
+    <div hlmCard class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Avg Latency</span>
+        <ng-icon hlmIcon name="lucideClock" size="sm" class="stat-icon" />
+      </div>
+      <div class="stat-value">{{ avgLatency() }}<span class="stat-unit">ms</span></div>
+      @if (snapshot(); as snap) {
+        <div class="stat-sub">Handler pipeline average</div>
+      }
+    </div>
+
+    <!-- P95 Latency -->
+    <div hlmCard class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">P95 Latency</span>
+        <ng-icon hlmIcon name="lucideServer" size="sm" class="stat-icon" />
+      </div>
+      <div class="stat-value">{{ p95Latency() }}<span class="stat-unit">ms</span></div>
+      @if (snapshot(); as snap) {
+        <div class="stat-sub">P99: {{ snap.p99HandlerMs.toFixed(1) }} ms</div>
+      }
+    </div>
+
+    <!-- WS Clients -->
+    <div hlmCard class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">WS Clients</span>
+        <ng-icon hlmIcon name="lucideWifi" size="sm" class="stat-icon" />
+      </div>
+      <div class="stat-value">{{ wsClients() }}</div>
+      <div class="stat-sub">Active WebSocket connections</div>
+    </div>
+
+    <!-- Errors -->
+    <div hlmCard class="stat-card" [class.stat-card-error]="totalErrors() > 0">
+      <div class="stat-header">
+        <span class="stat-label">Errors</span>
+        <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" class="stat-icon" />
+      </div>
+      <div class="stat-value">{{ totalErrors() | number }}</div>
+      @if (snapshot(); as snap) {
+        <div class="stat-sub">
+          Mongo: {{ snap.mongoWriteErrors | number }}
+          &middot; Processing: {{ snap.processingErrors | number }}
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- Time-Series Charts                                                     -->
+  <!-- ====================================================================== -->
+  <div class="chart-grid">
+    <!-- Throughput Chart -->
+    <div hlmCard class="chart-card">
+      <div hlmCardHeader class="chart-card-header">
+        <h3 hlmCardTitle>Throughput</h3>
+        <p hlmCardDescription>Messages processed per second over time</p>
+      </div>
+      <div hlmCardContent>
+        @if (hasHistory()) {
+          <div echarts [options]="throughputOptions()" [merge]="throughputOptions()" class="chart"></div>
+        } @else {
+          <div class="chart-empty">
+            <ng-icon hlmIcon name="lucideActivity" size="xl" class="empty-icon" />
+            <p>Waiting for data&hellip;</p>
+            <p class="empty-hint">Metrics will appear as WebSocket snapshots arrive</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Latency Chart -->
+    <div hlmCard class="chart-card">
+      <div hlmCardHeader class="chart-card-header">
+        <h3 hlmCardTitle>Latency Breakdown</h3>
+        <p hlmCardDescription>Average per-component latency over time</p>
+      </div>
+      <div hlmCardContent>
+        @if (hasHistory()) {
+          <div echarts [options]="latencyOptions()" [merge]="latencyOptions()" class="chart"></div>
+        } @else {
+          <div class="chart-empty">
+            <ng-icon hlmIcon name="lucideClock" size="xl" class="empty-icon" />
+            <p>Waiting for data&hellip;</p>
+            <p class="empty-hint">Metrics will appear as WebSocket snapshots arrive</p>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- Pipeline Breakdown Table                                               -->
+  <!-- ====================================================================== -->
+  @if (hasData()) {
+    <div hlmCard class="pipeline-card">
+      <div hlmCardHeader>
+        <h3 hlmCardTitle>Pipeline Breakdown</h3>
+        <p hlmCardDescription>Per-component latency from the latest snapshot</p>
+      </div>
+      <div hlmCardContent>
+        <table class="pipeline-table">
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Avg (ms)</th>
+              <th>Max (ms)</th>
+              <th>P95 (ms)</th>
+              <th>P99 (ms)</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of pipelineBreakdown(); track row.component) {
+              <tr>
+                <td class="component-name">{{ row.component }}</td>
+                <td>{{ row.avg }}</td>
+                <td>{{ row.max }}</td>
+                <td>{{ row.p95 }}</td>
+                <td>{{ row.p99 }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

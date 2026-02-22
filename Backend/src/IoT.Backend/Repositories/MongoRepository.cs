@@ -29,6 +29,44 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
     {
         _db = database;
         _logger = logger;
+
+        // Ensure TTL indexes for telemetry time-series collections
+        EnsureTelemetryTtlIndexesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates TTL indexes on telemetry collections so MongoDB automatically
+    /// deletes documents older than 7 days (604 800 seconds).
+    /// Safe to call on every startup — MongoDB is a no-op when the index already exists
+    /// with the same key and options.
+    /// </summary>
+    private async Task EnsureTelemetryTtlIndexesAsync()
+    {
+        try
+        {
+            var ttlExpiry = TimeSpan.FromDays(7);
+
+            // Tower telemetry — expire after 7 days on the "timestamp" field
+            var towerTelemetryCollection = _db.GetCollection<TowerTelemetry>(TowerTelemetryCollection);
+            var towerTtlIndex = new CreateIndexModel<TowerTelemetry>(
+                Builders<TowerTelemetry>.IndexKeys.Ascending(t => t.Timestamp),
+                new CreateIndexOptions { Name = "timestamp_ttl_7d", ExpireAfter = ttlExpiry });
+            await towerTelemetryCollection.Indexes.CreateOneAsync(towerTtlIndex);
+
+            // Reservoir telemetry — expire after 7 days on the "timestamp" field
+            var reservoirTelemetryCollection = _db.GetCollection<ReservoirTelemetry>(ReservoirTelemetryCollection);
+            var reservoirTtlIndex = new CreateIndexModel<ReservoirTelemetry>(
+                Builders<ReservoirTelemetry>.IndexKeys.Ascending(r => r.Timestamp),
+                new CreateIndexOptions { Name = "timestamp_ttl_7d", ExpireAfter = ttlExpiry });
+            await reservoirTelemetryCollection.Indexes.CreateOneAsync(reservoirTtlIndex);
+
+            _logger.LogInformation("Ensured 7-day TTL indexes on {TowerCollection} and {ReservoirCollection}",
+                TowerTelemetryCollection, ReservoirTelemetryCollection);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create TTL indexes for telemetry collections (may already exist with different options)");
+        }
     }
 
     #region Database Operations

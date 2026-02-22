@@ -1,0 +1,261 @@
+<!-- ============================================================================
+     Sensor Telemetry Diagnostics Page
+     ============================================================================ -->
+<div class="diagnostics-page">
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-left">
+      <ng-icon hlmIcon name="lucideBarChart3" size="lg" class="text-primary" />
+      <div>
+        <h1 class="page-title">Sensor Telemetry</h1>
+        <p class="page-description">Historical sensor data from reservoirs and towers</p>
+      </div>
+    </div>
+    <div class="header-right">
+      @if (lastFetchTime()) {
+        <span class="last-fetch text-xs text-muted-foreground">
+          Last updated: {{ formatLastFetchTime() }}
+        </span>
+      }
+      @if (hasReservoirData() || hasTowerData()) {
+        <span hlmBadge variant="info" class="text-xs">
+          {{ reservoirDataPoints() + towerDataPoints() }} data points
+        </span>
+      }
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       Filter Panel
+       ======================================================================== -->
+  <div hlmCard class="filter-panel">
+    <div class="filter-group">
+      <label for="farmId">Farm ID</label>
+      <input
+        id="farmId"
+        type="text"
+        placeholder="e.g. farm-001"
+        [value]="selectedFarmId()"
+        (input)="onFarmIdChange($any($event.target).value)"
+      />
+    </div>
+
+    <div class="filter-group">
+      <label for="coordId">Coordinator ID</label>
+      <input
+        id="coordId"
+        type="text"
+        placeholder="e.g. coord-001"
+        [value]="selectedCoordId()"
+        (input)="onCoordIdChange($any($event.target).value)"
+      />
+    </div>
+
+    <div class="filter-group">
+      <label for="towerId">Tower ID <span class="text-muted-foreground">(optional)</span></label>
+      <input
+        id="towerId"
+        type="text"
+        placeholder="e.g. tower-001"
+        [value]="selectedTowerId()"
+        (input)="onTowerIdChange($any($event.target).value)"
+      />
+    </div>
+
+    <div class="filter-group">
+      <label for="timeRange">Time Range</label>
+      <select
+        id="timeRange"
+        [value]="timeRange()"
+        (change)="onTimeRangeChange($any($event.target).value)"
+      >
+        @for (opt of timeRangeOptions; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <button
+        hlmBtn
+        variant="default"
+        size="sm"
+        (click)="loadData()"
+        [disabled]="!selectedCoordId() || reservoirLoading() || towerLoading()"
+      >
+        @if (reservoirLoading() || towerLoading()) {
+          <ng-icon hlmIcon name="lucideLoader2" size="sm" class="animate-spin mr-1.5" />
+          Loading...
+        } @else {
+          <ng-icon hlmIcon name="lucideRefreshCw" size="sm" class="mr-1.5" />
+          Load Data
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       Error Banners
+       ======================================================================== -->
+  @if (reservoirError()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>Reservoir: {{ reservoirError() }}</span>
+      <button hlmBtn variant="ghost" size="xs" (click)="loadData()">Retry</button>
+    </div>
+  }
+
+  @if (towerError()) {
+    <div class="error-banner">
+      <ng-icon hlmIcon name="lucideAlertTriangle" size="sm" />
+      <span>Tower: {{ towerError() }}</span>
+      <button hlmBtn variant="ghost" size="xs" (click)="loadData()">Retry</button>
+    </div>
+  }
+
+  <!-- ========================================================================
+       No Coordinator Selected – Empty State
+       ======================================================================== -->
+  @if (!selectedCoordId()) {
+    <div hlmCard class="empty-state">
+      <ng-icon hlmIcon name="lucideFilter" size="xl" class="text-muted-foreground" />
+      <p class="text-sm font-medium">No coordinator selected</p>
+      <p class="text-xs text-muted-foreground">
+        Enter a Coordinator ID above and click "Load Data" to view sensor telemetry history.
+      </p>
+    </div>
+  }
+
+  <!-- ========================================================================
+       Reservoir Section
+       ======================================================================== -->
+  @if (selectedCoordId()) {
+    <section class="data-section">
+      <div class="section-title">
+        <ng-icon hlmIcon name="lucideDroplets" size="default" class="text-blue-400" />
+        <span>Reservoir Telemetry</span>
+        @if (reservoirLoading()) {
+          <ng-icon hlmIcon name="lucideLoader2" size="sm" class="animate-spin text-muted-foreground" />
+        }
+        @if (hasReservoirData()) {
+          <span hlmBadge variant="outline" class="text-xs ml-auto">
+            {{ reservoirDataPoints() }} readings
+          </span>
+        }
+      </div>
+
+      @if (hasReservoirData()) {
+        <div class="sensor-grid">
+          <!-- pH Chart -->
+          <div hlmCard class="chart-card">
+            <div class="chart-header">
+              <ng-icon hlmIcon name="lucideBeaker" size="sm" class="text-green-400" />
+              <span class="chart-title">pH Level</span>
+              <span hlmBadge variant="success" class="text-xs ml-auto">5.5 – 6.5 optimal</span>
+            </div>
+            <div echarts [options]="phChartOptions()" class="chart"></div>
+          </div>
+
+          <!-- EC Chart -->
+          <div hlmCard class="chart-card">
+            <div class="chart-header">
+              <ng-icon hlmIcon name="lucideActivity" size="sm" class="text-amber-400" />
+              <span class="chart-title">EC (Electrical Conductivity)</span>
+              <span hlmBadge variant="warning" class="text-xs ml-auto">1.0 – 2.5 optimal</span>
+            </div>
+            <div echarts [options]="ecChartOptions()" class="chart"></div>
+          </div>
+
+          <!-- Water Level Chart -->
+          <div hlmCard class="chart-card">
+            <div class="chart-header">
+              <ng-icon hlmIcon name="lucideWaves" size="sm" class="text-blue-400" />
+              <span class="chart-title">Water Level</span>
+            </div>
+            <div echarts [options]="waterLevelChartOptions()" class="chart"></div>
+          </div>
+
+          <!-- Water Temperature Chart -->
+          <div hlmCard class="chart-card">
+            <div class="chart-header">
+              <ng-icon hlmIcon name="lucideThermometer" size="sm" class="text-red-400" />
+              <span class="chart-title">Water Temperature</span>
+            </div>
+            <div echarts [options]="waterTempChartOptions()" class="chart"></div>
+          </div>
+        </div>
+      } @else if (!reservoirLoading() && !reservoirError()) {
+        <div hlmCard class="empty-state">
+          <ng-icon hlmIcon name="lucideDroplets" size="xl" class="text-muted-foreground" />
+          <p class="text-sm font-medium">No reservoir data</p>
+          <p class="text-xs text-muted-foreground">
+            No telemetry readings found for coordinator
+            <strong>{{ selectedCoordId() }}</strong> in the last {{ getTimeRangeLabel() }}.
+          </p>
+        </div>
+      }
+    </section>
+
+    <!-- ====================================================================
+         Tower Section
+         ==================================================================== -->
+    @if (selectedTowerId()) {
+      <section class="data-section">
+        <div class="section-title">
+          <ng-icon hlmIcon name="lucideSun" size="default" class="text-yellow-400" />
+          <span>Tower Telemetry</span>
+          @if (towerLoading()) {
+            <ng-icon hlmIcon name="lucideLoader2" size="sm" class="animate-spin text-muted-foreground" />
+          }
+          @if (hasTowerData()) {
+            <span hlmBadge variant="outline" class="text-xs ml-auto">
+              {{ towerDataPoints() }} readings
+            </span>
+          }
+        </div>
+
+        @if (hasTowerData()) {
+          <div class="sensor-grid sensor-grid-3">
+            <!-- Ambient Temperature Chart -->
+            <div hlmCard class="chart-card">
+              <div class="chart-header">
+                <ng-icon hlmIcon name="lucideThermometer" size="sm" class="text-red-400" />
+                <span class="chart-title">Ambient Temperature</span>
+              </div>
+              <div echarts [options]="ambientTempChartOptions()" class="chart"></div>
+            </div>
+
+            <!-- Humidity Chart -->
+            <div hlmCard class="chart-card">
+              <div class="chart-header">
+                <ng-icon hlmIcon name="lucideDroplets" size="sm" class="text-cyan-400" />
+                <span class="chart-title">Humidity</span>
+              </div>
+              <div echarts [options]="humidityChartOptions()" class="chart"></div>
+            </div>
+
+            <!-- Light Level Chart -->
+            <div hlmCard class="chart-card">
+              <div class="chart-header">
+                <ng-icon hlmIcon name="lucideSun" size="sm" class="text-yellow-400" />
+                <span class="chart-title">Light Level</span>
+              </div>
+              <div echarts [options]="lightLevelChartOptions()" class="chart"></div>
+            </div>
+          </div>
+        } @else if (!towerLoading() && !towerError()) {
+          <div hlmCard class="empty-state">
+            <ng-icon hlmIcon name="lucideSun" size="xl" class="text-muted-foreground" />
+            <p class="text-sm font-medium">No tower data</p>
+            <p class="text-xs text-muted-foreground">
+              No telemetry readings found for tower
+              <strong>{{ selectedTowerId() }}</strong> in the last {{ getTimeRangeLabel() }}.
+            </p>
+          </div>
+        }
+      </section>
+    }
+  }
+</div>

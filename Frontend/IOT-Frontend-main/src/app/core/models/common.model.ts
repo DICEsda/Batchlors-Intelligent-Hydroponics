@@ -82,7 +82,11 @@ export type WSMessageType =
   | 'coordinator_registration_request'
   | 'coordinator_registered'
   | 'coordinator_rejected'
-  | 'coordinator_removed';
+  | 'coordinator_removed'
+  // Diagnostics
+  | 'diagnostics_update'
+  // Throttled telemetry batch
+  | 'telemetry_batch';
 
 export interface WSMessage<T = unknown> {
   type: WSMessageType;

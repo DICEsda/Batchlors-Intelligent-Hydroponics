@@ -109,6 +109,10 @@ builder.Services.AddSingleton<IMqttService, MqttService>();
 // WebSocket broadcaster (broadcasts telemetry to all connected clients)
 builder.Services.AddSingleton<IWsBroadcaster, WsBroadcaster>();
 
+// Diagnostics service (performance metrics collection and reporting)
+builder.Services.AddSingleton<IDiagnosticsService, DiagnosticsService>();
+builder.Services.AddHostedService<DiagnosticsPushService>();
+
 // Alert service (monitors telemetry and generates alerts)
 builder.Services.AddSingleton<IAlertService, AlertService>();
 

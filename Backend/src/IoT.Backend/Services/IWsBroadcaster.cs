@@ -1,3 +1,5 @@
+using IoT.Backend.Models.Diagnostics;
+
 namespace IoT.Backend.Services;
 
 /// <summary>
@@ -72,6 +74,11 @@ public interface IWsBroadcaster
     /// Triggered when a coordinator registration is approved.
     /// </summary>
     Task BroadcastCoordinatorRegisteredAsync(CoordinatorRegisteredPayload payload, CancellationToken ct = default);
+
+    /// <summary>
+    /// Broadcasts a diagnostics metrics snapshot to all connected clients.
+    /// </summary>
+    Task BroadcastDiagnosticsAsync(SystemMetricsSnapshot snapshot, CancellationToken ct = default);
 
     /// <summary>
     /// Registers a WebSocket client for broadcasts.

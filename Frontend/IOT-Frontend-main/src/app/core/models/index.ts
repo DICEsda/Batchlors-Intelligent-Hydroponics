@@ -39,5 +39,8 @@ export * from './pairing.model';
 // WebSocket real-time messages
 export * from './websocket.model';
 
+// Diagnostics (backend performance metrics)
+export * from './diagnostics.model';
+
 // Common/Shared types
 export * from './common.model';

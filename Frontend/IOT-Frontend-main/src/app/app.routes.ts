@@ -218,6 +218,36 @@ export const routes: Routes = [
     pathMatch: 'full'
   },
 
+  // Diagnostics - System performance metrics
+  {
+    path: 'diagnostics/system',
+    loadComponent: () =>
+      import('./pages/diagnostics-system/diagnostics-system.component').then(
+        m => m.DiagnosticsSystemComponent
+      ),
+    title: 'System Diagnostics | Smart Tile Dashboard'
+  },
+
+  // Diagnostics - Sensor telemetry history charts
+  {
+    path: 'diagnostics/sensors',
+    loadComponent: () =>
+      import('./pages/diagnostics-sensors/diagnostics-sensors.component').then(
+        m => m.DiagnosticsSensorsComponent
+      ),
+    title: 'Sensor Telemetry | Smart Tile Dashboard'
+  },
+
+  // Diagnostics - Scale test recording and analysis
+  {
+    path: 'diagnostics/scale-test',
+    loadComponent: () =>
+      import('./pages/diagnostics-scale-test/diagnostics-scale-test.component').then(
+        m => m.DiagnosticsScaleTestComponent
+      ),
+    title: 'Scale Test | Smart Tile Dashboard'
+  },
+
   // Wildcard redirect
   {
     path: '**',

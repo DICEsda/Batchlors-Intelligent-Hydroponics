@@ -26,7 +26,10 @@ import {
   lucideCpu,
   lucideGrid3x3,
   lucideRadar,
-  lucideDownload
+  lucideDownload,
+  lucideActivity,
+  lucideBarChart3,
+  lucideThermometer
 } from '@ng-icons/lucide';
 import { WebSocketService } from '../../../core/services/websocket.service';
 import { IoTDataService } from '../../../core/services/iot-data.service';
@@ -79,7 +82,10 @@ type UserRole = 'admin' | 'user';
       lucideCpu,
       lucideGrid3x3,
       lucideRadar,
-      lucideDownload
+      lucideDownload,
+      lucideActivity,
+      lucideBarChart3,
+      lucideThermometer
     })
   ],
   templateUrl: './sidebar.component.html',
@@ -137,6 +143,20 @@ export class SidebarComponent implements OnInit, OnDestroy {
     { label: 'Digital Twin', icon: 'lucideBeaker', route: '/digital-twin' },
     { label: 'Radar View', icon: 'lucideRadar', route: '/radar' },
     { label: 'Machine Learning', icon: 'lucideBrain', route: '/machine-learning' }
+  ]);
+
+  // Diagnostics section - Performance monitoring and testing
+  diagnosticsItems = signal<NavItem[]>([
+    {
+      label: 'Diagnostics',
+      icon: 'lucideActivity',
+      expanded: true,
+      children: [
+        { label: 'System', icon: 'lucideActivity', route: '/diagnostics/system' },
+        { label: 'Sensors', icon: 'lucideThermometer', route: '/diagnostics/sensors' },
+        { label: 'Scale Test', icon: 'lucideBarChart3', route: '/diagnostics/scale-test' }
+      ]
+    }
   ]);
 
   // System status signals
@@ -206,8 +226,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
     
     if (item.children) {
       item.expanded = !item.expanded;
-      // Trigger signal update
+      // Trigger signal update for whichever section owns the item
       this.platformItems.update(items => [...items]);
+      this.diagnosticsItems.update(items => [...items]);
     }
   }
 

@@ -13,6 +13,7 @@ namespace IoT.Backend.Services;
 public class CoordinatorRegistrationService : ICoordinatorRegistrationService
 {
     private readonly ICoordinatorRepository _coordinatorRepository;
+    private readonly ITwinRepository _twinRepository;
     private readonly IMqttService _mqtt;
     private readonly IWsBroadcaster _broadcaster;
     private readonly TwinChangeChannel _changeChannel;
@@ -38,12 +39,14 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
 
     public CoordinatorRegistrationService(
         ICoordinatorRepository coordinatorRepository,
+        ITwinRepository twinRepository,
         IMqttService mqtt,
         IWsBroadcaster broadcaster,
         TwinChangeChannel changeChannel,
         ILogger<CoordinatorRegistrationService> logger)
     {
         _coordinatorRepository = coordinatorRepository;
+        _twinRepository = twinRepository;
         _mqtt = mqtt;
         _broadcaster = broadcaster;
         _changeChannel = changeChannel;
@@ -230,6 +233,30 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
 
         // Persist to database
         await _coordinatorRepository.UpsertAsync(coordinator, ct);
+
+        // Persist the coordinator twin to MongoDB
+        var coordinatorTwin = new CoordinatorTwin
+        {
+            Id = request.CoordId,
+            CoordId = request.CoordId,
+            FarmId = request.FarmId,
+            SiteId = request.FarmId,
+            Name = request.Name,
+            Reported = new CoordinatorReportedState
+            {
+                FwVersion = pending?.FwVersion ?? string.Empty,
+                StatusMode = "operational"
+            },
+            Desired = new CoordinatorDesiredState(),
+            Metadata = new TwinMetadata
+            {
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                IsConnected = true,
+                SyncStatus = SyncStatus.InSync
+            }
+        };
+        await _twinRepository.UpsertCoordinatorTwinAsync(coordinatorTwin, ct);
 
         // Add to registered cache
         _registeredCache[request.CoordId] = true;

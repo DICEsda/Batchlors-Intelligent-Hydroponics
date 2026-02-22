@@ -564,6 +564,35 @@ export class WebSocketService {
         console.log('[WebSocket] Coordinator event:', data.type, data.payload);
         break;
 
+      // ========================================================================
+      // Throttled Telemetry Batch (from WsBroadcaster flush)
+      // ========================================================================
+      case 'telemetry_batch':
+        const batchPayload = data.payload as Array<{ type: string; payload: any }>;
+        if (Array.isArray(batchPayload)) {
+          for (const entry of batchPayload) {
+            if (entry.type === 'tower_telemetry') {
+              this.towerTelemetrySubject.next(entry.payload);
+            } else if (entry.type === 'reservoir_telemetry') {
+              this.reservoirTelemetrySubject.next(entry.payload);
+            }
+          }
+          if (this.env.isDevelopment) {
+            console.log('[WebSocket] Telemetry batch:', batchPayload.length, 'items');
+          }
+        }
+        break;
+
+      // ========================================================================
+      // Diagnostics Update (from DiagnosticsPushService)
+      // ========================================================================
+      case 'diagnostics_update':
+        // Handled by DiagnosticsService via messages$ subscription
+        if (this.env.isDevelopment) {
+          console.log('[WebSocket] Diagnostics update received');
+        }
+        break;
+
       default:
         if (this.env.isDevelopment) {
           console.warn('[WebSocket] Unknown message type:', data.type);

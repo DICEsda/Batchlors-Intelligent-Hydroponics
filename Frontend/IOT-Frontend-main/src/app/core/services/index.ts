@@ -29,3 +29,9 @@ export * from './alert.service';
 
 // Digital Twin state management service
 export * from './twin.service';
+
+// Diagnostics (backend performance metrics via WS + REST)
+export * from './diagnostics.service';
+
+// Telemetry history (reservoir + tower time-series from MongoDB)
+export * from './telemetry-history.service';

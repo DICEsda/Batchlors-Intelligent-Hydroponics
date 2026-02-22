@@ -33,7 +33,7 @@ public class TwinService : ITwinService
     // Tower Twin Operations
     // ============================================================================
 
-    public async Task ProcessTowerTelemetryAsync(string towerId, TowerReportedState reported, CancellationToken ct = default)
+    public async Task ProcessTowerTelemetryAsync(string towerId, string coordId, string farmId, TowerReportedState reported, CancellationToken ct = default)
     {
         _logger.LogDebug("Processing telemetry for tower {TowerId}", towerId);
 
@@ -41,8 +41,26 @@ public class TwinService : ITwinService
         
         if (!updated)
         {
-            _logger.LogWarning("Failed to update reported state for tower {TowerId} - twin may not exist", towerId);
-            return;
+            // Twin doesn't exist yet — auto-create from first telemetry
+            _logger.LogInformation("Auto-creating tower twin for {TowerId} from first telemetry", towerId);
+            var newTwin = new TowerTwin
+            {
+                Id = towerId,
+                TowerId = towerId,
+                CoordId = coordId,
+                FarmId = farmId,
+                Reported = reported,
+                Desired = new TowerDesiredState(),
+                Metadata = new TwinMetadata
+                {
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    LastReportedAt = DateTime.UtcNow,
+                    IsConnected = true,
+                    SyncStatus = SyncStatus.InSync
+                }
+            };
+            await _twinRepository.UpsertTowerTwinAsync(newTwin, ct);
         }
 
         // Emit ADT sync event (fire-and-forget via channel)
@@ -132,7 +150,7 @@ public class TwinService : ITwinService
     // Coordinator Twin Operations
     // ============================================================================
 
-    public async Task ProcessCoordinatorTelemetryAsync(string coordId, CoordinatorReportedState reported, CancellationToken ct = default)
+    public async Task ProcessCoordinatorTelemetryAsync(string coordId, string farmId, CoordinatorReportedState reported, CancellationToken ct = default)
     {
         _logger.LogDebug("Processing telemetry for coordinator {CoordId}", coordId);
 
@@ -140,8 +158,26 @@ public class TwinService : ITwinService
         
         if (!updated)
         {
-            _logger.LogWarning("Failed to update reported state for coordinator {CoordId} - twin may not exist", coordId);
-            return;
+            // Twin doesn't exist yet — auto-create from first telemetry
+            _logger.LogInformation("Auto-creating coordinator twin for {CoordId} from first telemetry", coordId);
+            var newTwin = new CoordinatorTwin
+            {
+                Id = coordId,
+                CoordId = coordId,
+                FarmId = farmId,
+                SiteId = farmId,
+                Reported = reported,
+                Desired = new CoordinatorDesiredState(),
+                Metadata = new TwinMetadata
+                {
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    LastReportedAt = DateTime.UtcNow,
+                    IsConnected = true,
+                    SyncStatus = SyncStatus.InSync
+                }
+            };
+            await _twinRepository.UpsertCoordinatorTwinAsync(newTwin, ct);
         }
 
         // Emit ADT sync event

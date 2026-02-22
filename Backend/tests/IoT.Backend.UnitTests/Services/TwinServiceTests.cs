@@ -77,7 +77,7 @@ public class TwinServiceTests
     // ========================================================================
 
     [Fact]
-    public async Task ProcessTowerTelemetryAsync_RepoReturnsFalse_ReturnsEarlyWithoutBroadcasting()
+    public async Task ProcessTowerTelemetryAsync_RepoReturnsFalse_AutoCreatesTwinAndContinues()
     {
         // Arrange
         _repo.UpdateTowerReportedStateAsync(Arg.Any<string>(), Arg.Any<TowerReportedState>(), Arg.Any<CancellationToken>())
@@ -86,13 +86,15 @@ public class TwinServiceTests
         var reported = new TowerReportedState { AirTempC = 25f };
 
         // Act
-        await _sut.ProcessTowerTelemetryAsync("tower-1", reported);
+        await _sut.ProcessTowerTelemetryAsync("tower-1", "coord-1", "farm-1", reported);
 
-        // Assert
-        await _broadcaster.DidNotReceive()
-            .BroadcastAsync(Arg.Any<string>(), Arg.Any<object>(), Arg.Any<CancellationToken>());
-        await _repo.DidNotReceive()
-            .GetTowerTwinByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        // Assert – twin was auto-created via upsert
+        await _repo.Received(1)
+            .UpsertTowerTwinAsync(Arg.Is<TowerTwin>(t =>
+                t.TowerId == "tower-1" &&
+                t.CoordId == "coord-1" &&
+                t.FarmId == "farm-1" &&
+                t.Reported == reported), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -106,7 +108,7 @@ public class TwinServiceTests
             .Returns((TowerTwin?)null); // twin not found after update (edge case)
 
         // Act
-        await _sut.ProcessTowerTelemetryAsync("tower-1", reported);
+        await _sut.ProcessTowerTelemetryAsync("tower-1", "coord-1", "farm-1", reported);
 
         // Assert – broadcaster was called
         await _broadcaster.Received(1)
@@ -134,7 +136,7 @@ public class TwinServiceTests
             .Returns(twin);
 
         // Act
-        await _sut.ProcessTowerTelemetryAsync("tower-1", reported);
+        await _sut.ProcessTowerTelemetryAsync("tower-1", "coord-1", "farm-1", reported);
 
         // Assert
         await _repo.Received(1)
@@ -155,7 +157,7 @@ public class TwinServiceTests
             .Returns(twin);
 
         // Act
-        await _sut.ProcessTowerTelemetryAsync("tower-1", reported);
+        await _sut.ProcessTowerTelemetryAsync("tower-1", "coord-1", "farm-1", reported);
 
         // Assert
         await _repo.DidNotReceive()
@@ -176,7 +178,7 @@ public class TwinServiceTests
             .Returns(twin);
 
         // Act
-        await _sut.ProcessTowerTelemetryAsync("tower-1", reported);
+        await _sut.ProcessTowerTelemetryAsync("tower-1", "coord-1", "farm-1", reported);
 
         // Assert – should NOT update sync status because it's not Pending
         await _repo.DidNotReceive()
@@ -439,20 +441,24 @@ public class TwinServiceTests
     // ========================================================================
 
     [Fact]
-    public async Task ProcessCoordinatorTelemetryAsync_RepoReturnsFalse_ReturnsEarlyWithoutBroadcasting()
+    public async Task ProcessCoordinatorTelemetryAsync_RepoReturnsFalse_AutoCreatesTwinAndContinues()
     {
         // Arrange
         _repo.UpdateCoordinatorReportedStateAsync(Arg.Any<string>(), Arg.Any<CoordinatorReportedState>(), Arg.Any<CancellationToken>())
             .Returns(false);
 
-        // Act
-        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", new CoordinatorReportedState());
+        var reported = new CoordinatorReportedState { StatusMode = "operational" };
 
-        // Assert
-        await _broadcaster.DidNotReceive()
-            .BroadcastAsync(Arg.Any<string>(), Arg.Any<object>(), Arg.Any<CancellationToken>());
-        await _repo.DidNotReceive()
-            .GetCoordinatorTwinByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        // Act
+        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", "farm-1", reported);
+
+        // Assert – twin was auto-created via upsert
+        await _repo.Received(1)
+            .UpsertCoordinatorTwinAsync(Arg.Is<CoordinatorTwin>(t =>
+                t.CoordId == "coord-1" &&
+                t.FarmId == "farm-1" &&
+                t.SiteId == "farm-1" &&
+                t.Reported == reported), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -469,7 +475,7 @@ public class TwinServiceTests
         while (_changeChannel.Reader.TryRead(out _)) { }
 
         // Act
-        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", reported);
+        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", "farm-1", reported);
 
         // Assert
         await _broadcaster.Received(1)
@@ -496,7 +502,7 @@ public class TwinServiceTests
             .Returns(twin);
 
         // Act
-        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", reported);
+        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", "farm-1", reported);
 
         // Assert
         await _repo.Received(1)
@@ -517,7 +523,7 @@ public class TwinServiceTests
             .Returns(twin);
 
         // Act
-        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", reported);
+        await _sut.ProcessCoordinatorTelemetryAsync("coord-1", "farm-1", reported);
 
         // Assert
         await _repo.DidNotReceive()
