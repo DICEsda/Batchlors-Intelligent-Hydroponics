@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import time
 from typing import List, Optional
 
@@ -229,6 +230,9 @@ class RestBootstrapper:
         self._base = base_url.rstrip("/")
         self._session = requests.Session()
         self._session.headers["Content-Type"] = "application/json"
+        api_key = os.environ.get("API_KEY", "hydro-thesis-2026")
+        if api_key:
+            self._session.headers["X-API-Key"] = api_key
 
     def health_check(self) -> bool:
         try:
@@ -249,8 +253,8 @@ class RestBootstrapper:
         raise ConnectionError(f"Backend not reachable at {self._base} after {timeout}s")
 
     def create_farm(self, farm: Farm) -> bool:
-        """POST /api/v1/farms -- create farm (ignores 409 Conflict)."""
-        url = f"{self._base}/api/v1/farms"
+        """POST /api/farms -- create farm (ignores 409 Conflict)."""
+        url = f"{self._base}/api/farms"
         body = {
             "farm_id": farm.farm_id,
             "name": farm.name,

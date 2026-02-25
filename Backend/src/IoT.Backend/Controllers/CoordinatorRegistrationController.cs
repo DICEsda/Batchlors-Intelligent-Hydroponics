@@ -129,7 +129,7 @@ public class CoordinatorRegistrationController : ControllerBase
         // Only publish to MQTT if there are operational settings to send
         if (mqttConfig.Count > 0)
         {
-            var topic = $"coordinator/{coordId}/config";
+            var topic = MqttTopics.CoordinatorConfig(coordId);
             await _mqtt.PublishJsonAsync(topic, mqttConfig, ct: ct);
 
             _logger.LogInformation(
@@ -154,7 +154,7 @@ public class CoordinatorRegistrationController : ControllerBase
         if (coordinator is null)
             return NotFound(new { error = $"Coordinator {coordId} not found" });
 
-        var topic = $"coordinator/{coordId}/cmd";
+        var topic = MqttTopics.CoordinatorDirectCmd(coordId);
         await _mqtt.PublishJsonAsync(topic, new { action = "restart" }, ct: ct);
 
         _logger.LogInformation("Restart command sent to coordinator {CoordId} on {Topic}", coordId, topic);

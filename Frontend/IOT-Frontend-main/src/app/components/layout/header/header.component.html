@@ -31,28 +31,16 @@
       />
     </div>
 
-    <!-- Status Badges -->
-    <div class="status-badges">
-      @if (usingMockData()) {
-        <app-status-badge status="info" [showLabel]="true" />
-      }
-      <app-status-badge 
-        [status]="wsConnected() ? 'online' : 'offline'" 
-        [showLabel]="true"
-      />
+    <!-- Status Area -->
+    <div class="status-area">
+      <!-- Subtle WebSocket indicator -->
+      <div class="ws-indicator" 
+           [class.connected]="wsConnected()" 
+           [title]="wsConnected() ? 'Real-time connection active' : 'Real-time connection lost'">
+        <span class="ws-dot"></span>
+      </div>
       <button hlmBtn variant="outline" size="sm" (click)="refreshData()" class="refresh-btn">
         <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
-      </button>
-      <button 
-        hlmBtn 
-        variant="destructive" 
-        size="sm" 
-        (click)="testToast()" 
-        class="test-toast-btn"
-        title="Test Toast Notifications (cycles through all types)"
-      >
-        <ng-icon hlmIcon name="lucideFlaskConical" size="sm" />
-        Test Toast
       </button>
     </div>
 

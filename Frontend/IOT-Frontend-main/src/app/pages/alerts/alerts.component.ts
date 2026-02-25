@@ -114,7 +114,6 @@ export class AlertsComponent implements OnInit, OnDestroy, AfterViewChecked {
   // ============================================================================
   readonly isLoading = this.alertService.isLoading;
   readonly error = this.alertService.error;
-  readonly usingMockData = this.alertService.usingMockData;
 
   // Data from IoT service
   readonly coordinators = this.dataService.coordinators;

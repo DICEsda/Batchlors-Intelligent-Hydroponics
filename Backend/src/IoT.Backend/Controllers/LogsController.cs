@@ -8,7 +8,7 @@ namespace IoT.Backend.Controllers;
 /// API controller for serial logs from coordinators
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/[controller]")]
 public class LogsController : ControllerBase
 {
     private readonly IRepository _repository;

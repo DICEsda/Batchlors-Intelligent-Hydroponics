@@ -57,7 +57,6 @@ export class FarmsListComponent implements OnInit {
   // Get coordinators and nodes from data service
   readonly coordinators = this.dataService.coordinators;
   readonly nodes = this.dataService.nodes;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Computed: farms with their reservoirs
   readonly farmsWithData = computed(() => {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideExperimentalZonelessChangeDetection } from '@angular/core';
-import { throwError } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AlertService } from './alert.service';
 import { ApiService } from './api.service';
 import { Alert } from '../models';
@@ -30,15 +30,29 @@ describe('AlertService', () => {
     };
   }
 
+  /** A set of test alerts used to seed the service via the API spy. */
+  const TEST_ALERTS: Alert[] = [
+    makeAlert({ _id: 'alert-001', title: 'High pH Level', severity: 'critical', status: 'active', category: 'sensor', source: { type: 'tower', id: 'tower-001', name: 'Tower A-1' } }),
+    makeAlert({ _id: 'alert-002', title: 'Low Nutrient', severity: 'warning', status: 'active', category: 'maintenance', source: { type: 'coordinator', id: 'coord-001', name: 'Main Controller' } }),
+    makeAlert({ _id: 'alert-003', title: 'Node Communication Lost', severity: 'critical', status: 'acknowledged', category: 'network', source: { type: 'tower', id: 'tower-007', name: 'Tower B-3' } }),
+    makeAlert({ _id: 'alert-004', title: 'Temperature High', severity: 'warning', status: 'active', category: 'sensor', source: { type: 'coordinator', id: 'coord-002', name: 'Zone 2 Controller' } }),
+    makeAlert({ _id: 'alert-005', title: 'Firmware Update', severity: 'info', status: 'active', category: 'system', source: { type: 'system', id: 'system', name: 'System' } }),
+    makeAlert({ _id: 'alert-006', title: 'Pump Maintenance', severity: 'info', status: 'active', category: 'maintenance', source: { type: 'coordinator', id: 'coord-001', name: 'Main Controller' } }),
+    makeAlert({ _id: 'alert-007', title: 'EC Level Normalized', severity: 'info', status: 'resolved', category: 'sensor', source: { type: 'tower', id: 'tower-012', name: 'Tower C-2' } }),
+    makeAlert({ _id: 'alert-008', title: 'Unauthorized Access', severity: 'critical', status: 'resolved', category: 'security', source: { type: 'backend', id: 'backend', name: 'Backend Server' } }),
+    makeAlert({ _id: 'alert-009', title: 'Light Sensor Calibration', severity: 'warning', status: 'acknowledged', category: 'sensor', source: { type: 'tower', id: 'tower-002', name: 'Tower A-2' } }),
+    makeAlert({ _id: 'alert-010', title: 'Database Backup', severity: 'info', status: 'resolved', category: 'system', source: { type: 'backend', id: 'backend', name: 'Backend Server' } }),
+  ];
+
   beforeEach(() => {
     mockApiService = jasmine.createSpyObj('ApiService', [
       'getAlerts',
       'updateAlert',
       'deleteAlert',
     ]);
-    // Default: API always fails → forces mock-data fallback path
+    // Default: API returns test alerts successfully
     mockApiService.getAlerts.and.returnValue(
-      throwError(() => new Error('no backend'))
+      of({ items: TEST_ALERTS, total: TEST_ALERTS.length, page: 1, pageSize: 100 } as any)
     );
 
     TestBed.configureTestingModule({
@@ -63,22 +77,26 @@ describe('AlertService', () => {
   });
 
   // ==========================================================================
-  // loadAlerts → API failure → mock fallback
+  // loadAlerts → API failure → empty array + error
   // ==========================================================================
 
-  it('should fall back to mock data when API fails', async () => {
+  it('should set empty alerts and error when API fails', async () => {
+    mockApiService.getAlerts.and.returnValue(
+      throwError(() => new Error('no backend'))
+    );
+
     await service.loadAlerts();
 
-    expect(service.usingMockData()).toBeTrue();
-    expect(service.alerts().length).toBe(10);
+    expect(service.alerts().length).toBe(0);
+    expect(service.error()).toBeTruthy();
     expect(service.isLoading()).toBeFalse();
   });
 
   // ==========================================================================
-  // loadMockData — 10 items
+  // loadAlerts → API success → 10 items
   // ==========================================================================
 
-  it('should have 10 mock alerts after loadAlerts with API failure', async () => {
+  it('should have 10 alerts after successful loadAlerts', async () => {
     await service.loadAlerts();
     expect(service.alerts().length).toBe(10);
   });
@@ -230,7 +248,7 @@ describe('AlertService', () => {
       stats.byCategory.network + stats.byCategory.maintenance + stats.byCategory.security;
     expect(categorySum).toBe(10);
 
-    // Spot-check known counts from mock data
+    // Spot-check known counts from test data
     // critical: alert-001, alert-003, alert-008 => 3
     expect(stats.bySeverity.critical).toBe(3);
     // warning: alert-002, alert-004, alert-009 => 3
@@ -361,7 +379,7 @@ describe('AlertService', () => {
     const ack = service.acknowledgedAlerts();
 
     expect(ack.every(a => a.status === 'acknowledged')).toBeTrue();
-    // Mock data: alert-003, alert-009 => 2 acknowledged
+    // Test data: alert-003, alert-009 => 2 acknowledged
     expect(ack.length).toBe(2);
   });
 
@@ -374,7 +392,7 @@ describe('AlertService', () => {
     const resolved = service.resolvedAlerts();
 
     expect(resolved.every(a => a.status === 'resolved')).toBeTrue();
-    // Mock data: alert-007, alert-008, alert-010 => 3 resolved
+    // Test data: alert-007, alert-008, alert-010 => 3 resolved
     expect(resolved.length).toBe(3);
   });
 

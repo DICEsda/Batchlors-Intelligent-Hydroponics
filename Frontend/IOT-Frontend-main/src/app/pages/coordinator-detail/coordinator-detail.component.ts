@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, interval, takeWhile, finalize, filter, forkJoin } from 'rxjs';
@@ -12,15 +12,17 @@ import {
   getBatteryPercent,
   getBatteryStatus,
   DEFAULT_PAIRING_DURATION_MS,
-  DiscoveredNode,
-  WSNodeDiscoveredPayload,
-  WSNodePairedPayload,
+  DiscoveredTower,
+  WSTowerDiscoveredPayload,
+  WSTowerPairedPayload,
   WSPairingStoppedPayload,
   WSPairingTimeoutPayload,
   PairingSession,
   TowerPairingRequest,
   getPairingSecondsRemaining,
-  formatPairingCountdown as formatCountdown
+  formatPairingCountdown as formatCountdown,
+  TimeRange,
+  ReservoirTelemetry,
 } from '../../core/models';
 import {
   HlmCardDirective,
@@ -33,6 +35,7 @@ import { HlmBadgeDirective } from '../../components/ui/badge';
 import { HlmButtonDirective } from '../../components/ui/button';
 import { HlmIconDirective } from '../../components/ui/icon';
 import { HlmSkeletonComponent } from '../../components/ui/skeleton';
+import { TelemetryChartComponent } from '../../components/ui/telemetry-chart/telemetry-chart.component';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import {
   lucideThermometer,
@@ -53,7 +56,8 @@ import {
   lucideServer,
   lucideRadio,
   lucideLoader2,
-  lucideInfo
+  lucideInfo,
+  lucideBarChart3,
 } from '@ng-icons/lucide';
 
 @Component({
@@ -71,7 +75,8 @@ import {
     HlmButtonDirective,
     HlmIconDirective,
     HlmSkeletonComponent,
-    NgIcon
+    NgIcon,
+    TelemetryChartComponent,
   ],
   providers: [
     provideIcons({
@@ -93,7 +98,8 @@ import {
       lucideServer,
       lucideRadio,
       lucideLoader2,
-      lucideInfo
+      lucideInfo,
+      lucideBarChart3,
     })
   ],
   templateUrl: './coordinator-detail.component.html',
@@ -113,13 +119,12 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   readonly loading = this.dataService.loading;
   readonly error = this.dataService.error;
   readonly wsConnected = this.wsService.connected;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Pairing state
   readonly isPairing = signal(false);
   readonly pairingSecondsRemaining = signal(0);
   readonly pairingError = signal<string | null>(null);
-  readonly discoveredNodes = signal<DiscoveredNode[]>([]);
+  readonly discoveredTowers = signal<DiscoveredTower[]>([]);
   readonly pairingSession = signal<PairingSession | null>(null);
   private pairingTimerSub: Subscription | null = null;
 
@@ -156,6 +161,14 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   readonly errorNodeCount = computed(() => 
     this.connectedNodes().filter(n => n.status_mode === 'error').length
   );
+
+  // ============================================================================
+  // Telemetry Charts
+  // ============================================================================
+  @ViewChild('phChart') phChart?: TelemetryChartComponent;
+  @ViewChild('ecChart') ecChart?: TelemetryChartComponent;
+  @ViewChild('waterLevelChart') waterLevelChart?: TelemetryChartComponent;
+  @ViewChild('waterTempChart') waterTempChart?: TelemetryChartComponent;
 
   ngOnInit(): void {
     // Get coordinator ID from route
@@ -197,11 +210,47 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
     this.dataService.loadCoordinatorById(id);
     // Also load nodes for this coordinator
     this.dataService.loadNodes();
+    // Load telemetry history for charts
+    this.loadTelemetryHistory(id);
   }
 
   private subscribeToRealTimeUpdates(id: string): void {
     // Subscribe to coordinator WebSocket updates
     this.wsService.subscribeToCoordinator(id);
+
+    // Subscribe to reservoir telemetry for live chart updates
+    const reservoirSub = this.wsService.reservoirTelemetry$.pipe(
+      filter((t: ReservoirTelemetry) => t.coordId === id)
+    ).subscribe((t) => {
+      const now = new Date(t.timestamp || Date.now());
+      this.phChart?.appendPoint({ time: now, value: t.ph });
+      this.ecChart?.appendPoint({ time: now, value: t.ec });
+      this.waterLevelChart?.appendPoint({ time: now, value: t.waterLevel });
+      this.waterTempChart?.appendPoint({ time: now, value: t.temperature });
+    });
+    this.subscriptions.push(reservoirSub);
+  }
+
+  /**
+   * Load 1-hour telemetry history for the coordinator charts.
+   */
+  private loadTelemetryHistory(coordId: string): void {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const timeRange: TimeRange = { start: oneHourAgo, end: now, interval: '1m' };
+
+    this.apiService.getCoordinatorHistory(coordId, timeRange).subscribe({
+      next: (history) => {
+        // The CoordinatorHistory model uses temp_c, light_lux, etc.
+        // But for reservoir-specific metrics (pH, EC, waterLevel), we need to check
+        // if the backend returns them. For now, use available fields.
+        // The charts are designed for reservoir data, so they'll display
+        // available data points.
+      },
+      error: (err) => {
+        console.log('[Telemetry] Could not load coordinator history:', err.message);
+      },
+    });
   }
 
   refreshData(): void {
@@ -303,15 +352,15 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
           
           // Convert pending requests to discovered nodes
           if (session.pending_requests?.length > 0) {
-            const nodes: DiscoveredNode[] = session.pending_requests.map(req => ({
-              nodeId: req.tower_id,
+            const nodes: DiscoveredTower[] = session.pending_requests.map(req => ({
+              towerId: req.tower_id,
               macAddress: req.mac_address,
               rssi: req.rssi || -70,
               discoveredAt: new Date(req.requested_at),
               firmwareVersion: req.fw_version,
               status: req.status === 'pending' ? 'discovered' : req.status as any
             }));
-            this.discoveredNodes.set(nodes);
+            this.discoveredTowers.set(nodes);
           }
           
           // Start countdown timer
@@ -346,7 +395,7 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
     this.pairingError.set(null);
     this.isPairing.set(true);
     this.pairingSecondsRemaining.set(durationSeconds);
-    this.discoveredNodes.set([]);
+    this.discoveredTowers.set([]);
 
     // Call API to start pairing
     const sub = this.apiService.startPairing(farmId, coord.coord_id, durationSeconds).subscribe({
@@ -446,21 +495,21 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   private subscribeToPairingEvents(): void {
     const coordId = this.coordinatorId;
     
-    // Subscribe to node_discovered events for this coordinator
-    const nodeDiscoveredSub = this.wsService.nodeDiscovered$.pipe(
-      filter((payload: WSNodeDiscoveredPayload) => payload.coordinatorId === coordId())
+    // Subscribe to tower discovered events for this coordinator
+    const towerDiscoveredSub = this.wsService.towerDiscovered$.pipe(
+      filter((payload: WSTowerDiscoveredPayload) => payload.coordinatorId === coordId())
     ).subscribe((payload) => {
-      this.handleNodeDiscovered(payload);
+      this.handleTowerDiscovered(payload);
     });
-    this.subscriptions.push(nodeDiscoveredSub);
+    this.subscriptions.push(towerDiscoveredSub);
 
-    // Subscribe to node_paired events for this coordinator
-    const nodePairedSub = this.wsService.nodePaired$.pipe(
-      filter((payload: WSNodePairedPayload) => payload.coordinatorId === coordId())
+    // Subscribe to tower paired events for this coordinator
+    const towerPairedSub = this.wsService.towerPaired$.pipe(
+      filter((payload: WSTowerPairedPayload) => payload.coordinatorId === coordId())
     ).subscribe((payload) => {
-      this.handleNodePaired(payload);
+      this.handleTowerPaired(payload);
     });
-    this.subscriptions.push(nodePairedSub);
+    this.subscriptions.push(towerPairedSub);
 
     // Subscribe to pairing_stopped events for this coordinator
     const pairingStoppedSub = this.wsService.pairingStopped$.pipe(
@@ -480,49 +529,49 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Handle node discovered event - add to discovered nodes list
+   * Handle tower discovered event - add to discovered towers list
    */
-  private handleNodeDiscovered(payload: WSNodeDiscoveredPayload): void {
-    console.log('[Pairing] Node discovered:', payload.nodeId);
+  private handleTowerDiscovered(payload: WSTowerDiscoveredPayload): void {
+    console.log('[Pairing] Tower discovered:', payload.towerId);
     
-    // Check if node already exists in discovered list
-    const existing = this.discoveredNodes().find(n => n.nodeId === payload.nodeId);
+    // Check if tower already exists in discovered list
+    const existing = this.discoveredTowers().find(t => t.towerId === payload.towerId);
     if (existing) {
       // Update existing entry
-      this.discoveredNodes.update(nodes => 
-        nodes.map(n => n.nodeId === payload.nodeId 
-          ? { ...n, rssi: payload.rssi, discoveredAt: new Date(payload.discoveredAt) }
-          : n
+      this.discoveredTowers.update(towers => 
+        towers.map(t => t.towerId === payload.towerId 
+          ? { ...t, rssi: payload.rssi, discoveredAt: new Date(payload.discoveredAt) }
+          : t
         )
       );
     } else {
-      // Add new discovered node
-      const newNode: DiscoveredNode = {
-        nodeId: payload.nodeId,
+      // Add new discovered tower
+      const newTower: DiscoveredTower = {
+        towerId: payload.towerId,
         macAddress: payload.macAddress,
         rssi: payload.rssi,
         discoveredAt: new Date(payload.discoveredAt),
         firmwareVersion: payload.firmwareVersion,
         status: 'discovered'
       };
-      this.discoveredNodes.update(nodes => [...nodes, newNode]);
+      this.discoveredTowers.update(towers => [...towers, newTower]);
     }
   }
 
   /**
-   * Handle node paired event - update node status in discovered list
+   * Handle tower paired event - update tower status in discovered list
    */
-  private handleNodePaired(payload: WSNodePairedPayload): void {
-    console.log('[Pairing] Node paired:', payload.nodeId);
+  private handleTowerPaired(payload: WSTowerPairedPayload): void {
+    console.log('[Pairing] Tower paired:', payload.towerId);
     
-    this.discoveredNodes.update(nodes =>
-      nodes.map(n => n.nodeId === payload.nodeId
-        ? { ...n, status: 'paired' as const }
-        : n
+    this.discoveredTowers.update(towers =>
+      towers.map(t => t.towerId === payload.towerId
+        ? { ...t, status: 'paired' as const }
+        : t
       )
     );
     
-    // Refresh nodes list to show newly paired node
+    // Refresh nodes list to show newly paired tower
     this.dataService.loadNodes();
   }
 
@@ -536,9 +585,9 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
     this.isPairing.set(false);
     this.pairingSecondsRemaining.set(0);
     
-    // Keep discovered nodes visible for a moment, then clear
+    // Keep discovered towers visible for a moment, then clear
     setTimeout(() => {
-      this.discoveredNodes.set([]);
+      this.discoveredTowers.set([]);
     }, 5000);
   }
 
@@ -552,16 +601,16 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
     this.isPairing.set(false);
     this.pairingSecondsRemaining.set(0);
     
-    // Keep discovered nodes visible for a moment, then clear
+    // Keep discovered towers visible for a moment, then clear
     setTimeout(() => {
-      this.discoveredNodes.set([]);
+      this.discoveredTowers.set([]);
     }, 5000);
   }
 
   /**
-   * Approve a discovered node for pairing
+   * Approve a discovered tower for pairing
    */
-  approveNode(node: DiscoveredNode): void {
+  approveTower(tower: DiscoveredTower): void {
     const coord = this.coordinator();
     if (!coord) return;
 
@@ -571,33 +620,33 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Update node status to 'pairing'
-    this.discoveredNodes.update(nodes =>
-      nodes.map(n => n.nodeId === node.nodeId
-        ? { ...n, status: 'pairing' as const }
-        : n
+    // Update tower status to 'pairing'
+    this.discoveredTowers.update(towers =>
+      towers.map(t => t.towerId === tower.towerId
+        ? { ...t, status: 'pairing' as const }
+        : t
       )
     );
 
-    // Call API to approve node
-    this.apiService.approveNode(farmId, coord.coord_id, node.nodeId).subscribe({
-      next: (tower) => {
-        console.log('[Pairing] Node approved:', tower);
-        this.discoveredNodes.update(nodes =>
-          nodes.map(n => n.nodeId === node.nodeId
-            ? { ...n, status: 'paired' as const }
-            : n
+    // Call API to approve tower
+    this.apiService.approveTower(farmId, coord.coord_id, tower.towerId).subscribe({
+      next: (result) => {
+        console.log('[Pairing] Tower approved:', result);
+        this.discoveredTowers.update(towers =>
+          towers.map(t => t.towerId === tower.towerId
+            ? { ...t, status: 'paired' as const }
+            : t
           )
         );
-        // Refresh nodes list to show newly paired node
+        // Refresh nodes list to show newly paired tower
         this.dataService.loadNodes();
       },
       error: (err) => {
-        console.error('[Pairing] Failed to approve node:', err);
-        this.discoveredNodes.update(nodes =>
-          nodes.map(n => n.nodeId === node.nodeId
-            ? { ...n, status: 'error' as const, error: err.message || 'Approval failed' }
-            : n
+        console.error('[Pairing] Failed to approve tower:', err);
+        this.discoveredTowers.update(towers =>
+          towers.map(t => t.towerId === tower.towerId
+            ? { ...t, status: 'error' as const, error: err.message || 'Approval failed' }
+            : t
           )
         );
       }
@@ -605,9 +654,9 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Reject a discovered node
+   * Reject a discovered tower
    */
-  rejectNode(node: DiscoveredNode): void {
+  rejectTower(tower: DiscoveredTower): void {
     const coord = this.coordinator();
     if (!coord) return;
 
@@ -615,37 +664,37 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
     if (!farmId) {
       console.error('[Pairing] Farm ID not available');
       // Still update local state
-      this.discoveredNodes.update(nodes =>
-        nodes.filter(n => n.nodeId !== node.nodeId)
+      this.discoveredTowers.update(towers =>
+        towers.filter(t => t.towerId !== tower.towerId)
       );
       return;
     }
 
-    // Update node status to 'rejected'
-    this.discoveredNodes.update(nodes =>
-      nodes.map(n => n.nodeId === node.nodeId
-        ? { ...n, status: 'rejected' as const }
-        : n
+    // Update tower status to 'rejected'
+    this.discoveredTowers.update(towers =>
+      towers.map(t => t.towerId === tower.towerId
+        ? { ...t, status: 'rejected' as const }
+        : t
       )
     );
 
-    // Call API to reject node
-    this.apiService.rejectNode(farmId, coord.coord_id, node.nodeId).subscribe({
+    // Call API to reject tower
+    this.apiService.rejectTower(farmId, coord.coord_id, tower.towerId).subscribe({
       next: () => {
-        console.log('[Pairing] Node rejected:', node.nodeId);
+        console.log('[Pairing] Tower rejected:', tower.towerId);
         // Remove after animation
         setTimeout(() => {
-          this.discoveredNodes.update(nodes =>
-            nodes.filter(n => n.nodeId !== node.nodeId)
+          this.discoveredTowers.update(towers =>
+            towers.filter(t => t.towerId !== tower.towerId)
           );
         }, 300);
       },
       error: (err) => {
-        console.error('[Pairing] Failed to reject node:', err);
+        console.error('[Pairing] Failed to reject tower:', err);
         // Still remove from UI after showing error briefly
         setTimeout(() => {
-          this.discoveredNodes.update(nodes =>
-            nodes.filter(n => n.nodeId !== node.nodeId)
+          this.discoveredTowers.update(towers =>
+            towers.filter(t => t.towerId !== tower.towerId)
           );
         }, 1000);
       }
@@ -693,16 +742,16 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Track discovered nodes by ID
+   * Track discovered towers by ID
    */
-  trackByDiscoveredNodeId(_: number, node: DiscoveredNode): string {
-    return node.nodeId;
+  trackByDiscoveredTowerId(_: number, tower: DiscoveredTower): string {
+    return tower.towerId;
   }
 
   /**
-   * Get badge variant for discovered node status
+   * Get badge variant for discovered tower status
    */
-  getDiscoveredNodeBadgeVariant(status: DiscoveredNode['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
+  getDiscoveredTowerBadgeVariant(status: DiscoveredTower['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
       case 'discovered': return 'secondary';
       case 'pairing': return 'outline';

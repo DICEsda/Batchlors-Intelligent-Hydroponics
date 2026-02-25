@@ -276,7 +276,7 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
 
         // Notify the coordinator via MQTT that it has been registered
         await _mqtt.PublishJsonAsync(
-            $"coordinator/{request.CoordId}/registered",
+            MqttTopics.CoordinatorRegistered(request.CoordId),
             new { farm_id = request.FarmId },
             ct: ct);
 

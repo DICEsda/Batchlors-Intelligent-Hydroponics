@@ -13,9 +13,7 @@
             <span class="stat-value-sm">{{ coordTwins().length || systemStats().coordinators.total }}</span>
             <span class="stat-label-sm">Reservoirs</span>
           </div>
-          <span hlmBadge variant="outline" class="stat-badge">
-            @if (usingMockData()) { Mock } @else { Live }
-          </span>
+          <span hlmBadge variant="outline" class="stat-badge">Live</span>
         }
       </div>
 
@@ -327,10 +325,10 @@
 
             <!-- Infra pills -->
             <div class="infra-overlay">
-              <div class="infra-pill" [class.online]="!usingMockData()">
+              <div class="infra-pill online">
                 <ng-icon hlmIcon name="lucideServer" size="xs" /><span>API</span>
               </div>
-              <div class="infra-pill" [class.online]="!usingMockData()">
+              <div class="infra-pill online">
                 <ng-icon hlmIcon name="lucideDatabase" size="xs" /><span>DB</span>
               </div>
               <div class="infra-pill" [class.online]="wsConnected()">
@@ -340,6 +338,47 @@
           }
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- System Health Sparklines -->
+  <section class="system-health-section">
+    <div class="system-health-header">
+      <ng-icon hlmIcon name="lucideBarChart3" size="sm" />
+      <span class="system-health-title">System Health</span>
+    </div>
+    <div class="system-health-grid">
+      <app-telemetry-chart
+        #avgPhChart
+        title="Avg pH"
+        unit="pH"
+        color="#8b5cf6"
+        [minY]="0"
+        [maxY]="14"
+        [thresholdLow]="5.5"
+        [thresholdHigh]="7.5"
+        height="120px"
+      />
+      <app-telemetry-chart
+        #avgEcChart
+        title="Avg EC"
+        unit="mS/cm"
+        color="#06b6d4"
+        [minY]="0"
+        [maxY]="5"
+        [thresholdLow]="0.8"
+        [thresholdHigh]="3.0"
+        height="120px"
+      />
+      <app-telemetry-chart
+        #avgWaterLevelChart
+        title="Avg Water Level"
+        unit="%"
+        color="#3b82f6"
+        [minY]="0"
+        [maxY]="100"
+        height="120px"
+      />
     </div>
   </section>
 

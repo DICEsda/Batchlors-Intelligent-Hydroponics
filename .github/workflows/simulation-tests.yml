@@ -1,0 +1,154 @@
+name: Simulation Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'tools/simulator/**'
+      - 'Backend/src/**'
+      - 'docker-compose.simulation.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'tools/simulator/**'
+      - 'Backend/src/**'
+      - 'docker-compose.simulation.yml'
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable verbose test output'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  simulation-tests:
+    name: Simulation Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-sim-${{ hashFiles('Backend/src/IoT.Backend/Dockerfile', 'tools/simulator/Dockerfile', 'tools/simulator/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-sim-
+
+      - name: Build and start simulation environment
+        run: |
+          docker compose -f docker-compose.simulation.yml up -d --build --wait
+        timeout-minutes: 10
+
+      - name: Verify services are healthy
+        run: |
+          echo "Checking service health..."
+          
+          # Check MongoDB
+          docker compose -f docker-compose.simulation.yml exec -T mongodb-sim \
+            mongosh --quiet --eval "db.adminCommand('ping')"
+          echo "MongoDB: OK"
+          
+          # Check MQTT broker
+          docker compose -f docker-compose.simulation.yml exec -T mosquitto-sim \
+            mosquitto_sub -t '$SYS/#' -C 1 -u user1 -P user1 -W 5 || true
+          echo "Mosquitto: OK"
+          
+          # Check Backend health
+          curl -f http://localhost:8010/health/live
+          echo ""
+          echo "Backend: OK"
+          
+          curl -f http://localhost:8010/health/ready
+          echo ""
+          echo "Backend ready: OK"
+
+      - name: Run simulation tests
+        run: |
+          docker compose -f docker-compose.simulation.yml run \
+            --rm \
+            -e SIM_MQTT_HOST=mosquitto-sim \
+            -e SIM_MQTT_PORT=1883 \
+            -e SIM_MQTT_USER=user1 \
+            -e SIM_MQTT_PASS=user1 \
+            -e SIM_API_URL=http://backend-sim:8000 \
+            --entrypoint python \
+            simulator \
+            -m pytest tests/ \
+              -v \
+              --tb=short \
+              --json-report \
+              --json-report-file=/app/test-results.json \
+              --timeout=120 \
+              ${{ inputs.debug_enabled == true && '-s' || '' }}
+        timeout-minutes: 15
+
+      - name: Extract test results
+        if: always()
+        run: |
+          # Copy test results from the simulator container (if it still exists)
+          docker cp sim-simulator:/app/test-results.json ./test-results.json 2>/dev/null || \
+            echo '{"summary": {"failed": "unknown"}}' > ./test-results.json
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulation-test-results
+          path: ./test-results.json
+          retention-days: 30
+
+      - name: Collect service logs on failure
+        if: failure()
+        run: |
+          echo "=== MongoDB Logs ==="
+          docker compose -f docker-compose.simulation.yml logs mongodb-sim --tail=50
+          echo ""
+          echo "=== Mosquitto Logs ==="
+          docker compose -f docker-compose.simulation.yml logs mosquitto-sim --tail=50
+          echo ""
+          echo "=== Backend Logs ==="
+          docker compose -f docker-compose.simulation.yml logs backend-sim --tail=100
+          echo ""
+          echo "=== Simulator Logs ==="
+          docker compose -f docker-compose.simulation.yml logs simulator --tail=100
+
+      - name: Upload service logs on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: simulation-service-logs
+          path: |
+            /tmp/sim-logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.simulation.yml down -v
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## Simulation Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f ./test-results.json ]; then
+            # Parse JSON report for summary
+            TOTAL=$(python3 -c "import json; d=json.load(open('test-results.json')); print(d.get('summary',{}).get('total','?'))" 2>/dev/null || echo "?")
+            PASSED=$(python3 -c "import json; d=json.load(open('test-results.json')); print(d.get('summary',{}).get('passed','?'))" 2>/dev/null || echo "?")
+            FAILED=$(python3 -c "import json; d=json.load(open('test-results.json')); print(d.get('summary',{}).get('failed','?'))" 2>/dev/null || echo "?")
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total  | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No test results file found." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -97,9 +97,10 @@ export interface TowerPairingRequest {
 // ============================================================================
 
 /**
- * Basic tower model returned when approving a pairing request
+ * Basic tower model returned when approving a pairing request.
+ * Named PairedTower to avoid collision with the main Tower interface in tower.model.ts.
  */
-export interface Tower {
+export interface PairedTower {
   _id?: string;
   tower_id: string;
   coord_id: string;

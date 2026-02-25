@@ -1316,6 +1316,12 @@ MessageType MessageFactory::getMessageTypeFromBinary(const uint8_t* buffer, size
 		case 0x23: return MessageType::PAIRING_CONFIRM;
 		case 0x24: return MessageType::PAIRING_REJECT;
 		case 0x25: return MessageType::PAIRING_ABORT;
+		// OTA binary message type markers (0x30-0x34)
+		case 0x30: return MessageType::OTA_BEGIN;
+		case 0x31: return MessageType::OTA_CHUNK;
+		case 0x32: return MessageType::OTA_CHUNK_ACK;
+		case 0x33: return MessageType::OTA_ABORT;
+		case 0x34: return MessageType::OTA_COMPLETE;
 		default:
 			Serial.printf("MessageFactory: Unknown binary message type marker: 0x%02X\n", typeMarker);
 			return MessageType::ERROR;
@@ -1336,6 +1342,12 @@ EspNowMessage* MessageFactory::createFromBinary(const uint8_t* buffer, size_t le
 		case MessageType::PAIRING_CONFIRM:       m = new PairingConfirmMessage(); break;
 		case MessageType::PAIRING_REJECT:        m = new PairingRejectMessage(); break;
 		case MessageType::PAIRING_ABORT:         m = new PairingAbortMessage(); break;
+		// OTA messages (binary format)
+		case MessageType::OTA_BEGIN:             m = new OtaBeginMessage(); break;
+		case MessageType::OTA_CHUNK:             m = new OtaChunkMessage(); break;
+		case MessageType::OTA_CHUNK_ACK:         m = new OtaChunkAckMessage(); break;
+		case MessageType::OTA_ABORT:             m = new OtaAbortMessage(); break;
+		case MessageType::OTA_COMPLETE:          m = new OtaCompleteMessage(); break;
 		default:
 			Serial.printf("MessageFactory: Cannot create message from binary, type: %d\n", static_cast<int>(t));
 			return nullptr;
@@ -1362,6 +1374,22 @@ EspNowMessage* MessageFactory::createFromBinary(const uint8_t* buffer, size_t le
 				break;
 			case MessageType::PAIRING_ABORT:
 				success = static_cast<PairingAbortMessage*>(m)->fromBinary(buffer, len);
+				break;
+			// OTA messages
+			case MessageType::OTA_BEGIN:
+				success = static_cast<OtaBeginMessage*>(m)->fromBinary(buffer, len);
+				break;
+			case MessageType::OTA_CHUNK:
+				success = static_cast<OtaChunkMessage*>(m)->fromBinary(buffer, len);
+				break;
+			case MessageType::OTA_CHUNK_ACK:
+				success = static_cast<OtaChunkAckMessage*>(m)->fromBinary(buffer, len);
+				break;
+			case MessageType::OTA_ABORT:
+				success = static_cast<OtaAbortMessage*>(m)->fromBinary(buffer, len);
+				break;
+			case MessageType::OTA_COMPLETE:
+				success = static_cast<OtaCompleteMessage*>(m)->fromBinary(buffer, len);
 				break;
 			default:
 				break;

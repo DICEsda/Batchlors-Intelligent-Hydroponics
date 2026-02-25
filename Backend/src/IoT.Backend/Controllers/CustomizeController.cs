@@ -54,7 +54,7 @@ public class CustomizeController : ControllerBase
 
         var siteId = request.SiteId ?? "site001";
         var mqttDeviceType = deviceType == "reservoir" ? "coord" : "node";
-        var topic = $"site/{siteId}/{mqttDeviceType}/{deviceId}/cmd";
+        var topic = MqttTopics.DeviceCmd(siteId, mqttDeviceType, deviceId);
 
         var payload = new
         {
@@ -85,7 +85,7 @@ public class CustomizeController : ControllerBase
 
         var siteId = request.SiteId ?? "site001";
         var mqttDeviceType = deviceType == "reservoir" ? "coord" : "node";
-        var topic = $"site/{siteId}/{mqttDeviceType}/{deviceId}/cmd";
+        var topic = MqttTopics.DeviceCmd(siteId, mqttDeviceType, deviceId);
 
         var payload = new
         {
@@ -116,7 +116,7 @@ public class CustomizeController : ControllerBase
 
         var siteId = request.SiteId ?? "site001";
         var mqttDeviceType = deviceType == "reservoir" ? "coord" : "node";
-        var topic = $"site/{siteId}/{mqttDeviceType}/{deviceId}/cmd";
+        var topic = MqttTopics.DeviceCmd(siteId, mqttDeviceType, deviceId);
 
         var payload = new
         {
@@ -147,7 +147,7 @@ public class CustomizeController : ControllerBase
 
         var siteId = request.SiteId ?? "site001";
         var mqttDeviceType = deviceType == "reservoir" ? "coord" : "node";
-        var topic = $"site/{siteId}/{mqttDeviceType}/{deviceId}/cmd";
+        var topic = MqttTopics.DeviceCmd(siteId, mqttDeviceType, deviceId);
 
         var payload = new
         {
@@ -179,7 +179,7 @@ public class CustomizeController : ControllerBase
 
         var siteId = request.SiteId ?? "site001";
         var mqttDeviceType = deviceType == "reservoir" ? "coord" : "node";
-        var topic = $"site/{siteId}/{mqttDeviceType}/{deviceId}/cmd";
+        var topic = MqttTopics.DeviceCmd(siteId, mqttDeviceType, deviceId);
 
         var payload = new
         {

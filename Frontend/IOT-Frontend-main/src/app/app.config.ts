@@ -2,6 +2,7 @@ import { ApplicationConfig, provideExperimentalZonelessChangeDetection, APP_INIT
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { snakeCaseInterceptor } from './core/snake-case.interceptor';
+import { apiKeyInterceptor } from './core/api-key.interceptor';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 
@@ -32,7 +33,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideExperimentalZonelessChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(withFetch(), withInterceptors([snakeCaseInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([apiKeyInterceptor, snakeCaseInterceptor])),
     provideAnimations(),
     EnvironmentService,
     ApiService,

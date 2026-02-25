@@ -11,6 +11,8 @@ from .growth_cycle import GrowthCycleScenario
 from .reconnection import ReconnectionScenario
 from .full_demo import FullDemoScenario
 from .scale_test import ScaleTestScenario
+from .lwt_disconnect import LwtDisconnectScenario
+from .alert_cascade import AlertCascadeScenario
 
 SCENARIOS: dict[str, type] = {
     "steady-state": SteadyStateScenario,
@@ -24,6 +26,8 @@ SCENARIOS: dict[str, type] = {
     "reconnection": ReconnectionScenario,
     "full-demo": FullDemoScenario,
     "scale-test": ScaleTestScenario,
+    "lwt-disconnect": LwtDisconnectScenario,
+    "alert-cascade": AlertCascadeScenario,
 }
 
 __all__ = ["SCENARIOS"]

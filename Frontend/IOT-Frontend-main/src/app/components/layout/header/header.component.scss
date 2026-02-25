@@ -115,19 +115,41 @@
   }
 }
 
-// Status Badges
-.status-badges {
+// Status Area
+.status-area {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.status-badge {
+.ws-indicator {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.625rem;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  cursor: default;
+
+  .ws-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: oklch(0.55 0 0);
+    opacity: 0.4;
+    transition: all 0.3s ease;
+  }
+
+  &.connected .ws-dot {
+    background-color: oklch(0.7 0.15 145); // Subtle green
+    opacity: 0.8;
+    box-shadow: 0 0 4px oklch(0.7 0.15 145 / 0.3);
+    animation: ws-pulse 3s ease-in-out infinite;
+  }
+}
+
+@keyframes ws-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.5; }
 }
 
 .refresh-btn {

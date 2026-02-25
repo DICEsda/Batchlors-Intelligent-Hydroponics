@@ -1,8 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subscription, filter } from 'rxjs';
 import { IoTDataService, WebSocketService, ApiService } from '../../core/services';
 import {
   Node,
@@ -13,6 +13,8 @@ import {
   getBatteryPercent,
   getBatteryStatus,
   getSignalStrength,
+  TimeRange,
+  TowerTelemetry,
 } from '../../core/models';
 import {
   HlmCardDirective,
@@ -26,6 +28,7 @@ import { HlmButtonDirective } from '../../components/ui/button';
 import { HlmIconDirective } from '../../components/ui/icon';
 import { HlmSkeletonComponent } from '../../components/ui/skeleton';
 import { HlmLabelDirective } from '../../components/ui/label';
+import { TelemetryChartComponent } from '../../components/ui/telemetry-chart/telemetry-chart.component';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import {
   lucideArrowLeft,
@@ -51,6 +54,7 @@ import {
   lucideCpu,
   lucideSignal,
   lucideActivity,
+  lucideBarChart3,
 } from '@ng-icons/lucide';
 
 @Component({
@@ -70,7 +74,8 @@ import {
     HlmIconDirective,
     HlmSkeletonComponent,
     HlmLabelDirective,
-    NgIcon
+    NgIcon,
+    TelemetryChartComponent,
   ],
   providers: [
     provideIcons({
@@ -97,6 +102,7 @@ import {
       lucideCpu,
       lucideSignal,
       lucideActivity,
+      lucideBarChart3,
     })
   ],
   templateUrl: './node-detail.component.html',
@@ -115,7 +121,6 @@ export class NodeDetailComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly wsConnected = this.wsService.connected;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Live telemetry
   readonly liveTelemetry = signal<NodeTelemetry | null>(null);
@@ -189,6 +194,14 @@ export class NodeDetailComponent implements OnInit, OnDestroy {
     const coords = this.dataService.coordinators();
     return coords.find(c => c.coord_id === n.coordinator_id || c._id === n.coordinator_id) || null;
   });
+
+  // ============================================================================
+  // Telemetry Charts
+  // ============================================================================
+  @ViewChild('tempChart') tempChart?: TelemetryChartComponent;
+  @ViewChild('humidityChart') humidityChart?: TelemetryChartComponent;
+  @ViewChild('lightChart') lightChart?: TelemetryChartComponent;
+  @ViewChild('batteryChart') batteryChart?: TelemetryChartComponent;
 
   // Get assigned zone
   readonly assignedZone = computed(() => {
@@ -264,6 +277,18 @@ export class NodeDetailComponent implements OnInit, OnDestroy {
           avg_r: telemetry.avg_r ?? telemetry.rssi ?? -50,
           status_mode: telemetry.status_mode ?? 'operational',
         });
+
+        // Update telemetry charts
+        const now = new Date(telemetry.timestamp || Date.now());
+        const temp = telemetry.ambientTemp ?? telemetry.temp_c ?? telemetry.temperature;
+        const humidity = telemetry.humidity;
+        const light = telemetry.lightLevel;
+        const battery = telemetry.batteryVoltage ?? telemetry.vbat_mv ?? telemetry.batteryMv;
+
+        if (temp != null) this.tempChart?.appendPoint({ time: now, value: temp });
+        if (humidity != null) this.humidityChart?.appendPoint({ time: now, value: humidity });
+        if (light != null) this.lightChart?.appendPoint({ time: now, value: light });
+        if (battery != null) this.batteryChart?.appendPoint({ time: now, value: battery });
       }
     });
     this.subscriptions.push(telemetrySub);

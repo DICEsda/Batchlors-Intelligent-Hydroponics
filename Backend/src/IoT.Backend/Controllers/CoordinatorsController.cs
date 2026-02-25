@@ -29,7 +29,7 @@ public class CoordinatorsController : ControllerBase
     /// Used by frontend dashboard to list all coordinators.
     /// </summary>
     [HttpGet]
-    [Route("/api/v1/coordinators")]
+    [Route("/api/coordinators")]
     public async Task<ActionResult<IEnumerable<Coordinator>>> GetAllCoordinators(CancellationToken ct)
     {
         var coordinators = await _coordinatorRepository.GetAllAsync(ct);
@@ -41,7 +41,7 @@ public class CoordinatorsController : ControllerBase
     /// Used by frontend to customize coordinator display information.
     /// </summary>
     [HttpPatch]
-    [Route("/api/v1/coordinators/{coordId}")]
+    [Route("/api/coordinators/{coordId}")]
     public async Task<ActionResult<Coordinator>> UpdateCoordinator(
         string coordId,
         [FromBody] UpdateCoordinatorRequest request,
@@ -89,7 +89,7 @@ public class CoordinatorsController : ControllerBase
     /// Used by frontend when site is unknown.
     /// </summary>
     [HttpGet]
-    [Route("/coordinators/{coordId}")]
+    [Route("/api/coordinators/{coordId}")]
     public async Task<ActionResult<Coordinator>> GetCoordinatorById(string coordId, CancellationToken ct)
     {
         var coordinator = await _coordinatorRepository.GetByIdAsync(coordId, ct);
@@ -156,7 +156,7 @@ public class CoordinatorsController : ControllerBase
         [FromBody] ReservoirPumpRequest request,
         CancellationToken ct)
     {
-        var topic = $"farm/{farmId}/coord/{coordId}/reservoir/cmd";
+        var topic = MqttTopics.ReservoirCmd(farmId, coordId);
         var command = new CoordinatorCommand
         {
             Cmd = "pump",
@@ -193,7 +193,7 @@ public class CoordinatorsController : ControllerBase
         [FromBody] DosingRequest request,
         CancellationToken ct)
     {
-        var topic = $"farm/{farmId}/coord/{coordId}/reservoir/cmd";
+        var topic = MqttTopics.ReservoirCmd(farmId, coordId);
         var dosingParams = new Dictionary<string, object>();
 
         if (request.NutrientAMl.HasValue)
@@ -271,7 +271,7 @@ public class CoordinatorsController : ControllerBase
         _logger.LogInformation("Reservoir targets updated for {FarmId}/{CoordId}", farmId, coordId);
 
         // Also send to device via MQTT so it can enforce setpoints locally
-        var topic = $"farm/{farmId}/coord/{coordId}/reservoir/cmd";
+        var topic = MqttTopics.ReservoirCmd(farmId, coordId);
         var command = new CoordinatorCommand
         {
             Cmd = "set_targets",

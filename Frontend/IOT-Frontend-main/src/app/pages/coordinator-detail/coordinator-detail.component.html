@@ -24,11 +24,6 @@
       </div>
     </div>
     <div class="header-actions">
-      @if (usingMockData()) {
-        <span hlmBadge variant="secondary" class="mock-badge">
-          Mock Data
-        </span>
-      }
       <span
         hlmBadge
         [variant]="wsConnected() ? 'outline' : 'destructive'"
@@ -112,81 +107,81 @@
     </div>
   }
 
-  <!-- Discovered Nodes Section (visible during pairing or when nodes are discovered) -->
-  @if (isPairing() || discoveredNodes().length > 0) {
+  <!-- Discovered Towers Section (visible during pairing or when towers are discovered) -->
+  @if (isPairing() || discoveredTowers().length > 0) {
     <section class="discovered-nodes-section">
       <div class="section-header">
         <h2 class="section-title">
           <ng-icon hlmIcon name="lucideRadio" size="sm" class="section-icon" />
-          Discovered Nodes
+          Discovered Towers
         </h2>
-        @if (discoveredNodes().length > 0) {
-          <span hlmBadge variant="secondary">{{ discoveredNodes().length }} found</span>
+        @if (discoveredTowers().length > 0) {
+          <span hlmBadge variant="secondary">{{ discoveredTowers().length }} found</span>
         }
       </div>
 
-      @if (discoveredNodes().length === 0) {
+      @if (discoveredTowers().length === 0) {
         <div class="empty-discovered">
-          <ng-icon hlmIcon name="lucideRadio" size="xl" class="animate-pulse" />
-          <h3>Scanning for nodes...</h3>
-          <p>Put new nodes into pairing mode. They will appear here when discovered.</p>
+          <ng-icon hlmIcon name="lucideRadar" size="xl" class="animate-pulse" />
+          <h3>Scanning for towers...</h3>
+          <p>Put new towers into pairing mode. They will appear here when discovered.</p>
         </div>
       } @else {
         <div class="discovered-nodes-grid">
-          @for (node of discoveredNodes(); track trackByDiscoveredNodeId($index, node)) {
-            <div hlmCard class="discovered-node-card" [class.paired]="node.status === 'paired'" [class.error]="node.status === 'error'" [class.rejected]="node.status === 'rejected'">
+          @for (tower of discoveredTowers(); track trackByDiscoveredTowerId($index, tower)) {
+            <div hlmCard class="discovered-node-card" [class.paired]="tower.status === 'paired'" [class.error]="tower.status === 'error'" [class.rejected]="tower.status === 'rejected'">
               <div hlmCardHeader class="discovered-node-header">
                 <div class="node-info">
-                  <span hlmCardTitle class="node-id">{{ node.nodeId }}</span>
-                  <span hlmCardDescription class="mac-address">{{ node.macAddress }}</span>
+                  <span hlmCardTitle class="node-id">{{ tower.towerId }}</span>
+                  <span hlmCardDescription class="mac-address">{{ tower.macAddress }}</span>
                 </div>
-                <span hlmBadge [variant]="getDiscoveredNodeBadgeVariant(node.status)" size="sm">
-                  @if (node.status === 'pairing') {
+                <span hlmBadge [variant]="getDiscoveredTowerBadgeVariant(tower.status)" size="sm">
+                  @if (tower.status === 'pairing') {
                     <ng-icon hlmIcon name="lucideLoader2" size="xs" class="animate-spin" />
                   }
-                  {{ node.status }}
+                  {{ tower.status }}
                 </span>
               </div>
               <div hlmCardContent class="discovered-node-content">
                 <div class="node-details">
                   <div class="detail">
                     <ng-icon hlmIcon name="lucideWifi" size="xs" />
-                    <span>RSSI: {{ node.rssi }} dBm</span>
+                    <span>RSSI: {{ tower.rssi }} dBm</span>
                   </div>
-                  @if (node.firmwareVersion) {
+                  @if (tower.firmwareVersion) {
                     <div class="detail">
                       <ng-icon hlmIcon name="lucideCpu" size="xs" />
-                      <span>FW: {{ node.firmwareVersion }}</span>
+                      <span>FW: {{ tower.firmwareVersion }}</span>
                     </div>
                   }
                   <div class="detail">
                     <ng-icon hlmIcon name="lucideClock" size="xs" />
-                    <span>{{ formatTimeAgo(node.discoveredAt) }}</span>
+                    <span>{{ formatTimeAgo(tower.discoveredAt) }}</span>
                   </div>
                 </div>
                 
-                @if (node.error) {
+                @if (tower.error) {
                   <div class="node-error">
                     <ng-icon hlmIcon name="lucideAlertTriangle" size="xs" />
-                    <span>{{ node.error }}</span>
+                    <span>{{ tower.error }}</span>
                   </div>
                 }
               </div>
               
               <!-- Action buttons - only show for discovered status -->
-              @if (node.status === 'discovered') {
+              @if (tower.status === 'discovered') {
                 <div class="discovered-node-actions">
-                  <button hlmBtn variant="default" size="sm" (click)="approveNode(node)">
+                  <button hlmBtn variant="default" size="sm" (click)="approveTower(tower)">
                     <ng-icon hlmIcon name="lucideRadio" size="sm" />
                     Approve
                   </button>
-                  <button hlmBtn variant="ghost" size="sm" (click)="rejectNode(node)">
+                  <button hlmBtn variant="ghost" size="sm" (click)="rejectTower(tower)">
                     Reject
                   </button>
                 </div>
               }
               
-              @if (node.status === 'paired') {
+              @if (tower.status === 'paired') {
                 <div class="discovered-node-success">
                   <ng-icon hlmIcon name="lucideRadio" size="sm" />
                   <span>Successfully paired!</span>
@@ -323,6 +318,56 @@
             Real-time
           </span>
         }
+      </div>
+    </section>
+
+    <!-- Telemetry Charts Section -->
+    <section class="telemetry-section">
+      <h2 class="section-title">
+        <ng-icon hlmIcon name="lucideBarChart3" size="sm" class="section-icon" />
+        Telemetry
+      </h2>
+      <div class="telemetry-grid">
+        <app-telemetry-chart
+          #phChart
+          title="pH Level"
+          unit="pH"
+          color="#8b5cf6"
+          [minY]="0"
+          [maxY]="14"
+          [thresholdLow]="5.5"
+          [thresholdHigh]="7.5"
+          height="200px"
+        />
+        <app-telemetry-chart
+          #ecChart
+          title="EC (mS/cm)"
+          unit="mS/cm"
+          color="#06b6d4"
+          [minY]="0"
+          [maxY]="5"
+          [thresholdLow]="0.8"
+          [thresholdHigh]="3.0"
+          height="200px"
+        />
+        <app-telemetry-chart
+          #waterLevelChart
+          title="Water Level"
+          unit="%"
+          color="#3b82f6"
+          [minY]="0"
+          [maxY]="100"
+          height="200px"
+        />
+        <app-telemetry-chart
+          #waterTempChart
+          title="Water Temperature"
+          unit="°C"
+          color="#f97316"
+          [minY]="10"
+          [maxY]="40"
+          height="200px"
+        />
       </div>
     </section>
 

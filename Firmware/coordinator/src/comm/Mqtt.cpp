@@ -297,10 +297,35 @@ bool Mqtt::connectMqtt() {
     String clientId = "coord-" + coordId;
     bool connected = false;
     
+    // Build Last Will and Testament (LWT) payload.
+    // The broker publishes this retained message on the connection status topic
+    // if the coordinator disconnects unexpectedly (crash, power loss, WiFi drop).
+    String lwtTopic = connectionStatusTopic();
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    String lwtPayload = "{\"ts\":0,\"coord_id\":\"" + id
+                      + "\",\"farm_id\":\"" + farmId
+                      + "\",\"event\":\"disconnected\",\"wifi_connected\":false,\"mqtt_connected\":false}";
+    
     if (brokerUsername.length() > 0 && brokerPassword.length() > 0) {
-        connected = mqttClient.connect(clientId.c_str(), brokerUsername.c_str(), brokerPassword.c_str());
+        connected = mqttClient.connect(
+            clientId.c_str(),
+            brokerUsername.c_str(),
+            brokerPassword.c_str(),
+            lwtTopic.c_str(),       // willTopic
+            0,                       // willQos
+            true,                    // willRetain
+            lwtPayload.c_str()       // willMessage
+        );
     } else {
-        connected = mqttClient.connect(clientId.c_str());
+        connected = mqttClient.connect(
+            clientId.c_str(),
+            nullptr,                 // user (anonymous)
+            nullptr,                 // pass (anonymous)
+            lwtTopic.c_str(),        // willTopic
+            0,                       // willQos
+            true,                    // willRetain
+            lwtPayload.c_str()       // willMessage
+        );
     }
     
     // Log connection result with detailed info
@@ -327,8 +352,36 @@ bool Mqtt::connectMqtt() {
         bool nodeSubSuccess = mqttClient.subscribe(nodeCmd.c_str());
         MqttLogger::logSubscribe(nodeCmd, nodeSubSuccess);
         
+        // Subscribe to coordinator config push from backend
+        String configTopic = coordinatorConfigTopic();
+        bool configSubSuccess = mqttClient.subscribe(configTopic.c_str());
+        MqttLogger::logSubscribe(configTopic, configSubSuccess);
+        
+        // Subscribe to coordinator direct commands (restart, etc.) from backend
+        String directCmdTopic = coordinatorDirectCmdTopic();
+        bool directCmdSubSuccess = mqttClient.subscribe(directCmdTopic.c_str());
+        MqttLogger::logSubscribe(directCmdTopic, directCmdSubSuccess);
+        
+        // Subscribe to reservoir pump/dosing commands
+        String reservoirCmd = reservoirCmdTopic();
+        bool reservoirSubSuccess = mqttClient.subscribe(reservoirCmd.c_str());
+        MqttLogger::logSubscribe(reservoirCmd, reservoirSubSuccess);
+        
+        // Subscribe to OTA trigger from backend
+        String otaStart = coordinatorOtaStartTopic();
+        bool otaStartSubSuccess = mqttClient.subscribe(otaStart.c_str());
+        MqttLogger::logSubscribe(otaStart, otaStartSubSuccess);
+        
+        // Subscribe to OTA cancel from backend
+        String otaCancel = coordinatorOtaCancelTopic();
+        bool otaCancelSubSuccess = mqttClient.subscribe(otaCancel.c_str());
+        MqttLogger::logSubscribe(otaCancel, otaCancelSubSuccess);
+        
         // Publish coordinator announce so the backend can register/recognize us
         publishAnnounce();
+        
+        // Publish "connected" status (retained) to overwrite the LWT "disconnected" message
+        publishConnectionEvent("connected", "mqtt_connect");
         
         // Publish initial telemetry
         CoordinatorSensorSnapshot snapshot;
@@ -678,10 +731,15 @@ void Mqtt::runReachabilityProbe() {
 }
 
 void Mqtt::handleMqttMessage(char* topic, uint8_t* payload, unsigned int length) {
-    // DEBUG: Print ALL MQTT messages to serial
-    Serial.printf("\n[MQTT_RX] Topic: %s\n", topic);
-    Serial.printf("[MQTT_RX] Length: %d bytes\n", length);
-    Serial.printf("[MQTT_RX] Payload: %.*s\n", length, (char*)payload);
+    // Debug log: topic + payload size for all incoming messages
+    Serial.printf("[MQTT_RX] %s (%u bytes)\n", topic, length);
+
+    // Validate topic prefix — only process topics we expect to receive on.
+    // All subscribed topics start with either "farm/" or "coordinator/".
+    if (strncmp(topic, "farm/", 5) != 0 && strncmp(topic, "coordinator/", 12) != 0) {
+        Serial.printf("[MQTT] Ignoring message on unexpected topic: %s\n", topic);
+        return;
+    }
     
     // Log incoming message with detailed info
     MqttLogger::logReceive(String(topic), payload, length);
@@ -1047,6 +1105,18 @@ void Mqtt::handleRegistrationMessage(const String& payload) {
     mqttClient.subscribe(nodeCmd.c_str());
     MqttLogger::logSubscribe(nodeCmd, true);
 
+    String reservoirCmd = reservoirCmdTopic();
+    mqttClient.subscribe(reservoirCmd.c_str());
+    MqttLogger::logSubscribe(reservoirCmd, true);
+
+    String otaStart = coordinatorOtaStartTopic();
+    mqttClient.subscribe(otaStart.c_str());
+    MqttLogger::logSubscribe(otaStart, true);
+
+    String otaCancel = coordinatorOtaCancelTopic();
+    mqttClient.subscribe(otaCancel.c_str());
+    MqttLogger::logSubscribe(otaCancel, true);
+
     Logger::info("Re-subscribed to topics with new farm_id: %s", farmId.c_str());
 }
 
@@ -1060,4 +1130,149 @@ String Mqtt::coordinatorAnnounceTopic() const {
 
 String Mqtt::coordinatorRegisteredTopic() const {
     return "coordinator/" + coordId + "/registered";
+}
+
+String Mqtt::coordinatorConfigTopic() const {
+    return "coordinator/" + coordId + "/config";
+}
+
+String Mqtt::coordinatorDirectCmdTopic() const {
+    return "coordinator/" + coordId + "/cmd";
+}
+
+String Mqtt::reservoirCmdTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/reservoir/cmd";
+}
+
+String Mqtt::coordinatorOtaStartTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/ota/start";
+}
+
+String Mqtt::coordinatorOtaCancelTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/ota/cancel";
+}
+
+// ============================================================================
+// Topic Builders - Pairing
+// ============================================================================
+
+String Mqtt::pairingRequestTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/pairing/request";
+}
+
+String Mqtt::pairingStatusTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/pairing/status";
+}
+
+String Mqtt::pairingCompleteTopic() const {
+    String id = coordId.length() ? coordId : WiFi.macAddress();
+    return "farm/" + farmId + "/coord/" + id + "/pairing/complete";
+}
+
+// ============================================================================
+// Pairing Event Publishing
+// ============================================================================
+
+void Mqtt::publishPairingRequest(const String& towerId, const String& macAddress, int rssi, const String& fwVersion) {
+    if (!mqttClient.connected()) {
+        MqttLogger::logPublish("pairing_request", "", false, 0);
+        return;
+    }
+    
+    uint32_t startMs = millis();
+    
+    StaticJsonDocument<384> doc;
+    doc["ts"] = startMs / 1000;
+    doc["farm_id"] = farmId;
+    doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
+    doc["tower_id"] = towerId;
+    doc["mac_address"] = macAddress;
+    doc["rssi"] = rssi;
+    doc["fw_version"] = fwVersion;
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = pairingRequestTopic();
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str());
+    
+    MqttLogger::logPublish(topic, payload, success, payload.length());
+    MqttLogger::logLatency("PairingRequest", startMs);
+    
+    if (success) {
+        Logger::debug("Published pairing request for tower %s (MAC: %s)", towerId.c_str(), macAddress.c_str());
+    } else {
+        Logger::warn("Failed to publish pairing request for tower %s", towerId.c_str());
+    }
+}
+
+void Mqtt::publishPairingStatus(const String& status, int durationMs, int nodesDiscovered, int nodesPaired) {
+    if (!mqttClient.connected()) {
+        MqttLogger::logPublish("pairing_status", "", false, 0);
+        return;
+    }
+    
+    uint32_t startMs = millis();
+    
+    StaticJsonDocument<384> doc;
+    doc["ts"] = startMs / 1000;
+    doc["farm_id"] = farmId;
+    doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
+    doc["status"] = status;
+    doc["duration_ms"] = durationMs;
+    doc["nodes_discovered"] = nodesDiscovered;
+    doc["nodes_paired"] = nodesPaired;
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = pairingStatusTopic();
+    bool success = mqttClient.publish(topic.c_str(), payload.c_str());
+    
+    MqttLogger::logPublish(topic, payload, success, payload.length());
+    MqttLogger::logLatency("PairingStatus", startMs);
+    
+    if (success) {
+        Logger::debug("Published pairing status: %s (discovered=%d, paired=%d)", status.c_str(), nodesDiscovered, nodesPaired);
+    } else {
+        Logger::warn("Failed to publish pairing status: %s", status.c_str());
+    }
+}
+
+void Mqtt::publishPairingComplete(const String& towerId, const String& macAddress, bool success, const String& reason) {
+    if (!mqttClient.connected()) {
+        MqttLogger::logPublish("pairing_complete", "", false, 0);
+        return;
+    }
+    
+    uint32_t startMs = millis();
+    
+    StaticJsonDocument<384> doc;
+    doc["ts"] = startMs / 1000;
+    doc["farm_id"] = farmId;
+    doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
+    doc["tower_id"] = towerId;
+    doc["mac_address"] = macAddress;
+    doc["success"] = success;
+    doc["reason"] = reason;
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String topic = pairingCompleteTopic();
+    bool pubSuccess = mqttClient.publish(topic.c_str(), payload.c_str());
+    
+    MqttLogger::logPublish(topic, payload, pubSuccess, payload.length());
+    MqttLogger::logLatency("PairingComplete", startMs);
+    
+    if (pubSuccess) {
+        Logger::debug("Published pairing complete for tower %s (success=%s)", towerId.c_str(), success ? "true" : "false");
+    } else {
+        Logger::warn("Failed to publish pairing complete for tower %s", towerId.c_str());
+    }
 }

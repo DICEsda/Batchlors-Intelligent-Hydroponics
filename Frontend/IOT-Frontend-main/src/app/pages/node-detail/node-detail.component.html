@@ -24,11 +24,6 @@
       </div>
     </div>
     <div class="header-actions">
-      @if (usingMockData()) {
-        <span hlmBadge variant="secondary" class="mock-badge">
-          Mock Data
-        </span>
-      }
       <span
         hlmBadge
         [variant]="wsConnected() ? 'outline' : 'destructive'"
@@ -202,6 +197,53 @@
             Real-time
           </span>
         }
+      </div>
+    </section>
+
+    <!-- Telemetry Charts Section -->
+    <section class="telemetry-section">
+      <h2 class="section-title">
+        <ng-icon hlmIcon name="lucideBarChart3" size="sm" />
+        Telemetry
+      </h2>
+      <div class="telemetry-grid">
+        <app-telemetry-chart
+          #tempChart
+          title="Temperature"
+          unit="°C"
+          color="#ef4444"
+          [minY]="-10"
+          [maxY]="50"
+          [thresholdHigh]="35"
+          height="200px"
+        />
+        <app-telemetry-chart
+          #humidityChart
+          title="Humidity"
+          unit="%"
+          color="#06b6d4"
+          [minY]="0"
+          [maxY]="100"
+          height="200px"
+        />
+        <app-telemetry-chart
+          #lightChart
+          title="Light Level"
+          unit="%"
+          color="#eab308"
+          [minY]="0"
+          [maxY]="100"
+          height="200px"
+        />
+        <app-telemetry-chart
+          #batteryChart
+          title="Battery"
+          unit="mV"
+          color="#22c55e"
+          [minY]="2500"
+          [maxY]="4200"
+          height="200px"
+        />
       </div>
     </section>
 

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using IoT.Backend.Models;
 using IoT.Backend.Repositories;
 using IoT.Backend.Services;
@@ -47,6 +49,9 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
     });
+
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -153,6 +158,9 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Global error handler – must be first so it catches exceptions from all downstream middleware.
+app.UseMiddleware<IoT.Backend.Middleware.ErrorHandlingMiddleware>();
+
 // Configure pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -161,7 +169,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// CORS must run before API key auth so preflight OPTIONS requests get proper headers.
 app.UseCors();
+
+// API key authentication – after CORS so preflight requests are not rejected.
+app.UseMiddleware<IoT.Backend.Middleware.ApiKeyMiddleware>();
 
 // WebSocket endpoint
 app.UseWebSockets(new WebSocketOptions

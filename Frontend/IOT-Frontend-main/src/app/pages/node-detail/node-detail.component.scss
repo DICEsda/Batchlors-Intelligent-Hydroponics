@@ -338,6 +338,17 @@ $color-neutral: var(--muted-foreground);
   }
 }
 
+// Telemetry Section
+.telemetry-section {
+  margin-bottom: 2.5rem;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
 // LED Control Section
 .led-control-section {
   margin-bottom: 2.5rem;
@@ -558,6 +569,10 @@ $color-neutral: var(--muted-foreground);
   }
 
   .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .telemetry-grid {
     grid-template-columns: 1fr;
   }
 

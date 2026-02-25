@@ -1,8 +1,10 @@
-import { Component, OnInit, OnDestroy, inject, computed, signal, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, computed, signal, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { IoTDataService, WebSocketService, TwinService } from '../../core/services';
-import { CoordinatorSummary, NodeSummary, Alert, CoordinatorTwin, TowerTwin } from '../../core/models';
+import { CoordinatorSummary, NodeSummary, Alert, CoordinatorTwin, TowerTwin, ReservoirTelemetry } from '../../core/models';
+import { TelemetryChartComponent, TelemetryPoint } from '../../components/ui/telemetry-chart/telemetry-chart.component';
 
 import { HlmBadgeDirective } from '../../components/ui/badge';
 import { HlmButtonDirective } from '../../components/ui/button';
@@ -40,6 +42,7 @@ import {
   lucideArrowUpDown,
   lucideBeaker,
   lucideX,
+  lucideBarChart3,
 } from '@ng-icons/lucide';
 
 @Component({
@@ -52,7 +55,8 @@ import {
     HlmButtonDirective,
     HlmIconDirective,
     HlmSkeletonComponent,
-    NgIcon
+    NgIcon,
+    TelemetryChartComponent,
   ],
   providers: [
     provideIcons({
@@ -86,6 +90,7 @@ import {
       lucideArrowUpDown,
       lucideBeaker,
       lucideX,
+      lucideBarChart3,
     })
   ],
   templateUrl: './farm-overview.component.html',
@@ -105,7 +110,6 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
   readonly activeAlerts = this.dataService.activeAlerts;
   readonly loading = this.dataService.loading;
   readonly error = this.dataService.error;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Digital Twin data
   readonly coordTwins = this.twinService.coordTwins;
@@ -170,6 +174,20 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
   /** Does the detail panel have something to show? */
   readonly hasSelection = computed(() => this.selectedType() !== null && this.selectedId() !== null);
 
+  // ---- System Health Sparkline Charts ----
+  @ViewChild('avgPhChart') avgPhChart?: TelemetryChartComponent;
+  @ViewChild('avgEcChart') avgEcChart?: TelemetryChartComponent;
+  @ViewChild('avgWaterLevelChart') avgWaterLevelChart?: TelemetryChartComponent;
+
+  private telemetrySubs: Subscription[] = [];
+
+  // Running averages for aggregation
+  private phAccum: { sum: number; count: number } = { sum: 0, count: 0 };
+  private ecAccum: { sum: number; count: number } = { sum: 0, count: 0 };
+  private waterLevelAccum: { sum: number; count: number } = { sum: 0, count: 0 };
+  private lastAggTimestamp = 0;
+  private readonly AGG_INTERVAL_MS = 5000; // aggregate every 5s
+
   // ---- Crop Type Mapping ----
   private readonly cropMap: Record<number | string, string> = {
     1: 'Lettuce', 2: 'Spinach', 3: 'Kale', 4: 'Arugula',
@@ -221,10 +239,48 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
 
     // Load digital twin data
     this.twinService.loadFarmTwins('farm-alpha');
+
+    // Subscribe to reservoir telemetry for system health sparklines
+    this.subscribeToReservoirTelemetry();
   }
 
   ngOnDestroy(): void {
     this.dataService.stopAutoRefresh();
+    this.telemetrySubs.forEach(s => s.unsubscribe());
+  }
+
+  /**
+   * Subscribe to reservoir telemetry for aggregated sparkline charts.
+   * Accumulates readings across all coordinators and emits running averages.
+   */
+  private subscribeToReservoirTelemetry(): void {
+    const sub = this.wsService.reservoirTelemetry$.subscribe((t: ReservoirTelemetry) => {
+      // Accumulate values
+      if (t.ph != null) { this.phAccum.sum += t.ph; this.phAccum.count++; }
+      if (t.ec != null) { this.ecAccum.sum += t.ec; this.ecAccum.count++; }
+      if (t.waterLevel != null) { this.waterLevelAccum.sum += t.waterLevel; this.waterLevelAccum.count++; }
+
+      // Emit aggregated point every AGG_INTERVAL_MS
+      const now = Date.now();
+      if (now - this.lastAggTimestamp >= this.AGG_INTERVAL_MS) {
+        this.lastAggTimestamp = now;
+        const time = new Date(now);
+
+        if (this.phAccum.count > 0) {
+          this.avgPhChart?.appendPoint({ time, value: +(this.phAccum.sum / this.phAccum.count).toFixed(2) });
+          this.phAccum = { sum: 0, count: 0 };
+        }
+        if (this.ecAccum.count > 0) {
+          this.avgEcChart?.appendPoint({ time, value: +(this.ecAccum.sum / this.ecAccum.count).toFixed(2) });
+          this.ecAccum = { sum: 0, count: 0 };
+        }
+        if (this.waterLevelAccum.count > 0) {
+          this.avgWaterLevelChart?.appendPoint({ time, value: +(this.waterLevelAccum.sum / this.waterLevelAccum.count).toFixed(1) });
+          this.waterLevelAccum = { sum: 0, count: 0 };
+        }
+      }
+    });
+    this.telemetrySubs.push(sub);
   }
 
   refreshData(): void {

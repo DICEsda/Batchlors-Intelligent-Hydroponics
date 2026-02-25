@@ -103,7 +103,6 @@ export class OtaDashboardComponent implements OnInit {
   // ============================================================================
   readonly isLoading = this.otaService.isLoading;
   readonly error = this.otaService.error;
-  readonly usingMockData = this.otaService.usingMockData;
 
   // Firmware
   readonly firmwareVersions = this.otaService.firmwareVersions;

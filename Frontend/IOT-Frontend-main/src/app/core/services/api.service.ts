@@ -5,6 +5,8 @@ import { EnvironmentService } from './environment.service';
 import {
   // Site
   Site,
+  // Farm
+  Farm,
   // Coordinator
   Coordinator,
   CoordinatorSummary,
@@ -58,11 +60,12 @@ import {
   // Pairing
   PairingSession,
   TowerPairingRequest,
-  Tower,
+  PairedTower,
   // Common
   ApiResponse,
   PaginatedResponse,
   HealthStatus,
+  MlHealthStatus,
   PaginationParams,
   // Coordinator Registration
   ApproveCoordinatorRequest,
@@ -102,8 +105,12 @@ export class ApiService {
     return this.get<HealthStatus>('/health');
   }
 
+  getMlHealth(): Observable<MlHealthStatus> {
+    return this.get<MlHealthStatus>('/api/ml/health');
+  }
+
   getSystemMetrics(): Observable<SystemMetrics> {
-    return this.get<SystemMetrics>('/api/v1/metrics');
+    return this.get<SystemMetrics>('/api/metrics');
   }
 
   // ============================================================================
@@ -111,11 +118,11 @@ export class ApiService {
   // ============================================================================
 
   getSites(): Observable<Site[]> {
-    return this.get<Site[]>('/sites');
+    return this.get<Site[]>('/api/sites');
   }
 
   getSite(siteId: string): Observable<Site> {
-    return this.get<Site>(`/sites/${siteId}`);
+    return this.get<Site>(`/api/sites/${siteId}`);
   }
 
   // ============================================================================
@@ -130,21 +137,21 @@ export class ApiService {
   getCoordinators(): Observable<CoordinatorSummary[]> {
     // The backend has GET /coordinators/{id} for single coordinator
     // For list, we need to go through sites
-    return this.get<CoordinatorSummary[]>('/api/v1/coordinators');
+    return this.get<CoordinatorSummary[]>('/api/coordinators');
   }
 
   /**
    * Get coordinator by site and coordinator ID
    */
   getCoordinator(siteId: string, coordId: string): Observable<Coordinator> {
-    return this.get<Coordinator>(`/sites/${siteId}/coordinators/${coordId}`);
+    return this.get<Coordinator>(`/api/sites/${siteId}/coordinators/${coordId}`);
   }
 
   /**
    * Get coordinator by ID only (when site is unknown)
    */
   getCoordinatorById(coordId: string): Observable<Coordinator> {
-    return this.get<Coordinator>(`/coordinators/${coordId}`);
+    return this.get<Coordinator>(`/api/coordinators/${coordId}`);
   }
 
   // ============================================================================
@@ -200,8 +207,8 @@ export class ApiService {
    * Approve a pending tower pairing request.
    * Creates the tower entity and sends approval to the coordinator.
    */
-  approveNode(farmId: string, coordId: string, towerId: string): Observable<Tower> {
-    return this.post<Tower>('/api/pairing/approve', {
+  approveTower(farmId: string, coordId: string, towerId: string): Observable<PairedTower> {
+    return this.post<PairedTower>('/api/pairing/approve', {
       farmId,
       coordId,
       towerId
@@ -212,7 +219,7 @@ export class ApiService {
    * Reject a pending tower pairing request.
    * Sends rejection to the coordinator - tower will go to idle state.
    */
-  rejectNode(farmId: string, coordId: string, towerId: string): Observable<ApiResponse<void>> {
+  rejectTower(farmId: string, coordId: string, towerId: string): Observable<ApiResponse<void>> {
     return this.post<ApiResponse<void>>('/api/pairing/reject', {
       farmId,
       coordId,
@@ -237,21 +244,21 @@ export class ApiService {
    * Restart coordinator
    */
   restartCoordinator(command: CoordinatorRestartCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/coordinator/restart', command);
+    return this.post<ApiResponse<void>>('/api/coordinator/restart', command);
   }
 
   /**
    * Update coordinator WiFi settings
    */
   updateCoordinatorWifi(command: CoordinatorWifiCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/coordinator/wifi', command);
+    return this.post<ApiResponse<void>>('/api/coordinator/wifi', command);
   }
 
   /**
    * Update coordinator metadata (name, description, etc.)
    */
   updateCoordinator(coordId: string, data: any): Observable<any> {
-    return this.put(`/api/v1/coordinators/${encodeURIComponent(coordId)}`, data);
+    return this.put(`/api/coordinators/${encodeURIComponent(coordId)}`, data);
   }
 
   /**
@@ -272,66 +279,66 @@ export class ApiService {
   getNodes(siteId: string, coordId: string): Observable<Node[]>;
   getNodes(siteId?: string, coordId?: string): Observable<Node[] | NodeSummary[]> {
     if (siteId && coordId) {
-      return this.get<Node[]>(`/sites/${siteId}/coordinators/${coordId}/nodes`);
+      return this.get<Node[]>(`/api/sites/${siteId}/coordinators/${coordId}/nodes`);
     }
     // Get all nodes across the system
-    return this.get<NodeSummary[]>('/api/v1/nodes');
+    return this.get<NodeSummary[]>('/api/nodes');
   }
 
   /**
    * Get node by ID
    */
   getNode(nodeId: string): Observable<Node> {
-    return this.get<Node>(`/nodes/${nodeId}`);
+    return this.get<Node>(`/api/nodes/${nodeId}`);
   }
 
   /**
    * Delete a node
    */
   deleteNode(siteId: string, coordId: string, nodeId: string): Observable<ApiResponse<void>> {
-    return this.delete<ApiResponse<void>>(`/sites/${siteId}/coordinators/${coordId}/nodes/${nodeId}`);
+    return this.delete<ApiResponse<void>>(`/api/sites/${siteId}/coordinators/${coordId}/nodes/${nodeId}`);
   }
 
   /**
    * Update node name
    */
   updateNodeName(update: NodeNameUpdate): Observable<ApiResponse<void>> {
-    return this.put<ApiResponse<void>>('/api/v1/node/name', update);
+    return this.put<ApiResponse<void>>('/api/node/name', update);
   }
 
   /**
    * Assign node to zone
    */
   updateNodeZone(update: NodeZoneUpdate): Observable<ApiResponse<void>> {
-    return this.put<ApiResponse<void>>('/api/v1/node/zone', update);
+    return this.put<ApiResponse<void>>('/api/node/zone', update);
   }
 
   /**
    * Test node color (temporary)
    */
   testNodeColor(command: TestColorCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/node/test-color', command);
+    return this.post<ApiResponse<void>>('/api/node/test-color', command);
   }
 
   /**
    * Turn off node LED
    */
   turnOffNode(nodeId: string): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/node/off', { nodeId });
+    return this.post<ApiResponse<void>>('/api/node/off', { nodeId });
   }
 
   /**
    * Set node brightness
    */
   setNodeBrightness(command: BrightnessCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/node/brightness', command);
+    return this.post<ApiResponse<void>>('/api/node/brightness', command);
   }
 
   /**
    * Control node light (full control)
    */
   controlNodeLight(command: LedControlCommand): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>('/api/v1/node/light/control', command);
+    return this.post<ApiResponse<void>>('/api/node/light/control', command);
   }
 
   // ============================================================================
@@ -342,35 +349,35 @@ export class ApiService {
    * Get all zones
    */
   getZones(): Observable<Zone[]> {
-    return this.get<Zone[]>('/api/v1/zones');
+    return this.get<Zone[]>('/api/zones');
   }
 
   /**
    * Create a zone
    */
   createZone(request: CreateZoneRequest): Observable<Zone> {
-    return this.post<Zone>('/api/v1/zones', request);
+    return this.post<Zone>('/api/zones', request);
   }
 
   /**
    * Get zone by ID
    */
   getZone(zoneId: string): Observable<Zone> {
-    return this.get<Zone>(`/api/v1/zones/${zoneId}`);
+    return this.get<Zone>(`/api/zones/${zoneId}`);
   }
 
   /**
    * Update a zone
    */
   updateZone(zoneId: string, request: UpdateZoneRequest): Observable<Zone> {
-    return this.put<Zone>(`/api/v1/zones/${zoneId}`, request);
+    return this.put<Zone>(`/api/zones/${zoneId}`, request);
   }
 
   /**
    * Delete a zone
    */
   deleteZone(zoneId: string): Observable<ApiResponse<void>> {
-    return this.delete<ApiResponse<void>>(`/api/v1/zones/${zoneId}`);
+    return this.delete<ApiResponse<void>>(`/api/zones/${zoneId}`);
   }
 
   // ============================================================================
@@ -381,14 +388,14 @@ export class ApiService {
    * Get system settings
    */
   getSettings(): Observable<SmartTileSettings> {
-    return this.get<SmartTileSettings>('/api/v1/settings');
+    return this.get<SmartTileSettings>('/api/settings');
   }
 
   /**
    * Update system settings
    */
   updateSettings(settings: Partial<SmartTileSettings>): Observable<SmartTileSettings> {
-    return this.put<SmartTileSettings>('/api/v1/settings', settings);
+    return this.put<SmartTileSettings>('/api/settings', settings);
   }
 
   // ============================================================================
@@ -396,15 +403,15 @@ export class ApiService {
   // ============================================================================
 
   getCoordinatorTelemetry(coordId: string): Observable<CoordinatorTelemetryData> {
-    return this.get<CoordinatorTelemetryData>(`/api/v1/telemetry/coordinator/${coordId}`);
+    return this.get<CoordinatorTelemetryData>(`/api/telemetry/coordinator/${coordId}`);
   }
 
   getNodeTelemetry(nodeId: string): Observable<NodeTelemetryData> {
-    return this.get<NodeTelemetryData>(`/api/v1/telemetry/node/${nodeId}`);
+    return this.get<NodeTelemetryData>(`/api/telemetry/node/${nodeId}`);
   }
 
   getCoordinatorHistory(coordId: string, timeRange: TimeRange): Observable<CoordinatorHistory> {
-    return this.get<CoordinatorHistory>(`/api/v1/telemetry/coordinator/${coordId}/history`, {
+    return this.get<CoordinatorHistory>(`/api/telemetry/coordinator/${coordId}/history`, {
       start: timeRange.start.toISOString(),
       end: timeRange.end.toISOString(),
       interval: timeRange.interval
@@ -412,7 +419,7 @@ export class ApiService {
   }
 
   getNodeHistory(nodeId: string, timeRange: TimeRange): Observable<NodeHistory> {
-    return this.get<NodeHistory>(`/api/v1/telemetry/node/${nodeId}/history`, {
+    return this.get<NodeHistory>(`/api/telemetry/node/${nodeId}/history`, {
       start: timeRange.start.toISOString(),
       end: timeRange.end.toISOString(),
       interval: timeRange.interval
@@ -431,19 +438,19 @@ export class ApiService {
       if (params.severity !== undefined) queryParams['severity'] = params.severity;
       if (params.acknowledged !== undefined) queryParams['acknowledged'] = params.acknowledged.toString();
     }
-    return this.get<PaginatedResponse<Alert>>('/api/v1/alerts', queryParams);
+    return this.get<PaginatedResponse<Alert>>('/api/alerts', queryParams);
   }
 
   acknowledgeAlert(alertId: string): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>(`/api/v1/alerts/${alertId}/acknowledge`, {});
+    return this.post<ApiResponse<void>>(`/api/alerts/${alertId}/acknowledge`, {});
   }
 
   updateAlert(alertId: string, update: { status?: string; acknowledgedBy?: string; resolvedBy?: string }): Observable<Alert> {
-    return this.put<Alert>(`/api/v1/alerts/${alertId}`, update);
+    return this.put<Alert>(`/api/alerts/${alertId}`, update);
   }
 
   deleteAlert(alertId: string): Observable<ApiResponse<void>> {
-    return this.delete<ApiResponse<void>>(`/api/v1/alerts/${alertId}`);
+    return this.delete<ApiResponse<void>>(`/api/alerts/${alertId}`);
   }
 
   // ============================================================================
@@ -452,7 +459,7 @@ export class ApiService {
 
   getFirmwareVersions(targetType?: 'coordinator' | 'node'): Observable<FirmwareVersion[]> {
     const params: Record<string, string> = targetType ? { targetType } : {};
-    return this.get<FirmwareVersion[]>('/api/v1/ota/firmware', params);
+    return this.get<FirmwareVersion[]>('/api/ota/firmware', params);
   }
 
   getOtaJobs(params?: PaginationParams & { status?: string }): Observable<PaginatedResponse<OtaJob>> {
@@ -462,59 +469,59 @@ export class ApiService {
       if (params.pageSize !== undefined) queryParams['pageSize'] = params.pageSize.toString();
       if (params.status !== undefined) queryParams['status'] = params.status;
     }
-    return this.get<PaginatedResponse<OtaJob>>('/api/v1/ota/jobs', queryParams);
+    return this.get<PaginatedResponse<OtaJob>>('/api/ota/jobs', queryParams);
   }
 
   getOtaJob(jobId: string): Observable<OtaJob> {
-    return this.get<OtaJob>(`/api/v1/ota/jobs/${jobId}`);
+    return this.get<OtaJob>(`/api/ota/jobs/${jobId}`);
   }
 
   startOtaUpdate(request: StartOtaRequest): Observable<OtaJob> {
-    return this.post<OtaJob>('/api/v1/ota/start', request);
+    return this.post<OtaJob>('/api/ota/start', request);
   }
 
   cancelOtaJob(jobId: string): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>(`/api/v1/ota/jobs/${jobId}/cancel`, {});
+    return this.post<ApiResponse<void>>(`/api/ota/jobs/${jobId}/cancel`, {});
   }
 
   getOtaCampaigns(): Observable<OtaCampaign[]> {
-    return this.get<OtaCampaign[]>('/api/v1/ota/campaigns');
+    return this.get<OtaCampaign[]>('/api/ota/campaigns');
   }
 
   createOtaCampaign(request: CreateCampaignRequest): Observable<OtaCampaign> {
-    return this.post<OtaCampaign>('/api/v1/ota/campaigns', request);
+    return this.post<OtaCampaign>('/api/ota/campaigns', request);
   }
 
   getOtaStatistics(): Observable<OtaStatistics> {
-    return this.get<OtaStatistics>('/api/v1/ota/statistics');
+    return this.get<OtaStatistics>('/api/ota/statistics');
   }
 
   getDeviceFirmwareStatus(): Observable<DeviceFirmwareStatus[]> {
-    return this.get<DeviceFirmwareStatus[]>('/api/v1/ota/devices/status');
+    return this.get<DeviceFirmwareStatus[]>('/api/ota/devices/status');
   }
 
   // ============================================================================
   // ML Predictions API (if available)
   // ============================================================================
 
-  getPrediction(nodeId: string): Observable<HeightPrediction> {
-    return this.get<HeightPrediction>(`/api/v1/predictions/node/${nodeId}`);
+  getPrediction(towerId: string): Observable<HeightPrediction> {
+    return this.get<HeightPrediction>(`/api/predictions/node/${towerId}`);
   }
 
   getFarmPredictionSummary(): Observable<FarmPredictionSummary> {
-    return this.get<FarmPredictionSummary>('/api/v1/predictions/summary');
+    return this.get<FarmPredictionSummary>('/api/predictions/summary');
   }
 
   requestPrediction(request: PredictionRequest): Observable<HeightPrediction> {
-    return this.post<HeightPrediction>('/api/v1/predictions/request', request);
+    return this.post<HeightPrediction>('/api/predictions/request', request);
   }
 
   requestBatchPredictions(request: BatchPredictionRequest): Observable<TowerPredictions[]> {
-    return this.post<TowerPredictions[]>('/api/v1/predictions/batch', request);
+    return this.post<TowerPredictions[]>('/api/predictions/batch', request);
   }
 
-  getGrowthAnalysis(nodeId: string): Observable<GrowthAnalysis> {
-    return this.get<GrowthAnalysis>(`/api/v1/predictions/analysis/${nodeId}`);
+  getGrowthAnalysis(towerId: string): Observable<GrowthAnalysis> {
+    return this.get<GrowthAnalysis>(`/api/predictions/analysis/${towerId}`);
   }
 
   getAnomalies(params?: PaginationParams & { severity?: string; status?: string }): Observable<PaginatedResponse<GrowthAnomaly>> {
@@ -525,15 +532,15 @@ export class ApiService {
       if (params.severity !== undefined) queryParams['severity'] = params.severity;
       if (params.status !== undefined) queryParams['status'] = params.status;
     }
-    return this.get<PaginatedResponse<GrowthAnomaly>>('/api/v1/predictions/anomalies', queryParams);
+    return this.get<PaginatedResponse<GrowthAnomaly>>('/api/predictions/anomalies', queryParams);
   }
 
   acknowledgeAnomaly(anomalyId: string): Observable<ApiResponse<void>> {
-    return this.post<ApiResponse<void>>(`/api/v1/predictions/anomalies/${anomalyId}/acknowledge`, {});
+    return this.post<ApiResponse<void>>(`/api/predictions/anomalies/${anomalyId}/acknowledge`, {});
   }
 
   getMLModels(): Observable<MLModelInfo[]> {
-    return this.get<MLModelInfo[]>('/api/v1/predictions/models');
+    return this.get<MLModelInfo[]>('/api/predictions/models');
   }
 
   // ============================================================================
@@ -541,8 +548,8 @@ export class ApiService {
   // ============================================================================
 
   /** Get all farms. */
-  getFarms(): Observable<any[]> {
-    return this.get<any[]>('/api/v1/farms');
+  getFarms(): Observable<Farm[]> {
+    return this.get<Farm[]>('/api/farms');
   }
 
   // ============================================================================

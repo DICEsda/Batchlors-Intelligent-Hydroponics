@@ -1,0 +1,9 @@
+<div class="tower-rack-container" #containerRef>
+  <canvas #canvas class="tower-rack-canvas"></canvas>
+  <div #labelContainer class="label-overlay"></div>
+  @if (towers.length === 0) {
+    <div class="empty-overlay">
+      <span class="empty-text">No towers to display</span>
+    </div>
+  }
+</div>
