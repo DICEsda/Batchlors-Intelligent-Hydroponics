@@ -9,9 +9,6 @@
       </div>
     </div>
     <div class="header-actions">
-      @if (usingMockData()) {
-        <span hlmBadge variant="outline" class="mock-badge">Mock Data</span>
-      }
       <button hlmBtn variant="outline" size="sm" (click)="refresh()" [disabled]="isLoading()">
         <ng-icon hlmIcon name="lucideRefreshCw" size="sm" class="mr-1.5" />
         Refresh

@@ -121,7 +121,6 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   readonly loading = this.dataService.loading;
   readonly error = this.dataService.error;
   readonly wsConnected = this.wsService.connected;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Pairing state
   readonly isPairing = signal(false);

@@ -192,32 +192,18 @@
 
   <!-- Bottom Section - System Status & User Account -->
   <div class="sidebar-footer">
-    <!-- System Status Section (Compact) -->
-    <div class="system-status">
+    <!-- System Status Section -->
+    <div class="system-status" [class.ws-offline]="!wsConnected()">
       @if (!collapsed()) {
         <span class="status-section-title">System Status</span>
       }
-      
-      <!-- MQTT Status -->
-      <div class="status-item" [title]="collapsed() ? ('MQTT: ' + (wsConnected() ? 'Connected' : 'Offline')) : ''">
-        <div class="status-indicator" [class.online]="wsConnected()" [class.offline]="!wsConnected()">
-          <span class="status-dot"></span>
-        </div>
-        <ng-icon name="lucideWifi" size="14" />
-        @if (!collapsed()) {
-          <span class="status-label">MQTT</span>
-          <span class="status-value" [class.online]="wsConnected()">
-            {{ wsConnected() ? 'Connected' : 'Offline' }}
-          </span>
-        }
-      </div>
-      
-      <!-- Backend Status -->
+
+      <!-- Backend -->
       <div class="status-item" [title]="collapsed() ? ('Backend: ' + (backendConnected() ? 'Online' : 'Offline')) : ''">
         <div class="status-indicator" [class.online]="backendConnected()" [class.offline]="!backendConnected()">
           <span class="status-dot"></span>
         </div>
-        <ng-icon name="lucideDatabase" size="14" />
+        <ng-icon name="lucideServer" size="14" />
         @if (!collapsed()) {
           <span class="status-label">Backend</span>
           <span class="status-value" [class.online]="backendConnected()">
@@ -225,8 +211,69 @@
           </span>
         }
       </div>
-      
-      <!-- Connected Coordinators -->
+
+      <!-- MongoDB -->
+      <div class="status-item" [title]="collapsed() ? ('MongoDB: ' + (mongodbConnected() ? 'Connected' : 'Offline')) : ''">
+        <div class="status-indicator" [class.online]="mongodbConnected()" [class.offline]="!mongodbConnected()">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideDatabase" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">MongoDB</span>
+          <span class="status-value" [class.online]="mongodbConnected()">
+            {{ mongodbConnected() ? 'Connected' : 'Offline' }}
+          </span>
+        }
+      </div>
+
+      <!-- MQTT Broker -->
+      <div class="status-item" [title]="collapsed() ? ('MQTT: ' + (mqttBrokerConnected() ? 'Connected' : 'Offline')) : ''">
+        <div class="status-indicator" [class.online]="mqttBrokerConnected()" [class.offline]="!mqttBrokerConnected()">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideRadio" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">MQTT Broker</span>
+          <span class="status-value" [class.online]="mqttBrokerConnected()">
+            {{ mqttBrokerConnected() ? 'Connected' : 'Offline' }}
+          </span>
+        }
+      </div>
+
+      <!-- ML Pipeline -->
+      <div class="status-item" [title]="collapsed() ? ('ML: ' + (mlPipelineHealthy() ? 'Healthy' : 'Offline')) : ''">
+        <div class="status-indicator" [class.online]="mlPipelineHealthy()" [class.offline]="!mlPipelineHealthy()">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideBrain" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">ML Pipeline</span>
+          <span class="status-value" [class.online]="mlPipelineHealthy()">
+            {{ mlPipelineHealthy() ? 'Healthy' : 'Offline' }}
+          </span>
+        }
+      </div>
+
+      <!-- Simulator -->
+      <div class="status-item" [title]="collapsed() ? ('Simulator: ' + (simulatorActive() ? 'Active' : 'Inactive')) : ''">
+        <div class="status-indicator" [class.online]="simulatorActive()" [class.offline]="!simulatorActive()">
+          <span class="status-dot"></span>
+        </div>
+        <ng-icon name="lucideFlaskConical" size="14" />
+        @if (!collapsed()) {
+          <span class="status-label">Simulator</span>
+          <span class="status-value" [class.online]="simulatorActive()">
+            {{ simulatorActive() ? 'Active' : 'Inactive' }}
+          </span>
+        }
+      </div>
+
+      <!-- Separator -->
+      @if (!collapsed()) {
+        <div class="status-separator"></div>
+      }
+
+      <!-- Coordinators -->
       <div class="status-item" [title]="collapsed() ? ('Coordinators: ' + onlineCoordinators() + '/' + totalCoordinators()) : ''">
         <div class="status-indicator" [class.online]="onlineCoordinators() > 0" [class.offline]="onlineCoordinators() === 0">
           <span class="status-dot"></span>
@@ -239,15 +286,15 @@
           </span>
         }
       </div>
-      
-      <!-- Connected Nodes -->
-      <div class="status-item" [title]="collapsed() ? ('Nodes: ' + onlineNodes() + '/' + totalNodes()) : ''">
+
+      <!-- Towers -->
+      <div class="status-item" [title]="collapsed() ? ('Towers: ' + onlineNodes() + '/' + totalNodes()) : ''">
         <div class="status-indicator" [class.online]="onlineNodes() > 0" [class.offline]="onlineNodes() === 0">
           <span class="status-dot"></span>
         </div>
         <ng-icon name="lucideLightbulb" size="14" />
         @if (!collapsed()) {
-          <span class="status-label">Nodes</span>
+          <span class="status-label">Towers</span>
           <span class="status-value" [class.online]="onlineNodes() > 0">
             {{ onlineNodes() }}/{{ totalNodes() }}
           </span>

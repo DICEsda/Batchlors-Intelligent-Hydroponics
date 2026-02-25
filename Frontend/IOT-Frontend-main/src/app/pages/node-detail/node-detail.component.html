@@ -24,11 +24,6 @@
       </div>
     </div>
     <div class="header-actions">
-      @if (usingMockData()) {
-        <span hlmBadge variant="secondary" class="mock-badge">
-          Mock Data
-        </span>
-      }
       <span
         hlmBadge
         [variant]="wsConnected() ? 'outline' : 'destructive'"

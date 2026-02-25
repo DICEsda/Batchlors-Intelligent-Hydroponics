@@ -110,7 +110,6 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
   readonly activeAlerts = this.dataService.activeAlerts;
   readonly loading = this.dataService.loading;
   readonly error = this.dataService.error;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Digital Twin data
   readonly coordTwins = this.twinService.coordTwins;

@@ -3,7 +3,6 @@ import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
-import { MockDataService } from './mock-data.service';
 import { EnvironmentService } from './environment.service';
 import {
   Site,
@@ -26,7 +25,6 @@ import {
  * IoT Data Service - Smart Tile System
  * Centralized state management using Angular signals
  * Provides reactive data access and automatic refresh
- * Falls back to mock data when backend is unavailable
  */
 @Injectable({
   providedIn: 'root'
@@ -34,7 +32,6 @@ import {
 export class IoTDataService {
   private readonly api = inject(ApiService);
   private readonly http = inject(HttpClient);
-  private readonly mockData = inject(MockDataService);
   private readonly env = inject(EnvironmentService);
   private readonly destroy$ = new Subject<void>();
 
@@ -45,7 +42,6 @@ export class IoTDataService {
   // Loading states
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly usingMockData = signal(false);
 
   // Health
   readonly healthStatus = signal<HealthStatus | null>(null);
@@ -150,66 +146,35 @@ export class IoTDataService {
     this.error.set(null);
 
     try {
-      // Try to check health first
       await this.checkHealth();
 
-      // Load real data - only coordinators endpoint is currently available
-      // Sites, nodes, zones, and alerts endpoints need to be implemented in backend
       await Promise.all([
         this.loadCoordinators().catch(err => {
-          console.warn('Failed to load coordinators, using empty array:', err);
+          console.warn('Failed to load coordinators:', err);
           this.coordinators.set([]);
         }),
-        // Sites endpoint not yet implemented in backend
-        // this.loadSites(),
-        // Nodes endpoint not yet implemented in backend  
-        // this.loadNodes(),
-        // Zones endpoint not yet implemented in backend
-        // this.loadZones(),
-        // Alerts endpoint not yet implemented in backend
-        // this.loadAlerts(),
+        this.loadNodes().catch(err => {
+          console.warn('Failed to load nodes:', err);
+          this.nodes.set([]);
+        }),
+        this.loadAlerts().catch(err => {
+          console.warn('Failed to load alerts:', err);
+          this.alerts.set([]);
+        }),
+        this.loadSites().catch(err => {
+          console.warn('Failed to load farms:', err);
+          this.sites.set([]);
+        }),
+        this.loadZones().catch(err => {
+          console.warn('Failed to load zones:', err);
+          this.zones.set([]);
+        }),
       ]);
-      
-      // Set empty arrays for unimplemented endpoints
-      this.sites.set([]);
-      this.nodes.set([]);
-      this.zones.set([]);
-      this.alerts.set([]);
-      
-      this.usingMockData.set(false);
     } catch (err) {
-      console.warn('Backend unavailable, falling back to mock data');
-      this.usingMockData.set(true);
-      await this.loadMockData();
+      console.error('Backend unavailable:', err);
+      this.error.set('Backend unavailable. Please check if the server is running.');
     } finally {
       this.isLoading.set(false);
-    }
-  }
-
-  /**
-   * Load mock data as fallback
-   */
-  private async loadMockData(): Promise<void> {
-    try {
-      const [sites, coordinators, nodes, zones, alerts, metrics] = await Promise.all([
-        firstValueFrom(this.mockData.getSites()),
-        firstValueFrom(this.mockData.getCoordinators()),
-        firstValueFrom(this.mockData.getNodes()),
-        firstValueFrom(this.mockData.getZones()),
-        firstValueFrom(this.mockData.getAlerts()),
-        firstValueFrom(this.mockData.getSystemMetrics()),
-      ]);
-
-      this.sites.set(sites);
-      this.coordinators.set(coordinators);
-      this.nodes.set(nodes);
-      this.zones.set(zones);
-      this.alerts.set(alerts);
-      this.systemMetrics.set(metrics);
-      this.error.set(null);
-    } catch (err) {
-      this.error.set('Failed to load mock data');
-      console.error('Failed to load mock data:', err);
     }
   }
 
@@ -380,45 +345,18 @@ export class IoTDataService {
   }
 
   /**
-   * Load all zones (with mock data fallback)
+   * Load all zones
    */
   loadZones(): Promise<void> {
     return new Promise((resolve, reject) => {
-      // If already using mock data, load from mock service directly
-      if (this.usingMockData()) {
-        this.mockData.getZones().subscribe({
-          next: (data) => {
-            this.zones.set(data);
-            resolve();
-          },
-          error: (err) => {
-            console.error('Failed to load mock zones:', err);
-            reject(err);
-          }
-        });
-        return;
-      }
-
-      // Try real API first
       this.api.getZones().subscribe({
         next: (data) => {
           this.zones.set(data);
           resolve();
         },
         error: (err) => {
-          console.warn('Failed to load zones from API, falling back to mock data:', err);
-          // Fallback to mock data
-          this.mockData.getZones().subscribe({
-            next: (data) => {
-              this.zones.set(data);
-              this.usingMockData.set(true);
-              resolve();
-            },
-            error: (mockErr) => {
-              console.error('Failed to load mock zones:', mockErr);
-              reject(mockErr);
-            }
-          });
+          console.error('Failed to load zones:', err);
+          reject(err);
         }
       });
     });
@@ -497,31 +435,15 @@ export class IoTDataService {
   startAutoRefresh(): void {
     this.refreshInterval$.pipe(
       takeUntil(this.destroy$),
-      switchMap(() => {
-        if (this.usingMockData()) {
-          // Try to reconnect to real backend
-          return this.api.getHealth().pipe(
-            tap(() => {
-              // Backend is back! Switch to real data
-              this.usingMockData.set(false);
-              this.loadDashboardData();
-            }),
-            catchError(() => {
-              // Still offline, refresh mock data
-              return this.mockData.getCoordinators();
-            })
-          );
-        }
-        return this.api.getCoordinators();
-      }),
+      switchMap(() => this.api.getCoordinators()),
       tap(data => {
         if (Array.isArray(data)) {
           this.coordinators.set(data);
         }
       }),
-      switchMap(() => this.usingMockData() ? this.mockData.getNodes() : this.api.getNodes()),
+      switchMap(() => this.api.getNodes()),
       tap(data => this.nodes.set(data)),
-      switchMap(() => this.usingMockData() ? this.mockData.getAlerts() : this.api.getAlerts({ page: 1, pageSize: 50 })),
+      switchMap(() => this.api.getAlerts({ page: 1, pageSize: 50 })),
       tap(data => {
         if (Array.isArray(data)) {
           this.alerts.set(data);

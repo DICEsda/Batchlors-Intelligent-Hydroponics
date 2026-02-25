@@ -121,7 +121,6 @@ export class NodeDetailComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly wsConnected = this.wsService.connected;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Live telemetry
   readonly liveTelemetry = signal<NodeTelemetry | null>(null);

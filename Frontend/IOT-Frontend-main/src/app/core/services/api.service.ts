@@ -65,6 +65,7 @@ import {
   ApiResponse,
   PaginatedResponse,
   HealthStatus,
+  MlHealthStatus,
   PaginationParams,
   // Coordinator Registration
   ApproveCoordinatorRequest,
@@ -102,6 +103,10 @@ export class ApiService {
 
   getHealth(): Observable<HealthStatus> {
     return this.get<HealthStatus>('/health');
+  }
+
+  getMlHealth(): Observable<MlHealthStatus> {
+    return this.get<MlHealthStatus>('/api/ml/health');
   }
 
   getSystemMetrics(): Observable<SystemMetrics> {

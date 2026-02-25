@@ -109,7 +109,6 @@ export class ReservoirsListComponent implements OnInit {
   readonly nodes = this.dataService.nodes;
   readonly loading = this.dataService.loading;
   readonly error = this.dataService.error;
-  readonly usingMockData = this.dataService.usingMockData;
   readonly wsConnected = this.wsService.connected;
   
   readonly onlineCount = this.dataService.onlineCoordinatorCount;

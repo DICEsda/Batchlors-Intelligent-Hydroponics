@@ -13,9 +13,6 @@
       </div>
     </div>
     <div class="header-actions">
-      @if (usingMockData()) {
-        <span hlmBadge variant="secondary" class="mock-badge">Mock Data</span>
-      }
       <span hlmBadge [variant]="wsConnected() ? 'default' : 'destructive'">
         <ng-icon [name]="wsConnected() ? 'lucideWifi' : 'lucideWifiOff'" size="14" />
         {{ wsConnected() ? 'Live' : 'Offline' }}

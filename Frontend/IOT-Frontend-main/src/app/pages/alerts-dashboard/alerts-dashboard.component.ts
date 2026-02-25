@@ -81,7 +81,6 @@ export class AlertsDashboardComponent implements OnInit {
   readonly resolvedAlerts = this.alertService.resolvedAlerts;
   readonly filteredAlerts = this.alertService.filteredAlerts;
   readonly isLoading = this.alertService.isLoading;
-  readonly usingMockData = this.alertService.usingMockData;
 
   // Filter state
   readonly filterSeverity = this.alertService.filterSeverity;

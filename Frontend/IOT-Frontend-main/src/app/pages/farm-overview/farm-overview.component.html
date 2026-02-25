@@ -13,9 +13,7 @@
             <span class="stat-value-sm">{{ coordTwins().length || systemStats().coordinators.total }}</span>
             <span class="stat-label-sm">Reservoirs</span>
           </div>
-          <span hlmBadge variant="outline" class="stat-badge">
-            @if (usingMockData()) { Mock } @else { Live }
-          </span>
+          <span hlmBadge variant="outline" class="stat-badge">Live</span>
         }
       </div>
 
@@ -327,10 +325,10 @@
 
             <!-- Infra pills -->
             <div class="infra-overlay">
-              <div class="infra-pill" [class.online]="!usingMockData()">
+              <div class="infra-pill online">
                 <ng-icon hlmIcon name="lucideServer" size="xs" /><span>API</span>
               </div>
-              <div class="infra-pill" [class.online]="!usingMockData()">
+              <div class="infra-pill online">
                 <ng-icon hlmIcon name="lucideDatabase" size="xs" /><span>DB</span>
               </div>
               <div class="infra-pill" [class.online]="wsConnected()">

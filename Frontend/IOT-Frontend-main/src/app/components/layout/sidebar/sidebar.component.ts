@@ -30,13 +30,16 @@ import {
   lucideActivity,
   lucideBarChart3,
   lucideThermometer,
-  lucideShieldAlert
+  lucideShieldAlert,
+  lucideRadio,
+  lucideFlaskConical
 } from '@ng-icons/lucide';
 import { WebSocketService } from '../../../core/services/websocket.service';
 import { IoTDataService } from '../../../core/services/iot-data.service';
+import { ApiService } from '../../../core/services/api.service';
 import { SidebarService } from '../../../core/services/sidebar.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { Subject, interval, takeUntil } from 'rxjs';
+import { Subject, interval, takeUntil, firstValueFrom } from 'rxjs';
 
 interface NavItem {
   label: string;
@@ -87,7 +90,9 @@ type UserRole = 'admin' | 'user';
       lucideActivity,
       lucideBarChart3,
       lucideThermometer,
-      lucideShieldAlert
+      lucideShieldAlert,
+      lucideRadio,
+      lucideFlaskConical
     })
   ],
   templateUrl: './sidebar.component.html',
@@ -96,6 +101,7 @@ type UserRole = 'admin' | 'user';
 export class SidebarComponent implements OnInit, OnDestroy {
   private readonly wsService = inject(WebSocketService);
   private readonly dataService = inject(IoTDataService);
+  private readonly api = inject(ApiService);
   private readonly sidebarService = inject(SidebarService);
   private readonly toastService = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
@@ -162,9 +168,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
   ]);
 
-  // System status signals
-  readonly wsConnected = this.wsService.connected;
+  // Service status signals
   readonly backendConnected = signal<boolean>(false);
+  readonly mongodbConnected = signal<boolean>(false);
+  readonly mqttBrokerConnected = signal<boolean>(false);
+  readonly mlPipelineHealthy = signal<boolean>(false);
+  readonly simulatorActive = signal<boolean>(false);
+
+  // WebSocket — used for gray-out effect on the panel
+  readonly wsConnected = this.wsService.connected;
   
   // Track previous states to detect changes
   private previousWsConnected = false;
@@ -209,11 +221,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => this.checkConnectionStatus());
     
-    // Check backend health periodically
+    // Check backend and ML health periodically
     this.checkBackendHealth();
+    this.checkMlHealth();
     interval(30000)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => this.checkBackendHealth());
+      .subscribe(() => {
+        this.checkBackendHealth();
+        this.checkMlHealth();
+      });
   }
 
   ngOnDestroy(): void {
@@ -338,8 +354,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private async checkBackendHealth(): Promise<void> {
     try {
       await this.dataService.checkHealth();
+      const health = this.dataService.healthStatus();
+
       const wasConnected = this.backendConnected();
       this.backendConnected.set(true);
+      this.mongodbConnected.set(health?.database ?? false);
+      this.mqttBrokerConnected.set(health?.mqtt_connected ?? false);
+      this.simulatorActive.set(health?.coordinator ?? false);
       
       // Show toast only on reconnection (was disconnected, now connected)
       if (!wasConnected && this.previousBackendConnected === false) {
@@ -352,6 +373,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
     } catch {
       const wasConnected = this.backendConnected();
       this.backendConnected.set(false);
+      this.mongodbConnected.set(false);
+      this.mqttBrokerConnected.set(false);
+      this.simulatorActive.set(false);
       
       // Show toast only on first disconnect
       if (wasConnected && this.previousBackendConnected === true) {
@@ -362,6 +386,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
         );
       }
       this.previousBackendConnected = false;
+    }
+  }
+
+  private async checkMlHealth(): Promise<void> {
+    try {
+      const health = await firstValueFrom(this.api.getMlHealth());
+      this.mlPipelineHealthy.set(health.status === 'healthy');
+    } catch {
+      this.mlPipelineHealthy.set(false);
     }
   }
   

@@ -54,6 +54,13 @@ public sealed class ApiKeyMiddleware
             return;
         }
 
+        // Always allow CORS preflight requests through so the CORS middleware can respond.
+        if (HttpMethods.IsOptions(context.Request.Method))
+        {
+            await _next(context);
+            return;
+        }
+
         // Check if the request path is exempt from authentication.
         var path = context.Request.Path.Value ?? string.Empty;
         if (IsExemptPath(path))

@@ -369,6 +369,27 @@
   opacity: 0.5;
 }
 
+// When WebSocket is offline, gray out entire status panel
+.system-status.ws-offline {
+  opacity: 0.4;
+  pointer-events: none;
+
+  .status-dot {
+    background-color: oklch(0.55 0 0) !important;
+    opacity: 0.3 !important;
+  }
+
+  .status-value {
+    color: oklch(0.55 0 0) !important;
+  }
+}
+
+.status-separator {
+  height: 1px;
+  background-color: var(--sidebar-border);
+  margin: 4px 8px;
+}
+
 // Role Switcher / User Account (Matches Reference)
 .role-switcher {
   position: relative;

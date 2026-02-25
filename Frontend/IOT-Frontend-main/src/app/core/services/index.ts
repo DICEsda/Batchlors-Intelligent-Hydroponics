@@ -9,9 +9,6 @@ export * from './environment.service';
 // REST API service for Smart Tile IoT
 export * from './api.service';
 
-// Mock data service for development
-export * from './mock-data.service';
-
 // WebSocket service for real-time updates
 export * from './websocket.service';
 

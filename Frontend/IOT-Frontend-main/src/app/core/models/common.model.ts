@@ -34,20 +34,23 @@ export interface ValidationError {
 // Health Status
 // ============================================================================
 
-export type ServiceHealth = 'healthy' | 'degraded' | 'unhealthy';
-
 export interface HealthStatus {
-  status: ServiceHealth;
-  service: string;
-  version: string;
-  uptime: number;
-  checks: {
-    database: boolean;
-    mqtt: boolean;
-    redis?: boolean;
-    mlService?: boolean;
-  };
+  status: string;
+  mqtt_connected: boolean;
+  mqtt: boolean;
+  database: boolean;
+  coordinator: boolean;
   timestamp: Date;
+  message?: string;
+}
+
+export interface MlHealthStatus {
+  status: string;
+  version: string;
+  mongodb_connected: boolean;
+  mqtt_connected: boolean;
+  models_loaded: string[];
+  uptime_seconds: number;
 }
 
 // ============================================================================

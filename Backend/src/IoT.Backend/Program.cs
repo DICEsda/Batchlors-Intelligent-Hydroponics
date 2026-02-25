@@ -161,9 +161,6 @@ var app = builder.Build();
 // Global error handler – must be first so it catches exceptions from all downstream middleware.
 app.UseMiddleware<IoT.Backend.Middleware.ErrorHandlingMiddleware>();
 
-// API key authentication – after error handling so auth failures get proper error formatting.
-app.UseMiddleware<IoT.Backend.Middleware.ApiKeyMiddleware>();
-
 // Configure pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -172,7 +169,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// CORS must run before API key auth so preflight OPTIONS requests get proper headers.
 app.UseCors();
+
+// API key authentication – after CORS so preflight requests are not rejected.
+app.UseMiddleware<IoT.Backend.Middleware.ApiKeyMiddleware>();
 
 // WebSocket endpoint
 app.UseWebSockets(new WebSocketOptions

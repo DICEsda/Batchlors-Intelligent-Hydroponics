@@ -14,13 +14,12 @@ import {
   lucideWifi,
   lucideWifiOff,
   lucideRefreshCw,
-  lucideFlaskConical,
   lucideRadioTower,
   lucideX,
   lucideCheck,
   lucideAlertTriangle
 } from '@ng-icons/lucide';
-import { Router } from '@angular/router';
+
 import { ThemeService, Theme } from '../../../core/services/theme.service';
 import { WebSocketService, IoTDataService, ApiService } from '../../../core/services';
 import { ToastService } from '../../../core/services/toast.service';
@@ -42,7 +41,6 @@ import {
 import { HlmInputDirective } from '../../ui/input';
 import { HlmLabelDirective } from '../../ui/label';
 import { NotificationsDropdownComponent } from '../../ui/notifications-dropdown/notifications-dropdown.component';
-import { StatusBadgeComponent } from '../../ui/status-badge/status-badge.component';
 
 @Component({
   selector: 'app-header',
@@ -62,8 +60,7 @@ import { StatusBadgeComponent } from '../../ui/status-badge/status-badge.compone
     HlmDialogCloseDirective,
     HlmInputDirective,
     HlmLabelDirective,
-    NotificationsDropdownComponent,
-    StatusBadgeComponent
+    NotificationsDropdownComponent
   ],
   providers: [
     provideIcons({
@@ -77,7 +74,6 @@ import { StatusBadgeComponent } from '../../ui/status-badge/status-badge.compone
       lucideWifi,
       lucideWifiOff,
       lucideRefreshCw,
-      lucideFlaskConical,
       lucideRadioTower,
       lucideX,
       lucideCheck,
@@ -105,10 +101,9 @@ export class HeaderComponent implements OnDestroy {
   readonly notificationService = inject(NotificationService);
   readonly notificationListener = inject(NotificationListenerService);
   readonly sidebarService = inject(SidebarService);
-  readonly router = inject(Router);
+
 
   readonly wsConnected = this.wsService.connected;
-  readonly usingMockData = this.dataService.usingMockData;
 
   // Coordinator registration state
   readonly pendingCoordinatorRegistrations = signal<WSCoordinatorRegistrationPayload[]>([]);
@@ -322,106 +317,5 @@ export class HeaderComponent implements OnDestroy {
     return `${bytes} B`;
   }
 
-  private testCounter = 0;
 
-  testToast() {
-    this.testCounter++;
-    
-    // Cycle through all toast types
-    const toastTypes = [
-      // Urgent toast
-      () => {
-        this.toastService.urgent(
-          'New Tower Discovered!',
-          'Tower T-3A7B (RSSI: -45 dBm) is requesting to pair with Coordinator COORD-001. Approve pairing?',
-          'Approve Pairing',
-          () => {
-            console.log('Navigating to towers page with pairing dialog...');
-            this.router.navigate(['/towers'], { 
-              queryParams: { action: 'pair', towerId: 'T-3A7B' } 
-            });
-          },
-          0, // duration - don't auto-dismiss
-          'Dismiss',
-          () => {
-            console.log('Pairing request dismissed');
-          }
-        );
-        // Also add to notification center
-        this.notificationService.discovery(
-          'New Tower Discovered',
-          'Tower T-3A7B is requesting to pair',
-          'View Details',
-          () => this.router.navigate(['/towers'])
-        );
-      },
-      // Success toast
-      () => {
-        this.toastService.success(
-          'Settings Saved!',
-          'Your configuration has been successfully updated.'
-        );
-        this.notificationService.success(
-          'Settings Saved',
-          'Your configuration has been successfully updated.'
-        );
-      },
-      // Error toast
-      () => {
-        this.toastService.error(
-          'Connection Failed',
-          'Unable to connect to the MQTT broker. Please check your network settings.'
-        );
-        this.notificationService.error(
-          'Connection Failed',
-          'Unable to connect to the MQTT broker',
-          'Retry',
-          () => this.wsService.connect()
-        );
-      },
-      // Warning toast
-      () => {
-        this.toastService.warning(
-          'Low Water Level',
-          'Reservoir water level is below 20%. Refill recommended.'
-        );
-        this.notificationService.warning(
-          'Low Water Level',
-          'Reservoir water level is below 20%',
-          'View Reservoir',
-          () => this.router.navigate(['/reservoirs'])
-        );
-      },
-      // Info toast
-      () => {
-        this.toastService.info(
-          'System Update Available',
-          'A new firmware version is ready to install.'
-        );
-        this.notificationService.info(
-          'System Update Available',
-          'A new firmware version is ready to install',
-          'Update Now',
-          () => this.router.navigate(['/ota'])
-        );
-      },
-      // Discovery toast
-      () => {
-        this.toastService.discovery(
-          'New Device Detected',
-          'Coordinator COORD-002 is broadcasting on the network.'
-        );
-        this.notificationService.discovery(
-          'New Device Detected',
-          'Coordinator COORD-002 is broadcasting on the network',
-          'View Device',
-          () => this.router.navigate(['/farms'])
-        );
-      }
-    ];
-
-    // Cycle through toast types
-    const toastType = toastTypes[this.testCounter % toastTypes.length];
-    toastType();
-  }
 }
