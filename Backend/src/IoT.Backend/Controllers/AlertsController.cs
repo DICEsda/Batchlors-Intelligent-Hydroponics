@@ -10,7 +10,7 @@ namespace IoT.Backend.Controllers;
 /// REST API for managing system alerts.
 /// </summary>
 [ApiController]
-[Route("api/v1/alerts")]
+[Route("api/alerts")]
 public class AlertsController : ControllerBase
 {
     private readonly IAlertRepository _alertRepository;

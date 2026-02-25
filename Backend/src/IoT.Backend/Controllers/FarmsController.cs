@@ -9,7 +9,7 @@ namespace IoT.Backend.Controllers;
 /// REST API for managing farms (hydroponic farms/sites).
 /// </summary>
 [ApiController]
-[Route("api/v1/farms")]
+[Route("api/farms")]
 public class FarmsController : ControllerBase
 {
     private readonly IFarmRepository _farmRepository;

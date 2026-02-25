@@ -15,9 +15,6 @@ export class EnvironmentService {
     apiUrl: this.getEnvVar('API_URL', 'http://localhost:8000'),
     wsUrl: this.getEnvVar('WS_URL', 'ws://localhost:8000/ws/broadcast'),
     
-    // MQTT WebSocket configuration
-    mqttWsUrl: this.getEnvVar('MQTT_WS_URL', 'ws://localhost:8000/mqtt'),
-    
     // Feature flags
     enableGoogleHome: this.getEnvVar('ENABLE_GOOGLE_HOME', 'false') === 'true',
     enableOTA: this.getEnvVar('ENABLE_OTA', 'true') === 'true',
@@ -30,6 +27,9 @@ export class EnvironmentService {
     wsReconnectDelay: parseInt(this.getEnvVar('WS_RECONNECT_DELAY', '5000'), 10),
     wsMaxReconnectAttempts: parseInt(this.getEnvVar('WS_MAX_RECONNECT_ATTEMPTS', '10'), 10),
     
+    // API authentication
+    apiKey: this.getEnvVar('API_KEY', 'hydro-thesis-2026'),
+
     // API timeouts
     apiTimeout: parseInt(this.getEnvVar('API_TIMEOUT', '30000'), 10),
     
@@ -50,10 +50,6 @@ export class EnvironmentService {
 
   get wsUrl(): string {
     return this.config.wsUrl;
-  }
-
-  get mqttWsUrl(): string {
-    return this.config.mqttWsUrl;
   }
 
   get enableGoogleHome(): boolean {
@@ -78,6 +74,10 @@ export class EnvironmentService {
 
   get wsMaxReconnectAttempts(): number {
     return this.config.wsMaxReconnectAttempts;
+  }
+
+  get apiKey(): string {
+    return this.config.apiKey;
   }
 
   get apiTimeout(): number {

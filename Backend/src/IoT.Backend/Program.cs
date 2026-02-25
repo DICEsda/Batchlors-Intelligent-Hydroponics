@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using IoT.Backend.Models;
 using IoT.Backend.Repositories;
 using IoT.Backend.Services;
@@ -47,6 +49,9 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
     });
+
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -152,6 +157,12 @@ builder.Services.AddHealthChecks()
         timeout: TimeSpan.FromSeconds(3));
 
 var app = builder.Build();
+
+// Global error handler – must be first so it catches exceptions from all downstream middleware.
+app.UseMiddleware<IoT.Backend.Middleware.ErrorHandlingMiddleware>();
+
+// API key authentication – after error handling so auth failures get proper error formatting.
+app.UseMiddleware<IoT.Backend.Middleware.ApiKeyMiddleware>();
 
 // Configure pipeline
 if (app.Environment.IsDevelopment())

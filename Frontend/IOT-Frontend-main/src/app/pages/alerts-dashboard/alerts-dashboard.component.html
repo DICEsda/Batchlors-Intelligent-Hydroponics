@@ -1,0 +1,223 @@
+<div class="alerts-dashboard">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <ng-icon hlmIcon name="lucideShieldAlert" size="lg" class="header-icon" />
+      <div>
+        <h1 class="page-title">Alerts Dashboard</h1>
+        <p class="page-subtitle">Monitor and manage system alerts</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      @if (usingMockData()) {
+        <span hlmBadge variant="outline" class="mock-badge">Mock Data</span>
+      }
+      <button hlmBtn variant="outline" size="sm" (click)="refresh()" [disabled]="isLoading()">
+        <ng-icon hlmIcon name="lucideRefreshCw" size="sm" class="mr-1.5" />
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Bar -->
+  <div class="summary-bar">
+    <div class="summary-card active">
+      <div class="summary-icon active">
+        <ng-icon hlmIcon name="lucideAlertCircle" size="sm" />
+      </div>
+      <div class="summary-body">
+        <span class="summary-value">{{ stats().byStatus.active }}</span>
+        <span class="summary-label">Active</span>
+      </div>
+    </div>
+
+    <div class="summary-card acknowledged">
+      <div class="summary-icon acknowledged">
+        <ng-icon hlmIcon name="lucideEye" size="sm" />
+      </div>
+      <div class="summary-body">
+        <span class="summary-value">{{ stats().byStatus.acknowledged }}</span>
+        <span class="summary-label">Acknowledged</span>
+      </div>
+    </div>
+
+    <div class="summary-card resolved">
+      <div class="summary-icon resolved">
+        <ng-icon hlmIcon name="lucideCheckCheck" size="sm" />
+      </div>
+      <div class="summary-body">
+        <span class="summary-value">{{ stats().byStatus.resolved }}</span>
+        <span class="summary-label">Resolved</span>
+      </div>
+    </div>
+
+    <div class="summary-card rate">
+      <div class="summary-icon rate">
+        <ng-icon hlmIcon name="lucideShieldCheck" size="sm" />
+      </div>
+      <div class="summary-body">
+        <span class="summary-value">{{ resolutionRate() }}%</span>
+        <span class="summary-label">Resolution Rate</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Controls -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <div class="filter-item">
+        <ng-icon hlmIcon name="lucideFilter" size="sm" class="filter-icon" />
+        <select
+          class="filter-select"
+          [ngModel]="filterSeverity()"
+          (ngModelChange)="onSeverityChange($event)"
+        >
+          <option value="all">All Severities</option>
+          <option value="critical">Critical</option>
+          <option value="warning">Warning</option>
+          <option value="info">Info</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <select
+          class="filter-select"
+          [ngModel]="filterStatus()"
+          (ngModelChange)="onStatusChange($event)"
+        >
+          <option value="all">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="acknowledged">Acknowledged</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="search-group">
+      <div class="search-input-wrapper">
+        <ng-icon hlmIcon name="lucideSearch" size="sm" class="search-icon" />
+        <input
+          hlmInput
+          size="sm"
+          type="text"
+          placeholder="Search alerts..."
+          class="search-input"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="onSearchChange($event)"
+        />
+      </div>
+      @if (filterSeverity() !== 'all' || filterStatus() !== 'all' || searchTerm()) {
+        <button hlmBtn variant="ghost" size="xs" (click)="clearFilters()">
+          <ng-icon hlmIcon name="lucideX" size="sm" class="mr-1" />
+          Clear
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Alert Cards List -->
+  <div class="alerts-list">
+    @if (isLoading()) {
+      @for (i of [1, 2, 3]; track i) {
+        <hlm-skeleton class="alert-skeleton" />
+      }
+    } @else if (filteredAlerts().length === 0) {
+      <div class="empty-state">
+        <ng-icon hlmIcon name="lucideShieldCheck" size="xl" class="empty-icon" />
+        <span class="empty-title">No alerts found</span>
+        <span class="empty-hint">
+          @if (filterSeverity() !== 'all' || filterStatus() !== 'all' || searchTerm()) {
+            Try adjusting your filters or search term.
+          } @else {
+            All systems are operating normally.
+          }
+        </span>
+      </div>
+    } @else {
+      @for (alert of filteredAlerts(); track trackByAlertId($index, alert)) {
+        <div class="alert-card" [class]="'severity-' + alert.severity">
+          <!-- Severity Indicator -->
+          <div class="alert-severity-bar" [class]="'bar-' + alert.severity"></div>
+
+          <div class="alert-card-body">
+            <!-- Top Row: Severity Icon + Title + Status + Time -->
+            <div class="alert-top-row">
+              <div class="alert-title-group">
+                <span class="severity-badge" [class]="'badge-' + alert.severity">
+                  <ng-icon [name]="getSeverityIcon(alert.severity)" size="14" />
+                  {{ alert.severity | titlecase }}
+                </span>
+                <h3 class="alert-title">{{ alert.title }}</h3>
+              </div>
+              <div class="alert-meta-group">
+                <span class="status-pill" [class]="'status-' + alert.status">
+                  {{ alert.status | titlecase }}
+                </span>
+                <span class="alert-time">
+                  <ng-icon hlmIcon name="lucideClock" size="xs" />
+                  {{ formatRelativeTime(alert.createdAt) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Message -->
+            <p class="alert-message">{{ alert.message }}</p>
+
+            <!-- Bottom Row: Source + Metadata + Actions -->
+            <div class="alert-bottom-row">
+              <div class="alert-details">
+                <span class="alert-source">
+                  <ng-icon [name]="getSourceIcon(alert.source.type)" size="14" />
+                  {{ alert.source.name }}
+                  <span class="source-id">({{ alert.source.id }})</span>
+                </span>
+                @if (alert.metadata) {
+                  <span class="alert-metadata">
+                    @if (alert.metadata['reading'] !== undefined && alert.metadata['threshold'] !== undefined) {
+                      {{ alert.metadata['reading'] }} / {{ alert.metadata['threshold'] }} {{ alert.metadata['unit'] ?? '' }}
+                    } @else if (alert.metadata['level'] !== undefined) {
+                      Level: {{ alert.metadata['level'] }}{{ alert.metadata['unit'] ?? '' }}
+                    } @else if (alert.metadata['reading'] !== undefined) {
+                      Reading: {{ alert.metadata['reading'] }} {{ alert.metadata['unit'] ?? '' }}
+                    }
+                  </span>
+                }
+              </div>
+
+              <div class="alert-actions">
+                @if (alert.status === 'active') {
+                  <button
+                    hlmBtn variant="outline" size="xs"
+                    (click)="acknowledge(alert._id)"
+                    title="Acknowledge this alert"
+                  >
+                    <ng-icon hlmIcon name="lucideEye" size="xs" class="mr-1" />
+                    Acknowledge
+                  </button>
+                }
+                @if (alert.status === 'acknowledged') {
+                  <button
+                    hlmBtn variant="success" size="xs"
+                    (click)="resolve(alert._id)"
+                    title="Mark as resolved"
+                  >
+                    <ng-icon hlmIcon name="lucideCheck" size="xs" class="mr-1" />
+                    Resolve
+                  </button>
+                }
+                <button
+                  hlmBtn variant="ghost" size="xs"
+                  class="dismiss-btn"
+                  (click)="dismiss(alert._id)"
+                  title="Dismiss alert"
+                >
+                  <ng-icon hlmIcon name="lucideX" size="xs" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>

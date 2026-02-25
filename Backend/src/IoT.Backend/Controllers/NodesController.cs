@@ -5,11 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace IoT.Backend.Controllers;
 
 /// <summary>
-/// REST API for nodes (towers) - provides /api/v1/nodes endpoints.
+/// REST API for nodes (towers) - provides /api/nodes endpoints.
 /// This is a wrapper around TowerRepository to match frontend expectations.
 /// </summary>
 [ApiController]
-[Route("api/v1/nodes")]
+[Route("api/nodes")]
 public class NodesController : ControllerBase
 {
     private readonly ITowerRepository _towerRepository;

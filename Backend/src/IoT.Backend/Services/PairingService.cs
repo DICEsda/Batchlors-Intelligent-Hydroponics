@@ -71,7 +71,7 @@ public class PairingService : IPairingService
         _activeSessions[sessionKey] = session;
 
         // Send pairing command to coordinator via MQTT
-        var topic = $"farm/{farmId}/coord/{coordId}/cmd";
+        var topic = MqttTopics.CoordinatorCmd(farmId, coordId);
         var command = new
         {
             cmd = "start_pairing",
@@ -121,7 +121,7 @@ public class PairingService : IPairingService
         _activeSessions.TryRemove(sessionKey, out _);
 
         // Send stop command to coordinator via MQTT
-        var topic = $"farm/{farmId}/coord/{coordId}/cmd";
+        var topic = MqttTopics.CoordinatorCmd(farmId, coordId);
         var command = new { cmd = "stop_pairing" };
         await _mqtt.PublishJsonAsync(topic, command, ct: ct);
 
@@ -265,7 +265,7 @@ public class PairingService : IPairingService
         session.ApprovedTowers.Add(towerId);
 
         // Send approval command to coordinator
-        var topic = $"farm/{farmId}/coord/{coordId}/cmd";
+        var topic = MqttTopics.CoordinatorCmd(farmId, coordId);
         var command = new
         {
             cmd = "approve_pairing",
@@ -363,7 +363,7 @@ public class PairingService : IPairingService
         session.RejectedTowers.Add(towerId);
 
         // Send rejection command to coordinator
-        var topic = $"farm/{farmId}/coord/{coordId}/cmd";
+        var topic = MqttTopics.CoordinatorCmd(farmId, coordId);
         var command = new
         {
             cmd = "reject_pairing",
@@ -541,7 +541,7 @@ public class PairingService : IPairingService
 
         // Send forget command to coordinator via MQTT
         // The coordinator should forward this to the tower to wipe its credentials
-        var topic = $"farm/{farmId}/coord/{coordId}/cmd";
+        var topic = MqttTopics.CoordinatorCmd(farmId, coordId);
         var command = new
         {
             cmd = "forget_device",

@@ -67,9 +67,9 @@ export class NotificationListenerService implements OnDestroy {
   private subscribeToEvents(): void {
     // Listen for new tower discoveries - use urgent toast for pairing action
     this.subscriptions.push(
-      this.wsService.nodeDiscovered$.subscribe((payload) => {
+      this.wsService.towerDiscovered$.subscribe((payload) => {
         const rssiText = payload.rssi ? ` (RSSI: ${payload.rssi} dBm)` : '';
-        const towerId = payload.nodeId || payload.macAddress;
+        const towerId = payload.towerId || payload.macAddress;
         
         this.toastService.urgent(
           'New Tower Discovered!',
@@ -85,10 +85,10 @@ export class NotificationListenerService implements OnDestroy {
 
     // Listen for successful pairing
     this.subscriptions.push(
-      this.wsService.nodePaired$.subscribe((payload) => {
+      this.wsService.towerPaired$.subscribe((payload) => {
         this.toastService.success(
           'Tower Paired Successfully',
-          `Tower ${payload.nodeId} has been paired with the reservoir`
+          `Tower ${payload.towerId} has been paired with the reservoir`
         );
       })
     );

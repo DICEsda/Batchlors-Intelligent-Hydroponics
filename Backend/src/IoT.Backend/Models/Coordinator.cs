@@ -112,6 +112,42 @@ public class Coordinator
     public float TempC { get; set; }
 
     // ============================================================================
+    // mmWave Radar Sensor Fields
+    // ============================================================================
+
+    /// <summary>
+    /// Whether the mmWave radar detects human presence
+    /// </summary>
+    [BsonElement("mmwave_presence")]
+    [JsonPropertyName("mmwave_presence")]
+    [BsonIgnoreIfNull]
+    public bool? MmwavePresence { get; set; }
+
+    /// <summary>
+    /// mmWave radar detection confidence (0-100)
+    /// </summary>
+    [BsonElement("mmwave_confidence")]
+    [JsonPropertyName("mmwave_confidence")]
+    [BsonIgnoreIfNull]
+    public int? MmwaveConfidence { get; set; }
+
+    /// <summary>
+    /// Whether the mmWave radar module is online/responding
+    /// </summary>
+    [BsonElement("mmwave_online")]
+    [JsonPropertyName("mmwave_online")]
+    [BsonIgnoreIfNull]
+    public bool? MmwaveOnline { get; set; }
+
+    /// <summary>
+    /// Whether WiFi is currently connected
+    /// </summary>
+    [BsonElement("wifi_connected")]
+    [JsonPropertyName("wifi_connected")]
+    [BsonIgnoreIfNull]
+    public bool? WifiConnected { get; set; }
+
+    // ============================================================================
     // Reservoir Water Quality Sensors (Hydroponic System)
     // ============================================================================
 

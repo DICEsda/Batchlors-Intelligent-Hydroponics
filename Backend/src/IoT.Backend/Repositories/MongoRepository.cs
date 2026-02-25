@@ -60,8 +60,52 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
                 new CreateIndexOptions { Name = "timestamp_ttl_7d", ExpireAfter = ttlExpiry });
             await reservoirTelemetryCollection.Indexes.CreateOneAsync(reservoirTtlIndex);
 
+            // ----------------------------------------------------------------
+            // Compound indexes for common query patterns
+            // ----------------------------------------------------------------
+
+            // 1. coordinators: { farm_id: 1, coord_id: 1 }
+            var coordinatorsCollection = _db.GetCollection<Coordinator>(CoordinatorsCollection);
+            var coordCompoundIndex = new CreateIndexModel<Coordinator>(
+                Builders<Coordinator>.IndexKeys
+                    .Ascending("farm_id")
+                    .Ascending("coord_id"),
+                new CreateIndexOptions { Name = "farm_coord_idx", Background = true });
+            await coordinatorsCollection.Indexes.CreateOneAsync(coordCompoundIndex);
+
+            // 2. towers: { farm_id: 1, coord_id: 1, tower_id: 1 }
+            var towersCollection = _db.GetCollection<Tower>(TowersCollection);
+            var towerCompoundIndex = new CreateIndexModel<Tower>(
+                Builders<Tower>.IndexKeys
+                    .Ascending(t => t.FarmId)
+                    .Ascending(t => t.CoordId)
+                    .Ascending(t => t.TowerId),
+                new CreateIndexOptions { Name = "farm_coord_tower_idx", Background = true });
+            await towersCollection.Indexes.CreateOneAsync(towerCompoundIndex);
+
+            // 3. tower_telemetry: { farm_id: 1, coord_id: 1, tower_id: 1, timestamp: -1 }
+            var towerTelCompoundIndex = new CreateIndexModel<TowerTelemetry>(
+                Builders<TowerTelemetry>.IndexKeys
+                    .Ascending(t => t.FarmId)
+                    .Ascending(t => t.CoordId)
+                    .Ascending(t => t.TowerId)
+                    .Descending(t => t.Timestamp),
+                new CreateIndexOptions { Name = "farm_coord_tower_ts_idx", Background = true });
+            await towerTelemetryCollection.Indexes.CreateOneAsync(towerTelCompoundIndex);
+
+            // 4. reservoir_telemetry: { farm_id: 1, coord_id: 1, timestamp: -1 }
+            var reservoirTelCompoundIndex = new CreateIndexModel<ReservoirTelemetry>(
+                Builders<ReservoirTelemetry>.IndexKeys
+                    .Ascending(r => r.FarmId)
+                    .Ascending(r => r.CoordId)
+                    .Descending(r => r.Timestamp),
+                new CreateIndexOptions { Name = "farm_coord_ts_idx", Background = true });
+            await reservoirTelemetryCollection.Indexes.CreateOneAsync(reservoirTelCompoundIndex);
+
             _logger.LogInformation("Ensured 7-day TTL indexes on {TowerCollection} and {ReservoirCollection}",
                 TowerTelemetryCollection, ReservoirTelemetryCollection);
+            _logger.LogInformation("Ensured compound indexes on {CoordCollection}, {TowerCollection}, {TowerTelCollection}, and {ReservoirTelCollection}",
+                CoordinatorsCollection, TowersCollection, TowerTelemetryCollection, ReservoirTelemetryCollection);
         }
         catch (Exception ex)
         {
@@ -380,6 +424,21 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
             _logger.LogError(ex, "Failed to update OTA job status");
             throw;
         }
+    }
+
+    public async Task<OtaJob?> GetActiveOtaJobByCoordIdAsync(string coordId, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<OtaJob>(OtaJobsCollection);
+
+        // Find the most recent non-terminal job for this coordinator
+        var filter = Builders<OtaJob>.Filter.And(
+            Builders<OtaJob>.Filter.Eq("coord_id", coordId),
+            Builders<OtaJob>.Filter.Nin("status", new[] { "completed", "failed", "cancelled" })
+        );
+
+        var sort = Builders<OtaJob>.Sort.Descending("created_at");
+
+        return await collection.Find(filter).Sort(sort).FirstOrDefaultAsync(ct);
     }
 
     #endregion
@@ -1015,6 +1074,9 @@ public sealed class MongoRepository : IRepository, ICoordinatorRepository, ITowe
     
     Task IOtaJobRepository.UpdateStatusAsync(string id, string status, CancellationToken ct)
         => UpdateOtaJobStatusAsync(id, status, ct);
+
+    Task<OtaJob?> IOtaJobRepository.GetActiveByCoordIdAsync(string coordId, CancellationToken ct)
+        => GetActiveOtaJobByCoordIdAsync(coordId, ct);
 
     // ISettingsRepository
     Task<Settings?> ISettingsRepository.GetAsync(string siteId, CancellationToken ct)

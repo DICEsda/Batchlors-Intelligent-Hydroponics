@@ -64,3 +64,44 @@ Use `context7` for library usage questions; use `chrome-devtools` when debugging
 - **Add dashboard widget**: create a standalone component under `features/dashboard`, wire to services, style with Spartan/Tailwind, add basic tests.
 - **Add API call**: extend a core service under `core/services`, add types, handle errors, and update consumers.
 - **Add route**: update `app.routes.ts` with lazy-loaded feature modules or standalone components.
+
+## Development Workflow
+
+### Test-Driven Development
+
+- Write a failing test BEFORE writing implementation code.
+- Run the test and confirm it fails for the right reason (feature missing, not typo).
+- Write the MINIMAL code to make the test pass.
+- Run the test again and confirm it passes.
+- Refactor only after green. Keep tests passing.
+- No production code without a failing test first.
+- If you wrote code before the test, delete it and start over.
+
+### Systematic Debugging
+
+When you encounter a bug, test failure, or unexpected behavior:
+
+1. **Read error messages carefully** - full stack traces, line numbers, error codes.
+2. **Reproduce consistently** - exact steps, reliable trigger.
+3. **Check recent changes** - git diff, new dependencies, config.
+4. **Trace data flow** - find where the bad value originates.
+5. **Form a single hypothesis** - "X is the root cause because Y".
+6. **Test minimally** - smallest possible change, one variable at a time.
+7. If 3+ fixes fail, STOP and question the architecture.
+
+Do NOT guess-and-fix. Root cause first, always.
+
+### Verification Before Completion
+
+Before reporting back that work is done:
+
+1. **Identify** what command proves your claim.
+2. **Run** the full command (fresh, not cached).
+3. **Read** the complete output and check exit code.
+4. **Confirm** the output matches your claim.
+
+If you haven't run the verification command, you cannot claim it passes. No "should work", "probably passes", or "looks correct".
+
+**Verification commands:**
+- `ng test --watch=false` - all Karma/Jasmine tests must pass with 0 failures.
+- `ng build` - must compile with exit code 0, no errors.

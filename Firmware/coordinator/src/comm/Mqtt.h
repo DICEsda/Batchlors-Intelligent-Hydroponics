@@ -33,6 +33,11 @@ public:
     void publishReservoirTelemetry(const ReservoirTelemetryMessage& telemetry);
     void publishOtaStatus(const String& status, int progress, const String& message, const String& error = "");
     
+    // Publishing methods - Pairing events (coordinator -> backend)
+    void publishPairingRequest(const String& towerId, const String& macAddress, int rssi, const String& fwVersion);
+    void publishPairingStatus(const String& status, int durationMs, int nodesDiscovered, int nodesPaired);
+    void publishPairingComplete(const String& towerId, const String& macAddress, bool success, const String& reason);
+    
     // Connection event publishing (real-time status updates)
     void publishConnectionEvent(const String& event, const String& reason = "");
     
@@ -106,6 +111,16 @@ private:
     String connectionStatusTopic() const;
     String coordinatorAnnounceTopic() const;
     String coordinatorRegisteredTopic() const;
+    String coordinatorConfigTopic() const;
+    String coordinatorDirectCmdTopic() const;
+    String reservoirCmdTopic() const;
+    String coordinatorOtaStartTopic() const;
+    String coordinatorOtaCancelTopic() const;
+    
+    // Pairing topic builders
+    String pairingRequestTopic() const;
+    String pairingStatusTopic() const;
+    String pairingCompleteTopic() const;
     
     // Legacy topic builders (for backward compatibility during migration)
     String nodeTelemetryTopic(const String& nodeId) const;

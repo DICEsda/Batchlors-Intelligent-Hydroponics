@@ -93,3 +93,46 @@ Use `context7` when you need to look up current API documentation for ESP32 func
 - Hardware context and pin mappings:
   - `coordinator/include/Pins.h`
   - `Datasheet/` folder for sensor/SoC datasheets.
+
+## Development Workflow
+
+### Test-Driven Development
+
+- Write a failing test BEFORE writing implementation code.
+- Run the test and confirm it fails for the right reason (feature missing, not typo).
+- Write the MINIMAL code to make the test pass.
+- Run the test again and confirm it passes.
+- Refactor only after green. Keep tests passing.
+- No production code without a failing test first.
+- If you wrote code before the test, delete it and start over.
+- For hardware-dependent logic, write host-side Unity tests that exercise the behavior behind thin abstractions.
+
+### Systematic Debugging
+
+When you encounter a bug, test failure, or unexpected behavior:
+
+1. **Read error messages carefully** - full compiler output, linker errors, serial monitor output.
+2. **Reproduce consistently** - exact steps, reliable trigger.
+3. **Check recent changes** - git diff, new dependencies, platformio.ini changes.
+4. **Trace data flow** - find where the bad value originates (ESP-NOW payload, MQTT message, serial output).
+5. **Form a single hypothesis** - "X is the root cause because Y".
+6. **Test minimally** - smallest possible change, one variable at a time.
+7. If 3+ fixes fail, STOP and question the architecture.
+
+Do NOT guess-and-fix. Root cause first, always.
+
+### Verification Before Completion
+
+Before reporting back that work is done:
+
+1. **Identify** what command proves your claim.
+2. **Run** the full command (fresh, not cached).
+3. **Read** the complete output and check exit code.
+4. **Confirm** the output matches your claim.
+
+If you haven't run the verification command, you cannot claim it passes. No "should work", "probably passes", or "looks correct".
+
+**Verification commands:**
+- `pio test -e native` - all host-side Unity tests must pass with 0 failures.
+- `pio run -e esp32-s3-devkitc-1` - coordinator firmware must compile with exit code 0.
+- `pio run -e esp32-c3-mini-1` - node firmware must compile with exit code 0.

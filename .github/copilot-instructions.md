@@ -4,7 +4,7 @@ go run cmd/iot/main.go
 Purpose: keep the ESP32 firmware, Go backend, and Angular UI moving fast without breaking the tight real-time lighting loop. Favor incremental fixes, follow existing manager patterns, and document any workflow changes.
 
 ## Architecture snapshot
-- Coordinator (ESP32-S3, PlatformIO/Arduino) orchestrates ESP-NOW nodes, MQTT uplink, Wi-Fi setup, and serial diagnostics; entry point lives in `coordinator/src/core/Coordinator.*` (ignore `SmartTileCoordinator.*`).
+- Coordinator (ESP32-S3, PlatformIO/Arduino) orchestrates ESP-NOW nodes, MQTT uplink, Wi-Fi setup, and serial diagnostics; entry point lives in `coordinator/src/core/Coordinator.*`.
 - Nodes (ESP32-C3) share code via `shared/` and talk ESP-NOW only; backend (`IOT-Backend-main`) and Angular frontend (`IOT-Frontend-main`) consume/publish MQTT + WebSockets.
 - Data path: Node telemetry → ESP-NOW → Coordinator → MQTT (`site/{siteId}/coord|node/...`) → backend/front-end; frontend commands → MQTT `/cmd` → Coordinator → ESP-NOW downlink.
 

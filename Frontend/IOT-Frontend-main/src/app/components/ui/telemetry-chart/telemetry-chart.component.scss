@@ -1,0 +1,16 @@
+.telemetry-chart {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  transition: border-color 150ms ease;
+
+  &:hover {
+    border-color: color-mix(in oklch, var(--ring) 60%, transparent);
+  }
+
+  .chart-container {
+    width: 100%;
+    min-height: 120px;
+  }
+}

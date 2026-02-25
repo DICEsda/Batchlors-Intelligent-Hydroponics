@@ -54,24 +54,24 @@ export const routes: Routes = [
     pathMatch: 'prefix'
   },
 
-  // Nodes List - All node units
+  // Towers List - All hydroponic tower units
   {
     path: 'towers',
     loadComponent: () =>
       import('./pages/towers-list/towers-list.component').then(
         m => m.TowersListComponent
       ),
-    title: 'Nodes | Smart Tile Dashboard'
+    title: 'Towers | Intelligent Hydroponics'
   },
 
-  // Node Detail - Node metrics and LED control
+  // Tower Detail - Tower metrics and controls
   {
     path: 'towers/:id',
     loadComponent: () =>
       import('./pages/node-detail/node-detail.component').then(
         m => m.NodeDetailComponent
       ),
-    title: 'Node Detail | Smart Tile Dashboard'
+    title: 'Tower Detail | Intelligent Hydroponics'
   },
 
   // Legacy route redirect for nodes
@@ -246,6 +246,16 @@ export const routes: Routes = [
         m => m.DiagnosticsScaleTestComponent
       ),
     title: 'Scale Test | Smart Tile Dashboard'
+  },
+
+  // Alerts Dashboard - Dedicated alerts management view
+  {
+    path: 'alerts-dashboard',
+    loadComponent: () =>
+      import('./pages/alerts-dashboard/alerts-dashboard.component').then(
+        m => m.AlertsDashboardComponent
+      ),
+    title: 'Alerts Dashboard | Smart Tile Dashboard'
   },
 
   // Wildcard redirect

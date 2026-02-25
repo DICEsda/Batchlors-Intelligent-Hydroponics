@@ -14,6 +14,7 @@ public class TelemetryHandler : BackgroundService
 {
     private readonly IMqttService _mqtt;
     private readonly ICoordinatorRepository _coordinatorRepository;
+    private readonly ITowerRepository _towerRepository;
     private readonly ITelemetryRepository _telemetryRepository;
     private readonly IOtaJobRepository _otaJobRepository;
     private readonly IWsBroadcaster _broadcaster;
@@ -21,12 +22,14 @@ public class TelemetryHandler : BackgroundService
     private readonly IPairingService _pairingService;
     private readonly ICoordinatorRegistrationService _registrationService;
     private readonly IDiagnosticsService _diagnostics;
+    private readonly IAlertService _alertService;
     private readonly ILogger<TelemetryHandler> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public TelemetryHandler(
         IMqttService mqtt, 
         ICoordinatorRepository coordinatorRepository,
+        ITowerRepository towerRepository,
         ITelemetryRepository telemetryRepository,
         IOtaJobRepository otaJobRepository,
         IWsBroadcaster broadcaster,
@@ -34,10 +37,12 @@ public class TelemetryHandler : BackgroundService
         IPairingService pairingService,
         ICoordinatorRegistrationService registrationService,
         IDiagnosticsService diagnostics,
+        IAlertService alertService,
         ILogger<TelemetryHandler> logger)
     {
         _mqtt = mqtt;
         _coordinatorRepository = coordinatorRepository;
+        _towerRepository = towerRepository;
         _telemetryRepository = telemetryRepository;
         _otaJobRepository = otaJobRepository;
         _broadcaster = broadcaster;
@@ -45,6 +50,7 @@ public class TelemetryHandler : BackgroundService
         _pairingService = pairingService;
         _registrationService = registrationService;
         _diagnostics = diagnostics;
+        _alertService = alertService;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -69,64 +75,57 @@ public class TelemetryHandler : BackgroundService
         _logger.LogInformation("TelemetryHandler subscribing to MQTT topics");
 
         // ============================================================================
-        // Legacy Smart Tile Topics (site/{siteId}/...)
-        // ============================================================================
-        
-        // Subscribe to coordinator telemetry
-        await _mqtt.SubscribeAsync("site/+/coord/+/telemetry", HandleCoordinatorTelemetry, ct: stoppingToken);
-        
-        // Subscribe to status updates
-        await _mqtt.SubscribeAsync("site/+/coord/+/status", HandleCoordinatorStatus, ct: stoppingToken);
-        
-        // Subscribe to OTA progress updates
-        await _mqtt.SubscribeAsync("site/+/ota/progress", HandleOtaProgress, ct: stoppingToken);
-
-        // ============================================================================
         // Hydroponic System Topics (farm/{farmId}/...)
         // ============================================================================
         
+        // Subscribe to coordinator telemetry (ambient sensors, mmWave radar, WiFi status)
+        await _mqtt.SubscribeAsync(MqttTopics.CoordinatorTelemetry, HandleFarmCoordinatorTelemetry, ct: stoppingToken);
+
         // Subscribe to reservoir telemetry (coordinator with water quality sensors)
-        await _mqtt.SubscribeAsync("farm/+/coord/+/reservoir/telemetry", HandleReservoirTelemetry, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.ReservoirTelemetry, HandleReservoirTelemetry, ct: stoppingToken);
         
         // Subscribe to tower telemetry (DHT22, light sensor, actuator states)
-        await _mqtt.SubscribeAsync("farm/+/coord/+/tower/+/telemetry", HandleTowerTelemetry, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.TowerTelemetry, HandleTowerTelemetry, ct: stoppingToken);
         
         // Subscribe to tower status updates
-        await _mqtt.SubscribeAsync("farm/+/coord/+/tower/+/status", HandleTowerStatus, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.TowerStatus, HandleTowerStatus, ct: stoppingToken);
+
+        // Subscribe to OTA status updates from coordinators
+        await _mqtt.SubscribeAsync(MqttTopics.OtaStatus, HandleFarmOtaStatus, ct: stoppingToken);
 
         // ============================================================================
         // Pairing Workflow Topics
         // ============================================================================
         
         // Subscribe to tower pairing requests (tower wants to pair with coordinator)
-        await _mqtt.SubscribeAsync("farm/+/coord/+/pairing/request", HandlePairingRequest, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.PairingRequest, HandlePairingRequest, ct: stoppingToken);
         
         // Subscribe to pairing mode status updates from coordinator
-        await _mqtt.SubscribeAsync("farm/+/coord/+/pairing/status", HandlePairingStatus, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.PairingStatus, HandlePairingStatus, ct: stoppingToken);
         
         // Subscribe to pairing completion events from coordinator
-        await _mqtt.SubscribeAsync("farm/+/coord/+/pairing/complete", HandlePairingComplete, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.PairingComplete, HandlePairingComplete, ct: stoppingToken);
 
         // ============================================================================
         // Coordinator Serial Log Topics (Real-time log streaming)
         // ============================================================================
         
         // Subscribe to coordinator serial logs (debug/diagnostics)
-        await _mqtt.SubscribeAsync("farm/+/coord/+/serial", HandleSerialLog, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.SerialLog, HandleSerialLog, ct: stoppingToken);
 
         // ============================================================================
         // Connection Status Topics (WiFi/MQTT connection events)
         // ============================================================================
         
         // Subscribe to connection status events (WiFi/MQTT connect/disconnect)
-        await _mqtt.SubscribeAsync("farm/+/coord/+/status/connection", HandleConnectionStatus, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.ConnectionStatus, HandleConnectionStatus, ct: stoppingToken);
 
         // ============================================================================
         // Coordinator Registration Topics (coordinator announce/discovery)
         // ============================================================================
         
         // Subscribe to coordinator announce (registration)
-        await _mqtt.SubscribeAsync("coordinator/+/announce", HandleCoordinatorAnnounce, ct: stoppingToken);
+        await _mqtt.SubscribeAsync(MqttTopics.CoordinatorAnnounce, HandleCoordinatorAnnounce, ct: stoppingToken);
 
         _logger.LogInformation("TelemetryHandler subscribed to all telemetry topics");
 
@@ -134,7 +133,12 @@ public class TelemetryHandler : BackgroundService
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 
-    private async Task HandleCoordinatorTelemetry(string topic, byte[] payload)
+    /// <summary>
+    /// Handle coordinator telemetry from the farm/ topic prefix.
+    /// Topic: farm/{farmId}/coord/{coordId}/telemetry
+    /// Payload: { ts, farm_id, coord_id, light_lux, temp_c, mmwave_presence, mmwave_confidence, mmwave_online, wifi_rssi, wifi_connected }
+    /// </summary>
+    private async Task HandleFarmCoordinatorTelemetry(string topic, byte[] payload)
     {
         try
         {
@@ -145,37 +149,46 @@ public class TelemetryHandler : BackgroundService
                 return; // Drop message from unregistered coordinator
             }
 
-            // Parse topic: site/{siteId}/coord/{coordId}/telemetry
+            // Parse topic: farm/{farmId}/coord/{coordId}/telemetry
             var parts = topic.Split('/');
-            if (parts.Length < 4) return;
+            if (parts.Length < 5) return;
 
-            var siteId = parts[1];
+            var farmId = parts[1];
             coordId = parts[3];
 
-            var telemetry = JsonSerializer.Deserialize<CoordinatorTelemetry>(payload, _jsonOptions);
+            var telemetry = JsonSerializer.Deserialize<FarmCoordinatorTelemetryDto>(payload, _jsonOptions);
             if (telemetry == null) return;
 
-            var coordinator = new Coordinator
+            _logger.LogDebug("Received farm coordinator telemetry for {FarmId}/{CoordId}: temp={Temp}C, lux={Lux}, mmwave={Presence}",
+                farmId, coordId, telemetry.TempC, telemetry.LightLux, telemetry.MmwavePresence);
+
+            // Update coordinator document in MongoDB
+            var existing = await _coordinatorRepository.GetByFarmAndIdAsync(farmId, coordId);
+            var coordinator = existing ?? new Coordinator
             {
                 Id = coordId,
                 CoordId = coordId,
-                SiteId = siteId,
-                FwVersion = telemetry.FwVersion ?? "",
-                NodesOnline = telemetry.NodesOnline,
-                WifiRssi = telemetry.WifiRssi,
-                LightLux = telemetry.LightLux,
-                TempC = telemetry.TempC,
-                LastSeen = DateTime.UtcNow
+                FarmId = farmId
             };
 
-            await _coordinatorRepository.UpsertAsync(coordinator);
-            _logger.LogDebug("Updated coordinator {CoordId} telemetry", coordId);
+            coordinator.FarmId = farmId;
+            coordinator.LightLux = telemetry.LightLux;
+            coordinator.TempC = telemetry.TempC;
+            coordinator.WifiRssi = telemetry.WifiRssi;
+            coordinator.WifiConnected = telemetry.WifiConnected;
+            coordinator.MmwavePresence = telemetry.MmwavePresence;
+            coordinator.MmwaveConfidence = telemetry.MmwaveConfidence;
+            coordinator.MmwaveOnline = telemetry.MmwaveOnline;
+            coordinator.LastSeen = DateTime.UtcNow;
 
-            // Broadcast to WebSocket clients (reservoir = coordinator)
+            await _coordinatorRepository.UpsertAsync(coordinator);
+            _logger.LogDebug("Updated coordinator {CoordId} with farm telemetry", coordId);
+
+            // Broadcast to WebSocket clients
             var broadcastPayload = new ReservoirTelemetryPayload
             {
                 ReservoirId = coordId,
-                SiteId = siteId,
+                SiteId = farmId,
                 Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 LightLux = telemetry.LightLux,
                 TempC = telemetry.TempC,
@@ -185,11 +198,20 @@ public class TelemetryHandler : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling coordinator telemetry from {Topic}", topic);
+            _logger.LogError(ex, "Error handling farm coordinator telemetry from {Topic}", topic);
         }
     }
 
-    private async Task HandleCoordinatorStatus(string topic, byte[] payload)
+    // ============================================================================
+    // Farm-prefix OTA Status Handler
+    // ============================================================================
+
+    /// <summary>
+    /// Handle OTA status updates from the farm/ topic prefix.
+    /// Topic: farm/{farmId}/coord/{coordId}/ota/status
+    /// Payload: { status, progress, message, error, timestamp }
+    /// </summary>
+    private async Task HandleFarmOtaStatus(string topic, byte[] payload)
     {
         try
         {
@@ -200,62 +222,29 @@ public class TelemetryHandler : BackgroundService
                 return; // Drop message from unregistered coordinator
             }
 
+            // Parse topic: farm/{farmId}/coord/{coordId}/ota/status
             var parts = topic.Split('/');
-            if (parts.Length < 4) return;
+            if (parts.Length < 6) return;
 
-            var siteId = parts[1];
+            var farmId = parts[1];
             coordId = parts[3];
 
-            var status = JsonSerializer.Deserialize<StatusUpdate>(payload, _jsonOptions);
-            if (status == null) return;
+            var otaStatus = JsonSerializer.Deserialize<FarmOtaStatusDto>(payload, _jsonOptions);
+            if (otaStatus == null) return;
 
-            var existing = await _coordinatorRepository.GetBySiteAndIdAsync(siteId, coordId);
-            if (existing != null)
-            {
-                existing.LastSeen = DateTime.UtcNow;
-                await _coordinatorRepository.UpsertAsync(existing);
-            }
+            _logger.LogInformation("OTA status from {FarmId}/{CoordId}: {Status} ({Progress}%) - {Message}",
+                farmId, coordId, otaStatus.Status, otaStatus.Progress, otaStatus.Message);
 
-            _logger.LogDebug("Updated coordinator {CoordId} status: {Status}", coordId, status.Status);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error handling coordinator status from {Topic}", topic);
-        }
-    }
-
-    private async Task HandleOtaProgress(string topic, byte[] payload)
-    {
-        try
-        {
-            // Parse topic: site/{siteId}/ota/progress
-            var parts = topic.Split('/');
-            if (parts.Length < 3) return;
-
-            var siteId = parts[1];
-
-            var progress = JsonSerializer.Deserialize<OtaProgressUpdate>(payload, _jsonOptions);
-            if (progress == null || string.IsNullOrEmpty(progress.JobId)) return;
-
-            _logger.LogInformation("OTA progress update for job {JobId}: {Status} ({Progress}%)",
-                progress.JobId, progress.Status, progress.Progress);
-
-            // Update job in database
-            var job = await _otaJobRepository.GetByIdAsync(progress.JobId);
+            // Find the active OTA job for this coordinator
+            var job = await _otaJobRepository.GetActiveByCoordIdAsync(coordId);
             if (job != null)
             {
-                if (!string.IsNullOrEmpty(progress.Status))
-                    job.Status = progress.Status;
-                if (progress.Progress.HasValue)
-                    job.Progress = progress.Progress.Value;
-                if (progress.DevicesTotal.HasValue)
-                    job.DevicesTotal = progress.DevicesTotal.Value;
-                if (progress.DevicesUpdated.HasValue)
-                    job.DevicesUpdated = progress.DevicesUpdated.Value;
-                if (progress.DevicesFailed.HasValue)
-                    job.DevicesFailed = progress.DevicesFailed.Value;
-                if (!string.IsNullOrEmpty(progress.ErrorMessage))
-                    job.ErrorMessage = progress.ErrorMessage;
+                if (!string.IsNullOrEmpty(otaStatus.Status))
+                    job.Status = otaStatus.Status;
+                if (otaStatus.Progress.HasValue)
+                    job.Progress = otaStatus.Progress.Value;
+                if (!string.IsNullOrEmpty(otaStatus.Error))
+                    job.ErrorMessage = otaStatus.Error;
 
                 job.UpdatedAt = DateTime.UtcNow;
 
@@ -267,13 +256,19 @@ public class TelemetryHandler : BackgroundService
 
                 await _otaJobRepository.UpdateAsync(job);
             }
+            else
+            {
+                _logger.LogWarning("No active OTA job found for coordinator {CoordId}, ignoring status update", coordId);
+            }
 
             // Broadcast to WebSocket clients
-            await _broadcaster.BroadcastOtaStatusAsync(progress.JobId, progress.Status ?? "unknown");
+            await _broadcaster.BroadcastOtaStatusAsync(
+                job?.Id ?? $"{farmId}/{coordId}",
+                otaStatus.Status ?? "unknown");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling OTA progress from {Topic}", topic);
+            _logger.LogError(ex, "Error handling farm OTA status from {Topic}", topic);
         }
     }
 
@@ -369,6 +364,34 @@ public class TelemetryHandler : BackgroundService
             _diagnostics.RecordReservoirMessage(swTotal.Elapsed, swMongo.Elapsed, swTwin.Elapsed, TimeSpan.Zero);
 
             _logger.LogDebug("Updated coordinator twin {CoordId} with reservoir telemetry", coordId);
+
+            // 4. Update coordinator entity with reservoir sensor data, then check alert thresholds
+            try
+            {
+                var coordinator = await _coordinatorRepository.GetByFarmAndIdAsync(farmId, coordId);
+                if (coordinator != null)
+                {
+                    // Sync reservoir sensor values into the coordinator document
+                    // so the AlertService can evaluate thresholds
+                    coordinator.Ph = telemetry.Ph;
+                    coordinator.EcMsCm = telemetry.EcMsCm;
+                    coordinator.WaterLevelPct = telemetry.WaterLevelPct;
+                    coordinator.WaterLevelCm = telemetry.WaterLevelCm;
+                    coordinator.WaterTempC = telemetry.WaterTempC;
+                    coordinator.MainPumpOn = telemetry.MainPumpOn;
+                    coordinator.DosingPumpPhOn = telemetry.DosingPumpPhOn;
+                    coordinator.DosingPumpNutrientOn = telemetry.DosingPumpNutrientOn;
+                    coordinator.LowWaterAlert = telemetry.LowWaterAlert;
+                    coordinator.LastSeen = DateTime.UtcNow;
+                    await _coordinatorRepository.UpsertAsync(coordinator);
+
+                    await _alertService.CheckCoordinatorAlertsAsync(coordinator);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Alert check failed for coordinator {CoordId}", coordId);
+            }
         }
         catch (Exception ex)
         {
@@ -458,7 +481,31 @@ public class TelemetryHandler : BackgroundService
 
             _logger.LogDebug("Updated tower twin {TowerId} with telemetry", towerId);
 
-            // 4. Broadcast to WebSocket clients for real-time dashboard
+            // 4. Update tower entity with sensor data, then check alert thresholds
+            try
+            {
+                var tower = await _towerRepository.GetByFarmCoordAndIdAsync(farmId, coordId, towerId);
+                if (tower != null)
+                {
+                    // Sync sensor values into the tower document
+                    // so the AlertService can evaluate thresholds
+                    tower.AirTempC = telemetry.AirTempC;
+                    tower.HumidityPct = telemetry.HumidityPct;
+                    tower.VbatMv = telemetry.VbatMv;
+                    tower.StatusMode = telemetry.StatusMode ?? tower.StatusMode;
+                    tower.FwVersion = telemetry.FwVersion ?? tower.FwVersion;
+                    tower.LastSeen = DateTime.UtcNow;
+                    await _towerRepository.UpsertAsync(tower);
+
+                    await _alertService.CheckTowerAlertsAsync(tower);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Alert check failed for tower {TowerId}", towerId);
+            }
+
+            // 5. Broadcast to WebSocket clients for real-time dashboard
             var broadcastPayload = new TowerTelemetryPayload
             {
                 TowerId = towerId,
@@ -836,7 +883,6 @@ public class TelemetryHandler : BackgroundService
     /// <summary>
     /// Extract the coordinator ID from an MQTT topic.
     /// Handles patterns like: farm/{farmId}/coord/{coordId}/...
-    ///                    and: site/{siteId}/coord/{coordId}/...
     /// </summary>
     private static string? ExtractCoordIdFromTopic(string topic)
     {
@@ -878,30 +924,35 @@ public class TelemetryHandler : BackgroundService
 
     #region DTOs for deserialization
 
-    private class CoordinatorTelemetry
+    /// <summary>
+    /// DTO for coordinator telemetry from farm/ topic prefix.
+    /// Topic: farm/{farmId}/coord/{coordId}/telemetry
+    /// </summary>
+    private class FarmCoordinatorTelemetryDto
     {
-        public string? FwVersion { get; set; }
-        public int NodesOnline { get; set; }
-        public int WifiRssi { get; set; }
+        public long Ts { get; set; }
+        public string? FarmId { get; set; }
+        public string? CoordId { get; set; }
         public float LightLux { get; set; }
         public float TempC { get; set; }
+        public bool? MmwavePresence { get; set; }
+        public int? MmwaveConfidence { get; set; }
+        public bool? MmwaveOnline { get; set; }
+        public int WifiRssi { get; set; }
+        public bool? WifiConnected { get; set; }
     }
 
-    private class StatusUpdate
+    /// <summary>
+    /// DTO for OTA status updates from farm/ topic prefix.
+    /// Topic: farm/{farmId}/coord/{coordId}/ota/status
+    /// </summary>
+    private class FarmOtaStatusDto
     {
-        public string? Status { get; set; }
-        public string? Mode { get; set; }
-    }
-
-    private class OtaProgressUpdate
-    {
-        public string? JobId { get; set; }
         public string? Status { get; set; }
         public int? Progress { get; set; }
-        public int? DevicesTotal { get; set; }
-        public int? DevicesUpdated { get; set; }
-        public int? DevicesFailed { get; set; }
-        public string? ErrorMessage { get; set; }
+        public string? Message { get; set; }
+        public string? Error { get; set; }
+        public long? Timestamp { get; set; }
     }
 
     // ============================================================================

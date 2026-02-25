@@ -465,3 +465,45 @@ docker compose up -d
 4. Test MQTT broker: `mosquitto_sub -h localhost -t '#' -v`
 5. Test API: `curl http://localhost:8000/health`
 6. Check MongoDB: `docker compose exec mongodb mongosh`
+
+## Development Workflow
+
+### Test-Driven Development
+
+- Write a failing health check or validation script BEFORE making infrastructure changes.
+- Run the check and confirm it fails for the right reason (missing config, service down, etc.).
+- Make the MINIMAL infrastructure change to make it pass.
+- Run the check again and confirm it passes.
+- No infrastructure changes without verifying rollback is possible first.
+- For Docker changes: verify the existing state, make the change, verify the new state.
+
+### Systematic Debugging
+
+When you encounter a bug, service failure, or unexpected behavior:
+
+1. **Read error messages carefully** - Docker logs, health check output, exit codes.
+2. **Reproduce consistently** - exact steps, clean environment, reliable trigger.
+3. **Check recent changes** - git diff, docker-compose changes, env var changes, config changes.
+4. **Gather evidence at each layer** - check each service independently (`docker compose ps`, logs per service, port checks, health endpoints).
+5. **Form a single hypothesis** - "X is the root cause because Y".
+6. **Test minimally** - smallest possible change, one variable at a time.
+7. If 3+ fixes fail, STOP and question the architecture.
+
+Do NOT guess-and-fix. Root cause first, always.
+
+### Verification Before Completion
+
+Before reporting back that work is done:
+
+1. **Identify** what command proves your claim.
+2. **Run** the full command (fresh, not cached).
+3. **Read** the complete output and check exit code.
+4. **Confirm** the output matches your claim.
+
+If you haven't run the verification command, you cannot claim it passes. No "should work", "probably passes", or "looks correct".
+
+**Verification commands:**
+- `docker compose ps` - all services must show healthy/running status.
+- `curl -f http://localhost:8000/health` - backend health endpoint must return 200.
+- `docker compose exec mongodb mongosh --eval "db.adminCommand('ping')"` - MongoDB must respond.
+- `docker compose logs --tail=50` - no error-level messages in recent output.

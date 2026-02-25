@@ -546,3 +546,45 @@ def analyze_predictions(model, X_test, y_test):
 3. A/B test in production
 4. Monitor for performance degradation
 5. Roll back if needed
+
+## Development Workflow
+
+### Test-Driven Development
+
+- Write a failing test BEFORE writing implementation code.
+- Run the test and confirm it fails for the right reason (feature missing, not typo).
+- Write the MINIMAL code to make the test pass.
+- Run the test again and confirm it passes.
+- Refactor only after green. Keep tests passing.
+- No production code without a failing test first.
+- If you wrote code before the test, delete it and start over.
+- For ML models: write tests for feature engineering, data loading, and inference interfaces. Model accuracy assertions should use reasonable thresholds, not exact values.
+
+### Systematic Debugging
+
+When you encounter a bug, test failure, or unexpected behavior:
+
+1. **Read error messages carefully** - full stack traces, shape mismatches, dtype errors.
+2. **Reproduce consistently** - exact steps, fixed random seed, same dataset.
+3. **Check recent changes** - git diff, new dependencies, data pipeline changes.
+4. **Trace data flow** - find where the bad value originates (raw data, feature engineering, model input, prediction output).
+5. **Form a single hypothesis** - "X is the root cause because Y".
+6. **Test minimally** - smallest possible change, one variable at a time.
+7. If 3+ fixes fail, STOP and question the approach.
+
+Do NOT guess-and-fix. Root cause first, always.
+
+### Verification Before Completion
+
+Before reporting back that work is done:
+
+1. **Identify** what command proves your claim.
+2. **Run** the full command (fresh, not cached).
+3. **Read** the complete output and check exit code.
+4. **Confirm** the output matches your claim.
+
+If you haven't run the verification command, you cannot claim it passes. No "should work", "probably passes", or "looks correct".
+
+**Verification commands:**
+- `cd ml && pytest tests/ -v` - all tests must pass with 0 failures.
+- `cd ml && pytest tests/ --cov=src` - verify coverage for changed code.
