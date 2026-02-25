@@ -53,8 +53,8 @@ Expected: 200 with JSON response + `Access-Control-Allow-Origin` header
 ## Task 2: Align Frontend HealthStatus Model with Backend
 
 **Files:**
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/models/common.model.ts` (lines 39-51)
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/api.service.ts` (line 103-105)
+- Modify: `Frontend/src/app/core/models/common.model.ts` (lines 39-51)
+- Modify: `Frontend/src/app/core/services/api.service.ts` (line 103-105)
 
 The backend returns a flat `{ status, mqtt_connected, mqtt, database, coordinator, timestamp, message }` but the frontend expects `{ status, service, version, uptime, checks: { database, mqtt }, timestamp }`.
 
@@ -110,11 +110,11 @@ Search for `healthStatus()?.checks` or `healthStatus()?.service` — these need 
 ## Task 3: Remove MockDataService and All Mock Fallbacks
 
 **Files:**
-- Delete: `Frontend/IOT-Frontend-main/src/app/core/services/mock-data.service.ts`
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/iot-data.service.ts` — remove all mock fallback logic
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/alert.service.ts` — remove `MOCK_ALERTS` and mock fallback
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/ota.service.ts` — remove `MOCK_*` constants and mock fallback
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/index.ts` — remove mock-data export
+- Delete: `Frontend/src/app/core/services/mock-data.service.ts`
+- Modify: `Frontend/src/app/core/services/iot-data.service.ts` — remove all mock fallback logic
+- Modify: `Frontend/src/app/core/services/alert.service.ts` — remove `MOCK_ALERTS` and mock fallback
+- Modify: `Frontend/src/app/core/services/ota.service.ts` — remove `MOCK_*` constants and mock fallback
+- Modify: `Frontend/src/app/core/services/index.ts` — remove mock-data export
 - Modify: 10 page components — remove `usingMockData` signal references
 
 ### Step 1: Remove MockDataService
@@ -234,10 +234,10 @@ Also search `.html` templates for `usingMockData` and remove those template bind
 ## Task 4: Redesign System Status Panel in Sidebar
 
 **Files:**
-- Modify: `Frontend/IOT-Frontend-main/src/app/components/layout/sidebar/sidebar.component.ts`
-- Modify: `Frontend/IOT-Frontend-main/src/app/components/layout/sidebar/sidebar.component.html`
-- Modify: `Frontend/IOT-Frontend-main/src/app/components/layout/sidebar/sidebar.component.scss`
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/api.service.ts` (add getMlHealth)
+- Modify: `Frontend/src/app/components/layout/sidebar/sidebar.component.ts`
+- Modify: `Frontend/src/app/components/layout/sidebar/sidebar.component.html`
+- Modify: `Frontend/src/app/components/layout/sidebar/sidebar.component.scss`
+- Modify: `Frontend/src/app/core/services/api.service.ts` (add getMlHealth)
 
 ### Step 1: Add new status signals to sidebar component
 
@@ -451,9 +451,9 @@ Import them from `@ng-icons/lucide`.
 ## Task 5: Move WebSocket Indicator to Header
 
 **Files:**
-- Modify: `Frontend/IOT-Frontend-main/src/app/components/layout/header/header.component.ts`
-- Modify: `Frontend/IOT-Frontend-main/src/app/components/layout/header/header.component.html`
-- Modify: `Frontend/IOT-Frontend-main/src/app/components/layout/header/header.component.scss`
+- Modify: `Frontend/src/app/components/layout/header/header.component.ts`
+- Modify: `Frontend/src/app/components/layout/header/header.component.html`
+- Modify: `Frontend/src/app/components/layout/header/header.component.scss`
 
 ### Step 1: Replace the current "Online/Offline" badge with a subtle WS dot
 
@@ -519,7 +519,7 @@ In `header.component.ts`, remove:
 ## Task 6: Enable All Real API Calls in loadDashboardData
 
 **Files:**
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/iot-data.service.ts`
+- Modify: `Frontend/src/app/core/services/iot-data.service.ts`
 
 The current `loadDashboardData()` only loads coordinators and sets empty arrays for everything else. We need to actually call the real endpoints.
 
@@ -581,7 +581,7 @@ The `loadZones()` method has its own mock fallback. Remove it — on error, just
 **Step 1: Build frontend**
 
 ```bash
-cd Frontend/IOT-Frontend-main && npx ng build --configuration production
+cd Frontend && npx ng build --configuration production
 ```
 Expected: 0 errors
 

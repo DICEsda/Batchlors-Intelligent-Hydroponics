@@ -75,8 +75,21 @@ build/
 **/bin/
 **/obj/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+
 # Windows artifacts
 nul
 
+# Session files
+session-*.md
+
+# PlantUML rendered output
+out/
+
 # OpenCode configuration (contains API keys)
 opencode.json
+.opencode/

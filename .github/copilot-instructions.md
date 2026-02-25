@@ -1,41 +1,55 @@
-go run cmd/iot/main.go
-# AI Coding Agent Instructions for IOT-TileNodeCoordinator
+# AI Coding Agent Instructions for Intelligent Hydroponics
 
-Purpose: keep the ESP32 firmware, Go backend, and Angular UI moving fast without breaking the tight real-time lighting loop. Favor incremental fixes, follow existing manager patterns, and document any workflow changes.
+Purpose: keep the ESP32 firmware, ASP.NET Core backend, ML service, and Angular UI moving fast without breaking the tight real-time control loops. Favor incremental fixes, follow existing patterns, and document any workflow changes.
 
 ## Architecture snapshot
-- Coordinator (ESP32-S3, PlatformIO/Arduino) orchestrates ESP-NOW nodes, MQTT uplink, Wi-Fi setup, and serial diagnostics; entry point lives in `coordinator/src/core/Coordinator.*`.
-- Nodes (ESP32-C3) share code via `shared/` and talk ESP-NOW only; backend (`IOT-Backend-main`) and Angular frontend (`IOT-Frontend-main`) consume/publish MQTT + WebSockets.
-- Data path: Node telemetry → ESP-NOW → Coordinator → MQTT (`site/{siteId}/coord|node/...`) → backend/front-end; frontend commands → MQTT `/cmd` → Coordinator → ESP-NOW downlink.
+- Coordinator (ESP32-S3, PlatformIO/Arduino) orchestrates ESP-NOW tower nodes, MQTT uplink, Wi-Fi setup, and serial diagnostics; entry point lives in `Firmware/coordinator/src/core/Coordinator.*`.
+- Tower nodes (ESP32-C3/C6) share code via `Firmware/shared/` and talk ESP-NOW only; backend (`Backend/src/IoT.Backend`) and Angular frontend (`Frontend/src/app`) consume/publish MQTT + WebSockets.
+- ML service (`ML/src/`) provides anomaly detection, crop clustering, drift forecasting via FastAPI.
+- Data path: Tower telemetry -> ESP-NOW -> Coordinator -> MQTT (`farm/{farmId}/coord/{coordId}/...`) -> backend -> MongoDB + WebSocket broadcast -> frontend dashboard.
+
+## Project structure
+- `Backend/` — ASP.NET Core 8 API (C#), MongoDB, MQTT bridge, Digital Twin service
+- `Frontend/` — Angular 19 dashboard with Tailwind, ECharts, Three.js, spartan-ng UI
+- `Firmware/coordinator/` — ESP32-S3 coordinator firmware
+- `Firmware/node/` — ESP32-C3/C6 tower node firmware
+- `Firmware/shared/` — Shared ESP-NOW message types and config
+- `ML/` — Python FastAPI ML service (scikit-learn models)
+- `tools/simulator/` — Python telemetry simulator for testing
+- `docs/` — Unified documentation (plans, reports, architecture, logging, pairing)
+- `Assets/Diagrams/` — PlantUML architecture diagrams
 
 ## Coordinator subsystems
-- Startup (`src/main.cpp`): Serial banner → `Logger::begin` (single init) → NVS init (erase-on-error) → `coordinator.begin()` → tight loop with `delay(1)`.
-- Subsystems follow the `*Manager` convention (`EspNow`, `Mqtt`, `WifiManager`, `NodeRegistry`, `ZoneControl`, `ThermalControl`, `ButtonControl`, `MmWave`, etc.); each allocates in `Coordinator::begin()` and exposes `loop()` ticks.
-- `WifiManager` (new) handles stored credentials + interactive serial provisioning (“No Wi-Fi… Configure? y/n”), reconnect backoff, and offline mode. Always call `wifi->loop()` and rely on it before touching MQTT.
-- `AmbientLightSensor` samples the analog divider on `Pins::External::AMBIENT_LIGHT_ADC` so coordinator can publish “light” telemetry even without nodes.
-- `Mqtt` now depends on `WifiManager`, loads broker/site IDs from ConfigManager `"mqtt"`, publishes `CoordinatorSensorSnapshot`, node status frames, mmWave events, and listens for coordinator `/cmd` payloads.
+- Startup (`src/main.cpp`): Serial banner -> `Logger::begin` -> NVS init -> `coordinator.begin()` -> tight loop with `delay(1)`.
+- Subsystems follow the `*Manager` convention (`EspNow`, `Mqtt`, `WifiManager`, `TowerRegistry`, `ZoneControl`, `ThermalControl`, `ButtonControl`, `MmWave`, etc.); each allocates in `Coordinator::begin()` and exposes `loop()` ticks.
+- `WifiManager` handles stored credentials + interactive serial provisioning, reconnect backoff, and offline mode.
+- `Mqtt` depends on `WifiManager`, loads broker/farm IDs from ConfigManager, publishes coordinator/tower telemetry, and listens for `/cmd` payloads.
 
 ## Pairing & telemetry conventions
-- Coordinator boots in normal mode; pairing opens only via touch button short-press or MQTT command (`{"cmd":"pair","duration_ms":60000}`). `startPairingWindow()` ties `NodeRegistry::startPairing` with `EspNow::enablePairingMode`, pulses the status LED blue, and logs over Serial (`PAIRING MODE ...`).
-- ESP-NOW pairing callback stores nodes in NVS (`NodeRegistry` namespace `nodes`), adds peers, flashes addressable LEDs (group of four pixels per node), and auto-closes the window.
-- Serial output must keep the operator informed: `COORDINATOR DATA: light=..., temp=..., mmwave=...`, `STATUS: wifi=..., mqtt=..., pairing=...`, and one `FETCHED NODE [MAC] DATA: ...` line per fresh telemetry (see `Coordinator::printSerialTelemetry`).
-- MQTT topology (see `docs/mqtt_api.md` + `docs/development/MQTT_TOPIC_ALIGNMENT_COMPLETE.md`):
-	- `site/{siteId}/coord/{coordId}/telemetry` → coordinator light/temp/mmWave/wifi state.
-	- `site/{siteId}/coord/{coordId}/mmwave` → mmWave frames (legacy-compatible payload).
-	- `site/{siteId}/node/{nodeId}/telemetry` → NodeStatus mirror (avg RGBW, temperature, button, voltage).
-	- `.../cmd` topics deliver downlink commands (pairing, light overrides). Keep schema additive.
+- Coordinator boots in normal mode; pairing opens via touch button short-press or MQTT command.
+- ESP-NOW pairing callback stores towers in NVS (`TowerRegistry`), adds peers, and auto-closes the window.
+- MQTT topic structure:
+  - `farm/{farmId}/coord/{coordId}/telemetry` — coordinator sensors
+  - `farm/{farmId}/coord/{coordId}/reservoir/telemetry` — water quality sensors
+  - `farm/{farmId}/coord/{coordId}/tower/{towerId}/telemetry` — tower DHT22/light/actuators
+  - `farm/{farmId}/coord/{coordId}/tower/{towerId}/status` — tower online/offline
+  - `farm/{farmId}/coord/{coordId}/pairing/*` — pairing workflow
+  - `.../cmd` topics deliver downlink commands. Keep schema additive.
 
 ## Developer workflows
-- Build & flash coordinator: `cd coordinator && pio run -e esp32-s3-devkitc-1 -t upload -t monitor`.
-- Build nodes: `cd node && pio run -e esp32-c3-mini-1` (use `-debug` env for verbose logging).
-- Backend: `cd IOT-Backend-main/IOT-Backend-main && go run cmd/iot/main.go`; Frontend uses standard Angular CLI (`npm install && npm start`).
-- Shared code is consumed via `lib_extra_dirs = ../shared`; update both coordinator/node as needed and keep APIs synchronized.
+- Build & flash coordinator: `cd Firmware/coordinator && pio run -e esp32-s3-devkitc-1 -t upload -t monitor`
+- Build tower nodes: `cd Firmware/node && pio run -e esp32-c3-mini-1`
+- Backend: `cd Backend/src/IoT.Backend && dotnet run`
+- Frontend: `cd Frontend && npm install && npm start`
+- ML service: `cd ML && pip install -r requirements.txt && uvicorn src.api.main:app`
+- Simulator: `cd tools/simulator && python run.py --scenario steady-state`
+- Docker: `docker compose up -d` (full stack)
 
 ## Guardrails & best practices
 - Never double-call `Logger::begin`; adjust verbosity via `Logger::setMinLevel` instead.
 - When touching messaging schemas or MQTT topics, audit the docs + frontend expectations; prefer new optional fields over breaking changes.
-- Keep ESP-NOW channel/power tweaks inside `EspNow` (it already enforces STA-only mode, PMK, channel=1). Don’t reconfigure Wi-Fi elsewhere.
-- Use `ConfigManager` namespaces (`"wifi"`, `"mqtt"`, etc.) for persistence; handle the erase/re-init path described in `docs/development/COMPLETE_NVS_FIX.md`.
+- Keep ESP-NOW channel/power tweaks inside `EspNow`. Don't reconfigure Wi-Fi elsewhere.
+- Use `ConfigManager` namespaces (`"wifi"`, `"mqtt"`, etc.) for persistence.
+- Backend follows repository pattern with DI. Services are registered in `Program.cs`.
+- Frontend uses standalone Angular components with signals and zoneless change detection.
 - For new hardware features, follow the manager pattern: allocate in `Coordinator::begin`, gate failures with `Logger::error`, and add a `loop()` pump plus serial/MQTT observability.
-
-Questions or unclear workflows (e.g., OTA, pairing UX, telemetry additions)? Note them in `docs/development/` and update this playbook.

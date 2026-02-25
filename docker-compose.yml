@@ -81,7 +81,7 @@ services:
   # Angular Frontend
   frontend:
     build:
-      context: ./Frontend/IOT-Frontend-main
+      context: ./Frontend
       dockerfile: Dockerfile
     container_name: iot-frontend
     restart: unless-stopped

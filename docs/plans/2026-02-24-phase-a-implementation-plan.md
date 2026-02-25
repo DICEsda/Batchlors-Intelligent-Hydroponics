@@ -630,10 +630,10 @@ Invalid requests return 400 with structured field-level errors.
 
 **Domain:** Frontend
 **Files:**
-- Create: `Frontend/IOT-Frontend-main/src/app/pages/alerts-dashboard/alerts-dashboard.component.ts`
-- Create: `Frontend/IOT-Frontend-main/src/app/pages/alerts-dashboard/alerts-dashboard.component.html`
-- Create: `Frontend/IOT-Frontend-main/src/app/pages/alerts-dashboard/alerts-dashboard.component.scss`
-- Modify: `Frontend/IOT-Frontend-main/src/app/app.routes.ts` (add route, before wildcard)
+- Create: `Frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.ts`
+- Create: `Frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.html`
+- Create: `Frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.scss`
+- Modify: `Frontend/src/app/app.routes.ts` (add route, before wildcard)
 
 ### Step 1: Create the alerts dashboard component
 
@@ -674,7 +674,7 @@ In the sidebar component, add "Alerts Dashboard" entry with a `bell-ring` Lucide
 
 ### Step 4: Verify
 
-Run: `npx ng build` in `Frontend/IOT-Frontend-main/`
+Run: `npx ng build` in `Frontend/`
 Expected: Build succeeds.
 
 ### Step 5: Commit
@@ -693,15 +693,15 @@ existing AlertService and WebSocket alert events.
 
 **Domain:** Frontend
 **Files:**
-- Create: `Frontend/IOT-Frontend-main/src/app/components/ui/telemetry-chart/telemetry-chart.component.ts` (reusable ECharts wrapper)
-- Create: `Frontend/IOT-Frontend-main/src/app/components/ui/telemetry-chart/telemetry-chart.component.html`
-- Create: `Frontend/IOT-Frontend-main/src/app/components/ui/telemetry-chart/telemetry-chart.component.scss`
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/coordinator-detail/coordinator-detail.component.ts` (add chart imports + data)
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/coordinator-detail/coordinator-detail.component.html` (add chart section)
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/node-detail/node-detail.component.ts` (add chart imports + data)
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/node-detail/node-detail.component.html` (add chart section)
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/farm-overview/farm-overview.component.ts` (add chart section)
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/farm-overview/farm-overview.component.html` (add system health charts)
+- Create: `Frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.ts` (reusable ECharts wrapper)
+- Create: `Frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.html`
+- Create: `Frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.scss`
+- Modify: `Frontend/src/app/pages/coordinator-detail/coordinator-detail.component.ts` (add chart imports + data)
+- Modify: `Frontend/src/app/pages/coordinator-detail/coordinator-detail.component.html` (add chart section)
+- Modify: `Frontend/src/app/pages/node-detail/node-detail.component.ts` (add chart imports + data)
+- Modify: `Frontend/src/app/pages/node-detail/node-detail.component.html` (add chart section)
+- Modify: `Frontend/src/app/pages/farm-overview/farm-overview.component.ts` (add chart section)
+- Modify: `Frontend/src/app/pages/farm-overview/farm-overview.component.html` (add system health charts)
 
 ### Step 1: Create reusable telemetry chart component
 
@@ -767,7 +767,7 @@ Template: 3 small sparklines in a row, compact height (120px).
 
 ### Step 5: Verify
 
-Run: `npx ng build` in `Frontend/IOT-Frontend-main/`
+Run: `npx ng build` in `Frontend/`
 Expected: Build succeeds.
 
 ### Step 6: Commit
@@ -787,12 +787,12 @@ and farm overview (system health sparklines).
 
 **Domain:** Frontend
 **Files:**
-- Create: `Frontend/IOT-Frontend-main/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.ts`
-- Create: `Frontend/IOT-Frontend-main/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.html`
-- Create: `Frontend/IOT-Frontend-main/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.scss`
-- Create: `Frontend/IOT-Frontend-main/src/app/services/three-scene.service.ts` (optional — or inline in component)
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/digital-twin/digital-twin.component.ts`
-- Modify: `Frontend/IOT-Frontend-main/src/app/pages/digital-twin/digital-twin.component.html`
+- Create: `Frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.ts`
+- Create: `Frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.html`
+- Create: `Frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.scss`
+- Create: `Frontend/src/app/services/three-scene.service.ts` (optional — or inline in component)
+- Modify: `Frontend/src/app/pages/digital-twin/digital-twin.component.ts`
+- Modify: `Frontend/src/app/pages/digital-twin/digital-twin.component.html`
 
 ### Step 1: Create the 3D tower rack component
 
@@ -862,7 +862,7 @@ Modify `digital-twin.component.ts`:
 
 ### Step 5: Verify
 
-Run: `npx ng build` in `Frontend/IOT-Frontend-main/`
+Run: `npx ng build` in `Frontend/`
 Expected: Build succeeds. No Three.js import errors.
 
 ### Step 6: Commit
@@ -883,13 +883,13 @@ panel detail view. Real-time updates via WebSocket.
 **Domain:** Frontend
 **Depends on:** Task 2 (backend API key middleware must exist)
 **Files:**
-- Create: `Frontend/IOT-Frontend-main/src/app/core/api-key.interceptor.ts`
-- Modify: `Frontend/IOT-Frontend-main/src/app/app.config.ts` (register interceptor)
-- Modify: `Frontend/IOT-Frontend-main/src/app/core/services/environment.service.ts` (add apiKey config)
+- Create: `Frontend/src/app/core/api-key.interceptor.ts`
+- Modify: `Frontend/src/app/app.config.ts` (register interceptor)
+- Modify: `Frontend/src/app/core/services/environment.service.ts` (add apiKey config)
 
 ### Step 1: Create the API key interceptor
 
-Create `Frontend/IOT-Frontend-main/src/app/core/api-key.interceptor.ts`:
+Create `Frontend/src/app/core/api-key.interceptor.ts`:
 
 ```typescript
 import { HttpInterceptorFn } from '@angular/common/http';
@@ -929,7 +929,7 @@ In `app.config.ts`, add `apiKeyInterceptor` to the `provideHttpClient(withInterc
 
 ### Step 4: Verify
 
-Run: `npx ng build` in `Frontend/IOT-Frontend-main/`
+Run: `npx ng build` in `Frontend/`
 Expected: Build succeeds.
 
 ### Step 5: Commit
@@ -948,7 +948,7 @@ via runtime environment; defaults to match docker-compose default.
 After all 8 tasks are complete:
 
 1. **Backend builds:** `dotnet build` in `Backend/src/IoT.Backend/` — no errors
-2. **Frontend builds:** `npx ng build` in `Frontend/IOT-Frontend-main/` — no errors
+2. **Frontend builds:** `npx ng build` in `Frontend/` — no errors
 3. **Docker compose up:** `docker-compose up --build` — all services healthy
 4. **API key enforcement:** `curl http://localhost:8000/api/farms` returns 401; `curl -H "X-API-Key: hydro-thesis-2026" http://localhost:8000/api/farms` returns 200
 5. **Validation:** `curl -X POST -H "X-API-Key: hydro-thesis-2026" -H "Content-Type: application/json" -d '{"farm_id":"","coord_id":""}' http://localhost:8000/api/pairing/start` returns 400 with field errors

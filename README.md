@@ -64,13 +64,18 @@ A distributed IoT platform for monitoring and controlling hydroponic farming sys
 │   │       └── pairing/        # Coordinator pairing
 │   └── shared/                 # Shared ESP-NOW message types
 │
-├── Frontend/                   # Angular 18 Dashboard
-│   └── IOT-Frontend-main/
-│       └── src/app/
+├── Frontend/                   # Angular 19 Dashboard
+│   └── src/app/
 │
-├── Assets/                     # Documentation & diagrams
-│   ├── Diagrams/               # PlantUML architecture diagrams
-│   └── docs/                   # Technical documentation
+├── Assets/                     # Diagrams & datasheets
+│   └── Diagrams/               # PlantUML architecture diagrams
+│
+├── docs/                       # Unified documentation
+│   ├── plans/                  # Implementation plans
+│   ├── report/                 # Academic report
+│   ├── firmware/               # Firmware docs
+│   ├── pairing/                # Pairing architecture
+│   └── logging/                # Logging strategy
 │
 └── docker-compose.yml          # Full stack deployment
 ```
@@ -261,7 +266,7 @@ pio device monitor
 ### Frontend Development
 
 ```bash
-cd Frontend/IOT-Frontend-main
+cd Frontend
 
 # Install dependencies
 npm install
