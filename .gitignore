@@ -93,3 +93,6 @@ out/
 # OpenCode configuration (contains API keys)
 opencode.json
 .opencode/
+
+# Git worktrees
+.worktrees/
