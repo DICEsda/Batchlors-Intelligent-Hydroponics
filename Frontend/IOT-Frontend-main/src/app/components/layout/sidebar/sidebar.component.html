@@ -125,35 +125,16 @@
         <span class="nav-section-title">Projects</span>
       }
       
-      @for (project of projects(); track project.label) {
-        <a 
-          [routerLink]="project.route" 
-          routerLinkActive="active"
-          class="nav-item"
-          (mouseenter)="onNavItemHover(project, $event)"
-          (mouseleave)="onNavItemLeave()"
-        >
-          <ng-icon [name]="project.icon" size="18" />
-          @if (!collapsed()) {
-            <span class="nav-label">{{ project.label }}</span>
-          }
-        </a>
-      }
-    </div>
-
-    <!-- Diagnostics Section -->
-    <div class="nav-section">
-      @if (!collapsed()) {
-        <span class="nav-section-title">Diagnostics</span>
-      }
-      
-      @for (item of diagnosticsItems(); track item.label) {
+      @for (item of projects(); track item.label) {
         @if (item.children) {
+          <!-- Expandable Project Item (e.g. Digital Twin with Diagnostics) -->
           <div class="nav-item-group">
-            <button 
+            <a 
+              [routerLink]="item.route" 
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
               class="nav-item expandable"
               [class.expanded]="item.expanded"
-              (click)="toggleExpand(item)"
               (mouseenter)="onNavItemHover(item, $event)"
               (mouseleave)="onNavItemLeave()"
             >
@@ -164,27 +145,81 @@
                   [name]="item.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
                   size="16" 
                   class="chevron"
+                  (click)="toggleExpand(item); $event.preventDefault(); $event.stopPropagation()"
                 />
               }
-            </button>
+            </a>
             
             @if (item.expanded && !collapsed()) {
               <div class="nav-children">
                 @for (child of item.children; track child.label) {
-                  <a 
-                    [routerLink]="child.route" 
-                    routerLinkActive="active"
-                    class="nav-item child"
-                  >
-                    <ng-icon [name]="child.icon" size="16" />
-                    @if (!collapsed()) {
-                      <span class="nav-label">{{ child.label }}</span>
-                    }
-                  </a>
+                  @if (child.children) {
+                    <!-- Nested expandable child (Diagnostics) -->
+                    <div class="nav-item-subgroup">
+                      <button 
+                        class="nav-item child expandable-child"
+                        [class.expanded]="child.expanded"
+                        (click)="toggleExpand(child)"
+                      >
+                        <ng-icon [name]="child.icon" size="16" />
+                        @if (!collapsed()) {
+                          <span class="nav-label">{{ child.label }}</span>
+                          <ng-icon 
+                            [name]="child.expanded ? 'lucideChevronDown' : 'lucideChevronRight'" 
+                            size="14" 
+                            class="chevron"
+                          />
+                        }
+                      </button>
+                      
+                      @if (child.expanded) {
+                        <div class="nav-grandchildren">
+                          @for (grandchild of child.children; track grandchild.label) {
+                            <a 
+                              [routerLink]="grandchild.route" 
+                              routerLinkActive="active"
+                              class="nav-item grandchild"
+                            >
+                              <ng-icon [name]="grandchild.icon" size="14" />
+                              @if (!collapsed()) {
+                                <span class="nav-label">{{ grandchild.label }}</span>
+                              }
+                            </a>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <!-- Regular child -->
+                    <a 
+                      [routerLink]="child.route" 
+                      routerLinkActive="active"
+                      class="nav-item child"
+                    >
+                      <ng-icon [name]="child.icon" size="16" />
+                      @if (!collapsed()) {
+                        <span class="nav-label">{{ child.label }}</span>
+                      }
+                    </a>
+                  }
                 }
               </div>
             }
           </div>
+        } @else {
+          <!-- Simple Project Item (e.g. Machine Learning) -->
+          <a 
+            [routerLink]="item.route" 
+            routerLinkActive="active"
+            class="nav-item"
+            (mouseenter)="onNavItemHover(item, $event)"
+            (mouseleave)="onNavItemLeave()"
+          >
+            <ng-icon [name]="item.icon" size="18" />
+            @if (!collapsed()) {
+              <span class="nav-label">{{ item.label }}</span>
+            }
+          </a>
         }
       }
     </div>

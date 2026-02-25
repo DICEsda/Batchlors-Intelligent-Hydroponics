@@ -60,7 +60,6 @@ export class MockDataService {
       fw_version: '2.1.0',
       nodes_online: 8,
       wifi_rssi: -45,
-      mmwave_event_rate: 2.5,
       light_lux: 450,
       temp_c: 23.5,
       last_seen: new Date(Date.now() - 30000), // 30 seconds ago
@@ -73,7 +72,6 @@ export class MockDataService {
       fw_version: '2.1.0',
       nodes_online: 4,
       wifi_rssi: -52,
-      mmwave_event_rate: 1.2,
       light_lux: 320,
       temp_c: 22.8,
       last_seen: new Date(Date.now() - 45000), // 45 seconds ago
@@ -86,7 +84,6 @@ export class MockDataService {
       fw_version: '2.0.5',
       nodes_online: 12,
       wifi_rssi: -58,
-      mmwave_event_rate: 0.8,
       light_lux: 680,
       temp_c: 19.2,
       last_seen: new Date(Date.now() - 60000), // 1 minute ago

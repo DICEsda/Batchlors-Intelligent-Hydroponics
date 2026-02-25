@@ -43,7 +43,6 @@ You are the ASP.NET Core backend specialist for this IoT Smart Tile System.
 - REST API base: `http://backend:8000`.
 - WebSocket endpoint: `ws://backend:8000/ws`.
 - All device traffic flows: **Coordinator ↔ MQTT Broker ↔ Backend** (never direct Coordinator ↔ Backend).
-- Radar endpoint returns **JSON only**; image rendering happens in the frontend.
 
 ## Key Rules
 

@@ -98,7 +98,6 @@ describe('Model Utility Functions', () => {
         fw_version: '1.0.0',
         nodes_online: 5,
         wifi_rssi: rssi,
-        mmwave_event_rate: 0,
         light_lux: 500,
         temp_c: 22,
         last_seen: new Date(Date.now() - lastSeenMinutesAgo * 60 * 1000),

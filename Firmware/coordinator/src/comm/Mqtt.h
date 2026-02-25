@@ -23,7 +23,6 @@ public:
     // Publishing methods - Smart Tile (legacy)
     void publishLightState(const String& lightId, uint8_t brightness);
     void publishThermalEvent(const String& nodeId, const NodeThermalData& data);
-    void publishMmWaveEvent(const MmWaveEvent& event);
     void publishNodeStatus(const NodeStatusMessage& status);
     void publishCoordinatorTelemetry(const CoordinatorSensorSnapshot& snapshot);
     void publishSerialLog(const String& message, const String& level = "INFO", const String& tag = "");
@@ -100,7 +99,6 @@ private:
     String coordinatorTelemetryTopic() const;
     String coordinatorCmdTopic() const;
     String coordinatorSerialTopic() const;
-    String coordinatorMmwaveTopic() const;
     String coordinatorOtaStatusTopic() const;
     String towerCmdTopic(const String& towerId) const;
     String connectionStatusTopic() const;

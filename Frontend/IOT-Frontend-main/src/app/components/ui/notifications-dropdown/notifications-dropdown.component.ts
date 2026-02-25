@@ -12,7 +12,7 @@ import {
   lucideCheckCircle2,
   lucideInfo,
   lucideAlertTriangle,
-  lucideRadar
+  lucideSearch
 } from '@ng-icons/lucide';
 import { NotificationService, Notification } from '../../../core/services/notification.service';
 import { HlmButtonDirective } from '../button';
@@ -34,7 +34,7 @@ import { HlmIconDirective } from '../icon';
       lucideCheckCircle2,
       lucideInfo,
       lucideAlertTriangle,
-      lucideRadar
+      lucideSearch
     })
   ],
   template: `
@@ -459,7 +459,7 @@ export class NotificationsDropdownComponent {
       success: 'lucideCheckCircle2',
       warning: 'lucideAlertTriangle',
       error: 'lucideAlertCircle',
-      discovery: 'lucideRadar'
+      discovery: 'lucideSearch'
     };
     return icons[type];
   }

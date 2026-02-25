@@ -40,7 +40,6 @@ class MQTTConfig(BaseModel):
     # Topic patterns
     tower_telemetry_topic: str = "farm/+/coord/+/tower/+/telemetry"
     reservoir_telemetry_topic: str = "farm/+/coord/+/reservoir/telemetry"
-    mmwave_topic: str = "farm/+/coord/+/mmwave"
 
 
 class MLConfig(BaseModel):

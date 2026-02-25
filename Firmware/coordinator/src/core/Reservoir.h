@@ -5,7 +5,6 @@
 #include <vector>
 #include "../comm/EspNow.h"
 #include "../comm/Mqtt.h"
-#include "../sensors/MmWave.h"
 #include "../towers/TowerRegistry.h"
 #include "../zones/ZoneControl.h"
 #include "../input/ButtonControl.h"
@@ -28,7 +27,6 @@ public:
 private:
     EspNow* espNow;
     Mqtt* mqtt;
-    MmWave* mmWave;
     TowerRegistry* towers;
     ZoneControl* zones;
     ButtonControl* buttons;
@@ -55,8 +53,6 @@ private:
     };
     std::map<String, TowerTelemetrySnapshot> towerTelemetry;
     ReservoirSensorSnapshot reservoirSensors;
-    MmWaveEvent lastMmWaveEvent;
-    bool haveMmWaveSample = false;
     bool zoneOccupiedState = false;
     uint32_t lastSensorSampleMs = 0;
     uint32_t lastSerialPrintMs = 0;
@@ -107,7 +103,6 @@ private:
     void flashAllTick(uint32_t now);
     
     // Event handlers
-    void onMmWaveEvent(const MmWaveEvent& event);
     void onThermalEvent(const String& towerId, const NodeThermalData& data);
     void onButtonEvent(const String& buttonId, bool pressed);
     void handleTowerMessage(const String& towerId, const uint8_t* data, size_t len);

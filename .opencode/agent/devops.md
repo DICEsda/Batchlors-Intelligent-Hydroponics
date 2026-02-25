@@ -257,7 +257,6 @@ persistence_location /mosquitto/data/
 site/{siteId}/
 ├── coord/{coordId}/
 │   ├── telemetry      -> Coordinator data (publish)
-│   ├── mmwave         -> Radar frames (publish)
 │   ├── status         -> Connection state (publish)
 │   └── cmd            <- Commands (subscribe)
 └── node/{nodeId}/

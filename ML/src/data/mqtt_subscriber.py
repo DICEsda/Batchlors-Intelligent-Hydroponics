@@ -30,8 +30,6 @@ class TelemetryMessage:
             return "tower_telemetry"
         elif "reservoir" in parts:
             return "reservoir_telemetry"
-        elif "mmwave" in parts:
-            return "mmwave"
         return "unknown"
     
     @property
@@ -114,7 +112,6 @@ class MQTTSubscriber:
         self._topics = [
             config.mqtt.tower_telemetry_topic,
             config.mqtt.reservoir_telemetry_topic,
-            config.mqtt.mmwave_topic,
         ]
     
     def add_callback(self, callback: Callable[[TelemetryMessage], None]) -> None:

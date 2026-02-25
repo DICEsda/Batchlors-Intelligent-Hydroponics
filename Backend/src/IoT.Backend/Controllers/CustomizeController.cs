@@ -215,12 +215,6 @@ public class CustomizeController : ControllerBase
                 ["pairing_window_s"] = 120
             };
 
-            schema.Radar = new Dictionary<string, object>
-            {
-                ["enabled"] = true,
-                ["online"] = false
-            };
-
             schema.Light = new Dictionary<string, object>
             {
                 ["enabled"] = true

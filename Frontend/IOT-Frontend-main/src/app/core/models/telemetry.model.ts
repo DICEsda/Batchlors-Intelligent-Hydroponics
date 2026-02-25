@@ -13,7 +13,6 @@ export interface CoordinatorTelemetryData {
   timestamp: Date;
   nodes_online: number;
   wifi_rssi: number;
-  mmwave_event_rate: number;
   light_lux: number;
   temp_c: number;
 }

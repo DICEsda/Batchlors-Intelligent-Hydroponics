@@ -32,7 +32,6 @@ enum Stage {
 enum MessageType {
     NODE_TELEMETRY,
     COORD_TELEMETRY,
-    MMWAVE_EVENT,
     NODE_COMMAND,
     COORD_COMMAND,
     SERIAL_LOG,
@@ -51,8 +50,6 @@ struct Stats {
     // Telemetry counters
     uint32_t nodeTelemetryCount = 0;
     uint32_t coordTelemetryCount = 0;
-    uint32_t mmwaveEventCount = 0;
-    
     // Command counters
     uint32_t nodeCommandCount = 0;
     uint32_t coordCommandCount = 0;
@@ -70,8 +67,6 @@ inline MessageType getMessageType(const String& topic) {
         return NODE_TELEMETRY;
     } else if (topic.indexOf("/coord/") >= 0 && topic.endsWith("/telemetry")) {
         return COORD_TELEMETRY;
-    } else if (topic.indexOf("/mmwave") >= 0) {
-        return MMWAVE_EVENT;
     } else if (topic.indexOf("/node/") >= 0 && topic.endsWith("/cmd")) {
         return NODE_COMMAND;
     } else if (topic.indexOf("/coord/") >= 0 && topic.endsWith("/cmd")) {
@@ -87,7 +82,6 @@ inline const char* getMessageTypeName(MessageType type) {
     switch (type) {
         case NODE_TELEMETRY: return "NodeTelemetry";
         case COORD_TELEMETRY: return "CoordTelemetry";
-        case MMWAVE_EVENT: return "MmWaveEvent";
         case NODE_COMMAND: return "NodeCommand";
         case COORD_COMMAND: return "CoordCommand";
         case SERIAL_LOG: return "SerialLog";
@@ -182,9 +176,6 @@ inline void logPublish(const String& topic, const String& payload, bool success,
                 break;
             case COORD_TELEMETRY:
                 stats.coordTelemetryCount++;
-                break;
-            case MMWAVE_EVENT:
-                stats.mmwaveEventCount++;
                 break;
             default:
                 break;
@@ -303,7 +294,6 @@ inline void printStats() {
     Logger::info("Messages Published:     %u", stats.messagesPublished);
     Logger::info("  - Node Telemetry:     %u", stats.nodeTelemetryCount);
     Logger::info("  - Coord Telemetry:    %u", stats.coordTelemetryCount);
-    Logger::info("  - MmWave Events:      %u", stats.mmwaveEventCount);
     Logger::info("Messages Received:      %u", stats.messagesReceived);
     Logger::info("  - Node Commands:      %u", stats.nodeCommandCount);
     Logger::info("  - Coord Commands:     %u", stats.coordCommandCount);

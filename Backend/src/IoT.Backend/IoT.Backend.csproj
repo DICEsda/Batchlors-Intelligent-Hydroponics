@@ -27,9 +27,6 @@
     <!-- Health Checks -->
     <PackageReference Include="AspNetCore.HealthChecks.MongoDb" Version="8.1.0" />
     
-    <!-- Image Generation for Radar -->
-    <PackageReference Include="SkiaSharp" Version="3.116.1" />
-    
     <!-- Azure Digital Twins -->
     <PackageReference Include="Azure.DigitalTwins.Core" Version="1.4.0" />
     <PackageReference Include="Azure.Identity" Version="1.13.1" />

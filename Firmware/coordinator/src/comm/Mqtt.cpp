@@ -212,58 +212,6 @@ void Mqtt::publishThermalEvent(const String& nodeId, const NodeThermalData& data
     Logger::info("Published thermal event for node %s", nodeId.c_str());
 }
 
-// Hydroponic: farm/{farmId}/coord/{coordId}/mmwave
-void Mqtt::publishMmWaveEvent(const MmWaveEvent& event) {
-    if (!mqttClient.connected()) return;
-    // Build rich target payload (backward compatible: includes legacy "events" array)
-    StaticJsonDocument<1024> doc;
-    doc["ts"] = event.timestampMs / 1000;
-    String coord = coordId.length() ? coordId : WiFi.macAddress();
-    doc["farm_id"] = farmId;
-    doc["coord_id"] = coord;
-    doc["sensor_id"] = event.sensorId;
-    doc["presence"] = event.presence;
-    doc["confidence"] = event.confidence;
-    // Legacy simplified presence format
-    JsonArray legacy = doc.createNestedArray("events");
-    {
-        JsonObject evt = legacy.createNestedObject();
-        int zone = 0;
-        // try parse numeric sensor id as zone
-        for (size_t i = 0; i < event.sensorId.length(); ++i) {
-            if (!isDigit(event.sensorId[i])) { zone = 0; break; }
-        }
-        if (zone == 0) {
-            zone = 1; // default single-zone
-        }
-        evt["zone"] = zone;
-        evt["presence"] = event.presence;
-        evt["confidence"] = event.confidence;
-    }
-    JsonArray targets = doc.createNestedArray("targets");
-    for (const auto &t : event.targets) {
-        if (!t.valid) continue; // only publish valid targets
-        JsonObject o = targets.createNestedObject();
-        o["id"] = t.id;
-        o["distance_mm"] = t.distance_mm;
-        JsonObject pos = o.createNestedObject("position_mm");
-        pos["x"] = t.x_mm;
-        pos["y"] = t.y_mm;
-        pos["z"] = 0;
-        JsonObject vel = o.createNestedObject("velocity_m_s");
-        vel["x"] = t.vx_m_s;
-        vel["y"] = t.vy_m_s;
-        vel["z"] = 0.0f;
-        o["speed_cm_s"] = t.speed_cm_s;
-        o["resolution_mm"] = t.resolution_mm;
-    }
-    String payload;
-    serializeJson(doc, payload);
-    String topic = coordinatorMmwaveTopic();
-    mqttClient.publish(topic.c_str(), payload.c_str());
-    Logger::info("Published mmWave frame (%d targets)", targets.size());
-}
-
 void Mqtt::publishNodeStatus(const NodeStatusMessage& status) {
     if (!mqttClient.connected()) {
         MqttLogger::logPublish("node_telemetry", "", false, 0);
@@ -776,9 +724,6 @@ void Mqtt::publishCoordinatorTelemetry(const CoordinatorSensorSnapshot& snapshot
     doc["coord_id"] = coordId.length() ? coordId : WiFi.macAddress();
     doc["light_lux"] = snapshot.lightLux;
     doc["temp_c"] = snapshot.tempC;
-    doc["mmwave_presence"] = snapshot.mmWavePresence;
-    doc["mmwave_confidence"] = snapshot.mmWaveConfidence;
-    doc["mmwave_online"] = snapshot.mmWaveOnline;
     doc["wifi_rssi"] = snapshot.wifiConnected ? snapshot.wifiRssi : -127;
     doc["wifi_connected"] = snapshot.wifiConnected;
     String payload;
@@ -917,11 +862,6 @@ String Mqtt::coordinatorSerialTopic() const {
 String Mqtt::coordinatorCmdTopic() const {
     String id = coordId.length() ? coordId : WiFi.macAddress();
     return "farm/" + farmId + "/coord/" + id + "/cmd";
-}
-
-String Mqtt::coordinatorMmwaveTopic() const {
-    String id = coordId.length() ? coordId : WiFi.macAddress();
-    return "farm/" + farmId + "/coord/" + id + "/mmwave";
 }
 
 // Hydroponic-specific topic builders

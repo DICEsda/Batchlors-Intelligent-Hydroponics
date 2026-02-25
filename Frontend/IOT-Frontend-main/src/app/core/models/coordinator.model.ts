@@ -20,7 +20,6 @@ export interface Coordinator {
   fw_version: string;
   nodes_online: number;
   wifi_rssi: number;
-  mmwave_event_rate: number;    // mmWave radar event rate
   light_lux: number;            // Ambient light level
   temp_c: number;               // Temperature in Celsius
   last_seen: Date;
@@ -61,7 +60,6 @@ export interface CoordinatorTelemetry {
   timestamp: Date;
   nodes_online: number;
   wifi_rssi: number;
-  mmwave_event_rate: number;
   light_lux: number;
   temp_c: number;
 }
@@ -98,23 +96,6 @@ export interface CoordinatorWifiCommand {
 export interface CoordinatorConfigUpdate {
   coord_id: string;
   name?: string;
-}
-
-// ============================================================================
-// mmWave Radar Data
-// ============================================================================
-
-export interface MmWaveTarget {
-  x: number;
-  y: number;
-  speed: number;
-  resolution: number;
-}
-
-export interface MmWaveFrame {
-  coord_id: string;
-  timestamp: Date;
-  targets: MmWaveTarget[];
 }
 
 // ============================================================================

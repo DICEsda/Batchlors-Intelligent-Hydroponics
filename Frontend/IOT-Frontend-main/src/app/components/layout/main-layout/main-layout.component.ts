@@ -64,15 +64,28 @@ export class MainLayoutComponent implements OnInit {
       { label: 'Projects', route: '/digital-twin' },
       { label: 'Digital Twin' }
     ],
-    '/radar': [
-      { label: 'Hydroponic Farm' },
-      { label: 'Projects', route: '/radar' },
-      { label: 'Radar View' }
-    ],
     '/machine-learning': [
       { label: 'Hydroponic Farm' },
       { label: 'Projects', route: '/machine-learning' },
       { label: 'Machine Learning' }
+    ],
+    '/digital-twin/diagnostics/system': [
+      { label: 'Hydroponic Farm' },
+      { label: 'Digital Twin', route: '/digital-twin' },
+      { label: 'Diagnostics' },
+      { label: 'System' }
+    ],
+    '/digital-twin/diagnostics/sensors': [
+      { label: 'Hydroponic Farm' },
+      { label: 'Digital Twin', route: '/digital-twin' },
+      { label: 'Diagnostics' },
+      { label: 'Sensors' }
+    ],
+    '/digital-twin/diagnostics/scale-test': [
+      { label: 'Hydroponic Farm' },
+      { label: 'Digital Twin', route: '/digital-twin' },
+      { label: 'Diagnostics' },
+      { label: 'Scale Test' }
     ]
   };
 

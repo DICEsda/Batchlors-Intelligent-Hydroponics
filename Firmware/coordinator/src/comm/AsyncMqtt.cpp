@@ -539,16 +539,6 @@ void AsyncMqtt::publishThermalEvent(const String& nodeId, const NodeThermalData&
     mqttClient.publish(nodeTelemetryTopic(nodeId).c_str(), 0, false, payload.c_str());
 }
 
-void AsyncMqtt::publishMmWaveEvent(const MmWaveEvent& event) {
-    if (!isConnected()) return;
-    StaticJsonDocument<512> doc;
-    doc["sensor_id"] = event.sensorId;
-    doc["presence"] = event.presence;
-    String payload;
-    serializeJson(doc, payload);
-    mqttClient.publish(coordinatorMmwaveTopic().c_str(), 0, false, payload.c_str());
-}
-
 void AsyncMqtt::publishNodeStatus(const NodeStatusMessage& status) {
     if (!isConnected()) return;
     StaticJsonDocument<512> doc;
@@ -573,11 +563,6 @@ String AsyncMqtt::coordinatorSerialTopic() const {
 String AsyncMqtt::coordinatorCmdTopic() const {
     String id = coordId.length() ? coordId : WiFi.macAddress();
     return "farm/" + farmId + "/coord/" + id + "/cmd";
-}
-
-String AsyncMqtt::coordinatorMmwaveTopic() const {
-    String id = coordId.length() ? coordId : WiFi.macAddress();
-    return "farm/" + farmId + "/coord/" + id + "/mmwave";
 }
 
 String AsyncMqtt::towerTelemetryTopic(const String& towerId) const {

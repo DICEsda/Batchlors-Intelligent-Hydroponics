@@ -1,4 +1,4 @@
-import { Component, inject, signal, effect, computed, OnDestroy } from '@angular/core';
+import { Component, inject, signal, effect, computed, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -23,6 +23,7 @@ import { HlmIconDirective } from '../../components/ui/icon';
 import { HlmBadgeDirective } from '../../components/ui/badge';
 import { TelemetryHistoryService } from '../../core/services/telemetry-history.service';
 import { ApiService } from '../../core/services/api.service';
+import { IoTDataService } from '../../core/services/iot-data.service';
 import { ReservoirTelemetry, TowerTelemetry } from '../../core/models/telemetry.model';
 import type { EChartsOption } from 'echarts';
 
@@ -66,14 +67,35 @@ import type { EChartsOption } from 'echarts';
   templateUrl: './diagnostics-sensors.component.html',
   styleUrl: './diagnostics-sensors.component.scss',
 })
-export class DiagnosticsSensorsComponent implements OnDestroy {
+export class DiagnosticsSensorsComponent implements OnInit, OnDestroy {
   private readonly telemetryService = inject(TelemetryHistoryService);
   private readonly apiService = inject(ApiService);
+  private readonly dataService = inject(IoTDataService);
+
+  // ============================================================================
+  // Device lists from backend
+  // ============================================================================
+  readonly coordinators = this.dataService.coordinators;
+  readonly nodes = this.dataService.nodes;
+
+  /** Unique farm IDs extracted from loaded coordinators */
+  readonly farmOptions = computed(() => {
+    const coords = this.coordinators();
+    const farmIds = [...new Set(coords.map(c => c.site_id).filter(Boolean))];
+    return farmIds.length > 0 ? farmIds : ['farm-001'];
+  });
+
+  /** Towers filtered to the currently selected coordinator */
+  readonly filteredTowers = computed(() => {
+    const coordId = this.selectedCoordId();
+    if (!coordId) return this.nodes();
+    return this.nodes().filter(n => n.coordinator_id === coordId);
+  });
 
   // ============================================================================
   // Filter state
   // ============================================================================
-  readonly selectedFarmId = signal<string>('farm-001');
+  readonly selectedFarmId = signal<string>('');
   readonly selectedCoordId = signal<string>('');
   readonly selectedTowerId = signal<string>('');
   readonly timeRange = signal<number>(60);
@@ -228,6 +250,21 @@ export class DiagnosticsSensorsComponent implements OnDestroy {
   // ============================================================================
   private reservoirSub?: { unsubscribe(): void };
   private towerSub?: { unsubscribe(): void };
+
+  ngOnInit(): void {
+    // Load coordinators and nodes from backend, then auto-select first options
+    this.dataService.loadCoordinators().then(() => {
+      const coords = this.coordinators();
+      if (coords.length > 0) {
+        // Auto-select farm
+        const farmId = coords[0].site_id || 'farm-001';
+        this.selectedFarmId.set(farmId);
+        // Auto-select first coordinator
+        this.selectedCoordId.set(coords[0].coord_id);
+      }
+    });
+    this.dataService.loadNodes();
+  }
 
   ngOnDestroy(): void {
     this.reservoirSub?.unsubscribe();
@@ -526,17 +563,24 @@ export class DiagnosticsSensorsComponent implements OnDestroy {
   }
 
   /**
-   * Called when any text input changes.
+   * Called when a dropdown selection changes.
    */
   onFarmIdChange(value: string): void {
-    this.selectedFarmId.set(value.trim());
+    this.selectedFarmId.set(value);
   }
 
   onCoordIdChange(value: string): void {
-    this.selectedCoordId.set(value.trim());
+    this.selectedCoordId.set(value);
+    // Reset tower when coordinator changes
+    this.selectedTowerId.set('');
+    // Auto-set farm from the selected coordinator
+    const coord = this.coordinators().find(c => c.coord_id === value);
+    if (coord?.site_id) {
+      this.selectedFarmId.set(coord.site_id);
+    }
   }
 
   onTowerIdChange(value: string): void {
-    this.selectedTowerId.set(value.trim());
+    this.selectedTowerId.set(value);
   }
 }

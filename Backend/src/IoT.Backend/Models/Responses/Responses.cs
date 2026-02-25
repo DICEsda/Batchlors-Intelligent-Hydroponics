@@ -12,7 +12,6 @@ namespace IoT.Backend.Models.Responses;
 public class DeviceConfigSchema
 {
     public Dictionary<string, object>? Device { get; set; }
-    public Dictionary<string, object>? Radar { get; set; }
     public Dictionary<string, object>? Light { get; set; }
     public Dictionary<string, object>? Led { get; set; }
 }

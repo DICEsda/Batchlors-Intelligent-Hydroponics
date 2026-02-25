@@ -68,8 +68,7 @@
         "@type": "Object",
         "fields": [
           { "name": "ambient_light_lux", "schema": "double" },
-          { "name": "ambient_temp_c", "schema": "double" },
-          { "name": "mmwave_presence", "schema": "boolean" }
+          { "name": "ambient_temp_c", "schema": "double" }
         ]
       }
     },
@@ -116,19 +115,6 @@
       "displayName": "Ambient Temperature",
       "schema": "double",
       "unit": "degreeCelsius"
-    },
-    {
-      "@type": "Telemetry",
-      "name": "mmwave_event",
-      "displayName": "mmWave Presence Event",
-      "schema": {
-        "@type": "Object",
-        "fields": [
-          { "name": "presence", "schema": "boolean" },
-          { "name": "confidence", "schema": "double" },
-          { "name": "target_count", "schema": "integer" }
-        ]
-      }
     },
     {
       "@type": "Command",

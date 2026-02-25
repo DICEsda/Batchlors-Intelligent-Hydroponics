@@ -14,7 +14,6 @@
 Reservoir::Reservoir()
     : espNow(nullptr)
     , mqtt(nullptr)
-    , mmWave(nullptr)
     , towers(nullptr)
     , zones(nullptr)
     , buttons(nullptr)
@@ -34,7 +33,6 @@ Reservoir::~Reservoir() {
     if (buttons) { delete buttons; buttons = nullptr; }
     if (zones) { delete zones; zones = nullptr; }
     if (towers) { delete towers; towers = nullptr; }
-    if (mmWave) { delete mmWave; mmWave = nullptr; }
     if (ambientLight) { delete ambientLight; ambientLight = nullptr; }
     if (mqtt) { delete mqtt; mqtt = nullptr; }
     if (wifi) { delete wifi; wifi = nullptr; }
@@ -52,7 +50,6 @@ bool Reservoir::begin() {
 
     espNow = new EspNow();
     mqtt = new Mqtt();
-    mmWave = new MmWave();
     towers = new TowerRegistry();
     zones = new ZoneControl();
     buttons = new ButtonControl();
@@ -196,18 +193,6 @@ bool Reservoir::begin() {
         this->handleMqttCommand(topic, payload);
     });
 
-    Logger::info("Initializing mmWave sensor...");
-    bool mmWaveOk = mmWave->begin();
-    bool mmWaveOnline = mmWave->isOnline();
-    recordBootStatus("mmWave", mmWaveOnline, mmWaveOnline ? "LD2450 streaming" : "will retry");
-    if (!mmWaveOk) {
-        Logger::warn("Failed to initialize mmWave sensor - continuing without it");
-    } else if (!mmWaveOnline) {
-        Logger::warn("mmWave sensor initialized but no stream detected - will retry in background");
-    } else {
-        Logger::info("mmWave initialized successfully");
-    }
-
     Logger::info("Initializing tower registry...");
     bool towersOk = towers->begin();
     recordBootStatus("Towers", towersOk, towersOk ? "registry ready" : "init failed");
@@ -305,10 +290,6 @@ bool Reservoir::begin() {
     recordBootStatus("Ambient", ambientOk, ambientOk ? "TSL2561 ready" : "sensor offline");
 
     // Register event handlers
-    mmWave->setEventCallback([this](const MmWaveEvent& event) {
-        this->onMmWaveEvent(event);
-    });
-
     thermal->registerThermalAlertCallback([this](const String& towerId, const NodeThermalData& data) {
         this->onThermalEvent(towerId, data);
     });
@@ -361,7 +342,6 @@ void Reservoir::loop() {
     // Use guard checks to prevent null pointer crashes
     if (espNow) espNow->loop();
     if (mqtt) mqtt->loop();
-    if (mmWave) mmWave->loop();
     if (towers) towers->loop();
     if (zones) zones->loop();
     if (buttons) buttons->loop();
@@ -395,41 +375,6 @@ void Reservoir::loop() {
 
     refreshReservoirSensors();
     printSerialTelemetry();
-}
-
-void Reservoir::onMmWaveEvent(const MmWaveEvent& event) {
-    lastMmWaveEvent = event;
-    haveMmWaveSample = true;
-    // Guard against null pointers
-    if (!zones || !towers || !thermal || !espNow || !mqtt) {
-        Logger::error("Cannot process mmWave event: components not initialized");
-        return;
-    }
-    
-    // Publish raw mmWave frame to MQTT for backend/frontend consumption
-    mqtt->publishMmWaveEvent(event);
-
-    // Only send lighting commands when zone state CHANGES (not every frame)
-    // This prevents flickering and allows manual control when out of zone
-    if (event.zoneOccupied != zoneOccupiedState) {
-        zoneOccupiedState = event.zoneOccupied;
-        
-        auto allTowers = towers->getAllTowers();
-        for (const auto& towerInfo : allTowers) {
-            if (zoneOccupiedState) {
-                // Just entered zone: turn all tower LEDs GREEN
-                espNow->sendColorCommand(towerInfo.towerId, 0, 255, 0, 0, 200); // Green, 200ms fade
-                Logger::info("ENTERED ZONE - sending GREEN to tower %s", towerInfo.towerId.c_str());
-            } else {
-                // Just left zone: turn off LEDs (available for manual control)
-                espNow->sendColorCommand(towerInfo.towerId, 0, 0, 0, 0, 200); // Off, 200ms fade
-                Logger::info("LEFT ZONE - turning off tower %s (manual control available)", towerInfo.towerId.c_str());
-            }
-            
-            // Publish state change to MQTT
-            mqtt->publishLightState(towerInfo.lightId, zoneOccupiedState ? 255 : 0);
-        }
-    }
 }
 
 void Reservoir::onThermalEvent(const String& towerId, const NodeThermalData& data) {
@@ -1106,15 +1051,6 @@ void Reservoir::refreshReservoirSensors() {
     #endif
     
     reservoirSensors.timestampMs = now;
-    bool mmWaveOnline = mmWave && mmWave->isOnline();
-    reservoirSensors.mmWaveOnline = mmWaveOnline;
-    if (haveMmWaveSample && mmWaveOnline) {
-        reservoirSensors.mmWavePresence = lastMmWaveEvent.presence;
-        reservoirSensors.mmWaveConfidence = lastMmWaveEvent.confidence;
-    } else if (!mmWaveOnline) {
-        reservoirSensors.mmWavePresence = false;
-        reservoirSensors.mmWaveConfidence = 0.0f;
-    }
 
     if (wifi) {
         WifiManager::Status wifiStatus = wifi->getStatus();
@@ -1152,13 +1088,6 @@ void Reservoir::printSerialTelemetry() {
     String brokerHost = mqtt ? mqtt->getBrokerHost() : String("n/a");
     uint16_t brokerPort = mqtt ? mqtt->getBrokerPort() : 0;
     const char* pairingState = (towers && towers->isPairingActive()) ? "OPEN" : "IDLE";
-    const char* mmStatus;
-    if (!reservoirSensors.mmWaveOnline) {
-        mmStatus = "OFFLINE";
-    } else {
-        mmStatus = reservoirSensors.mmWavePresence ? "PRESENT" : "CLEAR";
-    }
-    uint16_t mmRestarts = mmWave ? mmWave->getRestartCount() : 0;
 
     size_t activeTowers = 0;
     for (const auto& entry : towerTelemetry) {
@@ -1171,13 +1100,6 @@ void Reservoir::printSerialTelemetry() {
     Serial.println("========== Reservoir Snapshot ==========");
     Serial.printf("Sensors   | Lux %5.1f\n",
                   reservoirSensors.lightLux);
-    Serial.printf("mmWave    | %-8s  conf=%.2f restarts=%u\n",
-                  mmStatus,
-                  reservoirSensors.mmWaveConfidence,
-                  static_cast<unsigned>(mmRestarts));
-    if (!reservoirSensors.mmWaveOnline) {
-        Serial.println("           | sensor offline - verify LD2450 wiring (RX=GPIO44, TX=GPIO43, 3V3, GND)");
-    }
     Serial.printf("Wi-Fi     | %-10s ssid=%s rssi=%d dBm offline=%s\n",
                   wifiStatus.connected ? "CONNECTED" : "DISCONNECTED",
                   wifiStatus.ssid.c_str(),
@@ -1189,7 +1111,7 @@ void Reservoir::printSerialTelemetry() {
                   brokerPort);
     Serial.printf("Pairing   | %s\n", pairingState);
     if (activeTowers == 0) {
-        Serial.println("Towers    | none paired (mmWave + ambient-only mode)");
+        Serial.println("Towers    | none paired (ambient-only mode)");
     } else {
         Serial.printf("Towers    | %u active\n", static_cast<unsigned>(activeTowers));
         for (const auto& entry : towerTelemetry) {

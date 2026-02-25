@@ -127,7 +127,7 @@
 
       @if (discoveredNodes().length === 0) {
         <div class="empty-discovered">
-          <ng-icon hlmIcon name="lucideRadar" size="xl" class="animate-pulse" />
+          <ng-icon hlmIcon name="lucideRadio" size="xl" class="animate-pulse" />
           <h3>Scanning for nodes...</h3>
           <p>Put new nodes into pairing mode. They will appear here when discovered.</p>
         </div>
@@ -311,18 +311,6 @@
           </div>
         </div>
 
-        <!-- mmWave Radar -->
-        <div hlmCard class="metric-card">
-          <div hlmCardHeader class="metric-header">
-            <ng-icon hlmIcon name="lucideRadar" size="lg" class="metric-icon radar" />
-            <div class="metric-info">
-              <span hlmCardDescription>mmWave Events</span>
-              <span hlmCardTitle class="metric-value">
-                {{ coordinator()!.mmwave_event_rate !== undefined ? coordinator()!.mmwave_event_rate.toFixed(1) : '--' }}/s
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Last update timestamp -->

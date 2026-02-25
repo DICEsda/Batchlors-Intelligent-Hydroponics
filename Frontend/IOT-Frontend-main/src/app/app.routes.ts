@@ -121,16 +121,6 @@ export const routes: Routes = [
     pathMatch: 'prefix'
   },
 
-  // Radar View - Presence detection visualization
-  {
-    path: 'radar',
-    loadComponent: () =>
-      import('./pages/radar-view/radar-view.component').then(
-        m => m.RadarViewComponent
-      ),
-    title: 'Radar View | Smart Tile Dashboard'
-  },
-
   // ML Predictions - Growth predictions and analysis
   {
     path: 'predictions',
@@ -218,9 +208,9 @@ export const routes: Routes = [
     pathMatch: 'full'
   },
 
-  // Diagnostics - System performance metrics
+  // Diagnostics - System performance metrics (under Digital Twin)
   {
-    path: 'diagnostics/system',
+    path: 'digital-twin/diagnostics/system',
     loadComponent: () =>
       import('./pages/diagnostics-system/diagnostics-system.component').then(
         m => m.DiagnosticsSystemComponent
@@ -228,9 +218,9 @@ export const routes: Routes = [
     title: 'System Diagnostics | Smart Tile Dashboard'
   },
 
-  // Diagnostics - Sensor telemetry history charts
+  // Diagnostics - Sensor telemetry history charts (under Digital Twin)
   {
-    path: 'diagnostics/sensors',
+    path: 'digital-twin/diagnostics/sensors',
     loadComponent: () =>
       import('./pages/diagnostics-sensors/diagnostics-sensors.component').then(
         m => m.DiagnosticsSensorsComponent
@@ -238,9 +228,9 @@ export const routes: Routes = [
     title: 'Sensor Telemetry | Smart Tile Dashboard'
   },
 
-  // Diagnostics - Scale test recording and analysis
+  // Diagnostics - Scale test recording and analysis (under Digital Twin)
   {
-    path: 'diagnostics/scale-test',
+    path: 'digital-twin/diagnostics/scale-test',
     loadComponent: () =>
       import('./pages/diagnostics-scale-test/diagnostics-scale-test.component').then(
         m => m.DiagnosticsScaleTestComponent

@@ -31,36 +31,49 @@
        ======================================================================== -->
   <div hlmCard class="filter-panel">
     <div class="filter-group">
-      <label for="farmId">Farm ID</label>
-      <input
+      <label for="farmId">Farm</label>
+      <select
         id="farmId"
-        type="text"
-        placeholder="e.g. farm-001"
         [value]="selectedFarmId()"
-        (input)="onFarmIdChange($any($event.target).value)"
-      />
+        (change)="onFarmIdChange($any($event.target).value)"
+      >
+        @for (farm of farmOptions(); track farm) {
+          <option [value]="farm">{{ farm }}</option>
+        }
+      </select>
     </div>
 
     <div class="filter-group">
-      <label for="coordId">Coordinator ID</label>
-      <input
+      <label for="coordId">Coordinator</label>
+      <select
         id="coordId"
-        type="text"
-        placeholder="e.g. coord-001"
         [value]="selectedCoordId()"
-        (input)="onCoordIdChange($any($event.target).value)"
-      />
+        (change)="onCoordIdChange($any($event.target).value)"
+      >
+        <option value="">-- Select Coordinator --</option>
+        @for (coord of coordinators(); track coord.coord_id) {
+          <option [value]="coord.coord_id">
+            {{ coord.name || coord.coord_id }}
+          </option>
+        }
+      </select>
     </div>
 
     <div class="filter-group">
-      <label for="towerId">Tower ID <span class="text-muted-foreground">(optional)</span></label>
-      <input
+      <label for="towerId">Tower <span class="text-muted-foreground">(optional)</span></label>
+      <select
         id="towerId"
-        type="text"
-        placeholder="e.g. tower-001"
         [value]="selectedTowerId()"
-        (input)="onTowerIdChange($any($event.target).value)"
-      />
+        (change)="onTowerIdChange($any($event.target).value)"
+        [disabled]="!selectedCoordId()"
+      >
+        <option value="">-- None --</option>
+        @for (tower of filteredTowers(); track tower.light_id) {
+          <option [value]="tower.light_id">
+            {{ tower.name || tower.light_id }}
+          </option>
+        }
+      </select>
     </div>
 
     <div class="filter-group">
@@ -123,7 +136,7 @@
       <ng-icon hlmIcon name="lucideFilter" size="xl" class="text-muted-foreground" />
       <p class="text-sm font-medium">No coordinator selected</p>
       <p class="text-xs text-muted-foreground">
-        Enter a Coordinator ID above and click "Load Data" to view sensor telemetry history.
+        Select a coordinator from the dropdown above and click "Load Data" to view sensor telemetry history.
       </p>
     </div>
   }
