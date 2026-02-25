@@ -59,6 +59,7 @@ services:
       Mqtt__Port: 1883
       Mqtt__Username: ${MQTT_USERNAME:-user1}
       Mqtt__Password: ${MQTT_PASSWORD:-user1}
+      ApiSecurity__ApiKey: ${API_KEY:-hydro-thesis-2026}
       Cors__Origins__0: http://localhost:4200
       Cors__Origins__1: http://frontend:80
     ports:

@@ -26,6 +26,32 @@ public class MqttBridgeHandler : IMqttBridgeHandler
     private readonly ILogger<MqttBridgeHandler> _logger;
     private readonly ConcurrentDictionary<string, WebSocketConnection> _connections = new();
 
+    /// <summary>
+    /// The set of message types the backend accepts from frontend clients.
+    /// </summary>
+    private static readonly HashSet<string> ValidIncomingTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ping",
+        "subscribe",
+        "unsubscribe",
+        "publish"
+    };
+
+    /// <summary>
+    /// Message types that require a non-empty <c>topic</c> field.
+    /// </summary>
+    private static readonly HashSet<string> TypesRequiringTopic = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "subscribe",
+        "unsubscribe",
+        "publish"
+    };
+
+    private static readonly JsonSerializerOptions DeserializeOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public MqttBridgeHandler(IMqttService mqtt, ILogger<MqttBridgeHandler> logger)
     {
         _mqtt = mqtt;
@@ -82,42 +108,79 @@ public class MqttBridgeHandler : IMqttBridgeHandler
 
     private async Task HandleMessageAsync(WebSocketConnection connection, string json, CancellationToken ct)
     {
+        // ── Step 1: Validate JSON ──────────────────────────────────────
+        WsMessage? message;
         try
         {
-            var message = JsonSerializer.Deserialize<WsMessage>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (message == null)
-            {
-                _logger.LogWarning("Invalid WebSocket message from {ConnectionId}", connection.Id);
-                return;
-            }
-
-            switch (message.Type.ToLowerInvariant())
-            {
-                case "subscribe":
-                    await HandleSubscribeAsync(connection, message.Topic, ct);
-                    break;
-
-                case "unsubscribe":
-                    await HandleUnsubscribeAsync(connection, message.Topic, ct);
-                    break;
-
-                case "publish":
-                    await HandlePublishAsync(message.Topic, message.Payload, ct);
-                    break;
-
-                default:
-                    _logger.LogWarning("Unknown message type: {Type}", message.Type);
-                    break;
-            }
+            message = JsonSerializer.Deserialize<WsMessage>(json, DeserializeOptions);
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to parse WebSocket message");
+            _logger.LogWarning(ex, "Malformed JSON from {ConnectionId}", connection.Id);
+            await SendErrorAsync(connection.Socket, "Invalid message: malformed JSON", ct);
+            return;
         }
+
+        if (message is null)
+        {
+            _logger.LogWarning("Null deserialization result from {ConnectionId}", connection.Id);
+            await SendErrorAsync(connection.Socket, "Invalid message: empty payload", ct);
+            return;
+        }
+
+        // ── Step 2: Validate 'type' field exists ───────────────────────
+        if (string.IsNullOrWhiteSpace(message.Type))
+        {
+            _logger.LogWarning("Missing 'type' field from {ConnectionId}", connection.Id);
+            await SendErrorAsync(connection.Socket, "Invalid message: missing 'type' field", ct);
+            return;
+        }
+
+        // ── Step 3: Validate 'type' is a known value ──────────────────
+        if (!ValidIncomingTypes.Contains(message.Type))
+        {
+            _logger.LogWarning("Unknown message type '{Type}' from {ConnectionId}", message.Type, connection.Id);
+            await SendErrorAsync(connection.Socket,
+                $"Invalid message: unknown type '{message.Type}'", ct);
+            return;
+        }
+
+        // ── Step 4: Validate required fields per type ─────────────────
+        if (TypesRequiringTopic.Contains(message.Type) && string.IsNullOrWhiteSpace(message.Topic))
+        {
+            _logger.LogWarning("Missing 'topic' for '{Type}' from {ConnectionId}", message.Type, connection.Id);
+            await SendErrorAsync(connection.Socket,
+                $"Invalid message: '{message.Type}' requires a 'topic' field", ct);
+            return;
+        }
+
+        // ── Step 5: Dispatch to handler ───────────────────────────────
+        switch (message.Type.ToLowerInvariant())
+        {
+            case "ping":
+                await SendAsync(connection.Socket, new { type = "pong" }, ct);
+                break;
+
+            case "subscribe":
+                await HandleSubscribeAsync(connection, message.Topic, ct);
+                break;
+
+            case "unsubscribe":
+                await HandleUnsubscribeAsync(connection, message.Topic, ct);
+                break;
+
+            case "publish":
+                await HandlePublishAsync(message.Topic, message.Payload, ct);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Sends a structured error message back to the client.
+    /// </summary>
+    private Task SendErrorAsync(WebSocket socket, string errorMessage, CancellationToken ct)
+    {
+        return SendAsync(socket, new { type = "error", message = errorMessage }, ct);
     }
 
     private async Task HandleSubscribeAsync(WebSocketConnection connection, string? topic, CancellationToken ct)

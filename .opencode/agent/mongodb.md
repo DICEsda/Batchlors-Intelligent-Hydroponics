@@ -464,3 +464,43 @@ docker compose exec mongodb mongorestore --drop --db iot /backup/iot
 3. Consider compound index for multi-field queries
 4. Use projection to limit returned fields
 5. Consider denormalization if joins are slow
+
+## Development Workflow
+
+### Test-Driven Development
+
+- Write a failing validation query or test script BEFORE making schema or index changes.
+- Run the query and confirm it fails or returns incorrect results for the right reason.
+- Make the MINIMAL schema/index change to make it pass.
+- Run the query again and confirm correct results.
+- No schema changes without verifying the impact on existing queries first.
+
+### Systematic Debugging
+
+When you encounter a query issue, slow performance, or unexpected results:
+
+1. **Read error messages carefully** - MongoDB error codes, explain output, profiler data.
+2. **Reproduce consistently** - exact query, reliable trigger, same dataset.
+3. **Check recent changes** - schema changes, new indexes, data volume growth.
+4. **Trace data flow** - find where the bad value originates (application write, aggregation pipeline stage, missing index).
+5. **Form a single hypothesis** - "X is the root cause because Y".
+6. **Test minimally** - smallest possible change, one variable at a time.
+7. If 3+ fixes fail, STOP and question the data model.
+
+Do NOT guess-and-fix. Root cause first, always.
+
+### Verification Before Completion
+
+Before reporting back that work is done:
+
+1. **Identify** what command proves your claim.
+2. **Run** the full command (fresh, not cached).
+3. **Read** the complete output and check exit code.
+4. **Confirm** the output matches your claim.
+
+If you haven't run the verification command, you cannot claim it passes. No "should work", "probably passes", or "looks correct".
+
+**Verification commands:**
+- `db.collection.find(...).explain("executionStats")` - confirm queries use expected indexes and scan counts are reasonable.
+- `db.collection.validate()` - confirm collection integrity after schema changes.
+- Run affected aggregation pipelines end-to-end and verify output matches expected results.

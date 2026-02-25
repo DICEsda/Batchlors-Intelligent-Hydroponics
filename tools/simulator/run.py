@@ -33,6 +33,7 @@ from core.publisher import MqttPublisher, RestBootstrapper
 from core.topology import generate_topology, topology_stats
 from scenarios import SCENARIOS
 from scenarios.scale_test import ScaleTestScenario
+from scenarios.lwt_disconnect import LwtDisconnectScenario
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -216,6 +217,16 @@ def main() -> None:
                 interval=args.interval,
                 duration=args.duration,
                 total_towers=args.towers or stats["towers"],
+            )
+        elif args.scenario == "lwt-disconnect":
+            scenario = LwtDisconnectScenario(
+                farms=farms,
+                mqtt=mqtt,
+                speed=args.speed,
+                interval=args.interval,
+                duration=args.duration,
+                mqtt_user=args.mqtt_user,
+                mqtt_pass=args.mqtt_pass,
             )
         else:
             scenario = scenario_cls(

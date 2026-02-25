@@ -85,6 +85,7 @@ public class TowersController : ControllerBase
         var tower = await _towerRepository.GetByFarmCoordAndIdAsync(farmId, coordId, towerId, ct) 
             ?? new Tower
             {
+                Id = $"{farmId}/{coordId}/{towerId}",
                 TowerId = towerId,
                 CoordId = coordId,
                 FarmId = farmId,
@@ -149,7 +150,7 @@ public class TowersController : ControllerBase
         [FromBody] TowerCommand command,
         CancellationToken ct)
     {
-        var topic = $"farm/{farmId}/coord/{coordId}/tower/{towerId}/cmd";
+        var topic = MqttTopics.TowerCmd(farmId, coordId, towerId);
         await _mqtt.PublishJsonAsync(topic, command, ct: ct);
         _logger.LogInformation("Sent command {Command} to tower {TowerId}", command.Cmd, towerId);
         return Accepted();
@@ -166,7 +167,7 @@ public class TowersController : ControllerBase
         [FromBody] SetLightRequest request,
         CancellationToken ct)
     {
-        var topic = $"farm/{farmId}/coord/{coordId}/tower/{towerId}/cmd";
+        var topic = MqttTopics.TowerCmd(farmId, coordId, towerId);
         var command = new TowerCommand
         {
             Cmd = "set_light",
@@ -193,7 +194,7 @@ public class TowersController : ControllerBase
         [FromBody] SetPumpRequest request,
         CancellationToken ct)
     {
-        var topic = $"farm/{farmId}/coord/{coordId}/tower/{towerId}/cmd";
+        var topic = MqttTopics.TowerCmd(farmId, coordId, towerId);
         var command = new TowerCommand
         {
             Cmd = "set_pump",

@@ -1,4 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
@@ -32,6 +33,7 @@ import {
 })
 export class IoTDataService {
   private readonly api = inject(ApiService);
+  private readonly http = inject(HttpClient);
   private readonly mockData = inject(MockDataService);
   private readonly env = inject(EnvironmentService);
   private readonly destroy$ = new Subject<void>();
@@ -59,7 +61,7 @@ export class IoTDataService {
   readonly coordinators = signal<CoordinatorSummary[]>([]);
   readonly selectedCoordinator = signal<Coordinator | null>(null);
 
-  // Nodes (replaces towers)
+  // Nodes / Towers (NodeSummary serves both smart tiles and hydroponic towers via NodesController shim)
   readonly nodes = signal<NodeSummary[]>([]);
   readonly selectedNode = signal<Node | null>(null);
   readonly nodeTelemetry = signal<Map<string, NodeTelemetry>>(new Map());
@@ -131,12 +133,9 @@ export class IoTDataService {
     return coords.reduce((sum, c) => sum + (c.light_lux ?? 0), 0) / coords.length;
   });
 
-  // Backward compatibility aliases (for gradual migration)
-  /** @deprecated Use nodes instead */
+  // Tower aliases — point to nodes signal (NodesController returns Tower objects)
   readonly towers = this.nodes;
-  /** @deprecated Use onlineNodeCount instead */
   readonly onlineTowerCount = this.onlineNodeCount;
-  /** @deprecated Use totalNodeCount instead */
   readonly totalTowerCount = this.totalNodeCount;
 
   // ============================================================================
@@ -576,18 +575,14 @@ export class IoTDataService {
     color?: string;
   }>): Promise<void> {
     try {
-      // Call backend API to update coordinator
-      const response = await fetch(`${this.env.apiUrl}/api/v1/coordinators/${coordId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update coordinator: ${response.statusText}`);
-      }
+      // Call backend API to update coordinator using Angular HttpClient
+      // (ensures snakeCaseInterceptor processes the request)
+      await firstValueFrom(
+        this.http.patch(
+          `${this.env.apiUrl}/api/coordinators/${encodeURIComponent(coordId)}`,
+          updates
+        )
+      );
 
       // Update local state
       const coords = this.coordinators();
@@ -662,10 +657,9 @@ export class IoTDataService {
   }
 
   // ============================================================================
-  // Backward Compatibility - Tower methods (delegates to node methods)
+  // Tower convenience methods (delegate to node methods — NodesController returns Tower objects)
   // ============================================================================
 
-  /** @deprecated Use loadNodes instead */
   loadTowers(coordId?: string): Promise<void> {
     if (coordId) {
       // Find the coordinator to get site_id
@@ -677,7 +671,6 @@ export class IoTDataService {
     return this.loadNodes();
   }
 
-  /** @deprecated Use loadNode instead */
   loadTower(towerId: string): Promise<Node> {
     return this.loadNode(towerId);
   }

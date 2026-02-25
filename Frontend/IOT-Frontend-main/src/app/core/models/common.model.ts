@@ -155,11 +155,12 @@ export interface WSPairingStoppedPayload {
 }
 
 /**
- * Payload for node_discovered event - sent when a new node is found during pairing
+ * Payload for node_discovered event - sent when a new tower is found during pairing
+ * (WS event name kept as 'node_discovered' for backend compatibility)
  */
-export interface WSNodeDiscoveredPayload {
+export interface WSTowerDiscoveredPayload {
   coordinatorId: string;
-  nodeId: string;
+  towerId: string;
   macAddress: string;
   rssi: number;
   discoveredAt: string;
@@ -167,11 +168,12 @@ export interface WSNodeDiscoveredPayload {
 }
 
 /**
- * Payload for node_paired event - sent when a discovered node is approved and paired
+ * Payload for node_paired event - sent when a discovered tower is approved and paired
+ * (WS event name kept as 'node_paired' for backend compatibility)
  */
-export interface WSNodePairedPayload {
+export interface WSTowerPairedPayload {
   coordinatorId: string;
-  nodeId: string;
+  towerId: string;
   macAddress: string;
   assignedName?: string;
   pairedAt: string;
@@ -188,32 +190,16 @@ export interface WSPairingTimeoutPayload {
 }
 
 /**
- * Discovered node during pairing (for UI state)
+ * Discovered tower during pairing (for UI state)
  */
-export interface DiscoveredNode {
-  nodeId: string;
+export interface DiscoveredTower {
+  towerId: string;
   macAddress: string;
   rssi: number;
   discoveredAt: Date;
   firmwareVersion?: string;
   status: 'discovered' | 'pairing' | 'paired' | 'rejected' | 'error';
   error?: string;
-}
-
-// ============================================================================
-// SignalR Hub Models
-// ============================================================================
-
-export interface SignalRConnection {
-  connectionId: string;
-  userId?: string;
-  connectedAt: Date;
-  groups: string[];
-}
-
-export interface HubSubscription {
-  hubName: 'telemetry' | 'alerts' | 'ota' | 'predictions';
-  groups: string[];         // e.g., ['coordinator:coord-001', 'tower:tower-001']
 }
 
 // ============================================================================

@@ -744,6 +744,25 @@ $color-neutral: var(--muted-foreground);
   }
 }
 
+// Telemetry Section
+.telemetry-section {
+  margin-bottom: 2.5rem;
+
+  .section-icon {
+    color: var(--primary);
+  }
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
 // Nodes Section
 .nodes-section {
   margin-bottom: 2rem;

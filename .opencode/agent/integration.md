@@ -749,3 +749,45 @@ mosquitto_sub -h localhost -p 1884 -t '#' -v
 3. Run test in isolation
 4. Add debug logging
 5. Check for timing issues
+
+## Development Workflow
+
+### Test-Driven Development
+
+- Write a failing integration test BEFORE writing implementation code.
+- Run the test and confirm it fails for the right reason (missing integration, not infrastructure issue).
+- Write the MINIMAL code to make the test pass.
+- Run the test again and confirm it passes.
+- Refactor only after green. Keep tests passing.
+- No cross-layer changes without a failing integration test first.
+- For contract tests: write the schema/contract assertion first, then verify implementations conform.
+
+### Systematic Debugging
+
+When you encounter a bug, test failure, or unexpected behavior:
+
+1. **Read error messages carefully** - full stack traces, HTTP status codes, MQTT error logs, Docker logs.
+2. **Reproduce consistently** - exact steps, clean test environment, reliable trigger.
+3. **Check recent changes** - git diff, docker-compose changes, config changes across all layers.
+4. **Gather evidence at each layer boundary** - log what enters and exits each component (Coordinator, MQTT Broker, Backend, MongoDB, Frontend).
+5. **Form a single hypothesis** - "X is the root cause because Y".
+6. **Test minimally** - smallest possible change, one variable at a time.
+7. If 3+ fixes fail, STOP and question the architecture.
+
+Do NOT guess-and-fix. Root cause first, always.
+
+### Verification Before Completion
+
+Before reporting back that work is done:
+
+1. **Identify** what command proves your claim.
+2. **Run** the full command (fresh, not cached).
+3. **Read** the complete output and check exit code.
+4. **Confirm** the output matches your claim.
+
+If you haven't run the verification command, you cannot claim it passes. No "should work", "probably passes", or "looks correct".
+
+**Verification commands:**
+- `docker compose -f docker-compose.test.yml up -d` then run the integration test suite - all tests must pass.
+- `docker compose -f docker-compose.test.yml ps` - all test services must be healthy.
+- `docker compose -f docker-compose.test.yml logs` - no error-level messages in output.

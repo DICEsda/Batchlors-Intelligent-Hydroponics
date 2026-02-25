@@ -159,7 +159,7 @@ public class OtaController : ControllerBase
             job.Id, job.TargetType, job.TargetVersion, job.FarmId);
 
         // Send MQTT command to start OTA (new topic format: farm/{farmId}/coord/{coordId}/ota/start)
-        var cmdTopic = $"farm/{request.FarmId}/coord/{request.CoordId}/ota/start";
+        var cmdTopic = MqttTopics.OtaStart(request.FarmId, request.CoordId);
         var cmdPayload = new
         {
             job_id = job.Id,
@@ -206,7 +206,7 @@ public class OtaController : ControllerBase
         _logger.LogInformation("Cancelled OTA job {JobId}", jobId);
 
         // Send cancel command via MQTT (new topic format: farm/{farmId}/coord/{coordId}/ota/cancel)
-        var cmdTopic = $"farm/{job.FarmId}/coord/{job.CoordId}/ota/cancel";
+        var cmdTopic = MqttTopics.OtaCancel(job.FarmId, job.CoordId);
         await _mqtt.PublishJsonAsync(cmdTopic, new { job_id = jobId });
 
         // Broadcast status update

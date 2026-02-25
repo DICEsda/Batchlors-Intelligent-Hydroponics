@@ -27,10 +27,10 @@ public class ZonesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all zones (system-wide) for frontend /api/v1/zones endpoint.
+    /// Get all zones (system-wide).
     /// </summary>
     [HttpGet]
-    [Route("/api/v1/zones")]
+    [Route("/api/zones")]
     public async Task<ActionResult<IEnumerable<Zone>>> GetAllZones(CancellationToken ct)
     {
         var zones = await _zoneRepository.GetAllAsync(ct);
@@ -222,7 +222,7 @@ public class ZonesController : ControllerBase
     {
         try
         {
-            var topic = $"site/{siteId}/coord/{coordinatorId}/cmd";
+            var topic = MqttTopics.CoordinatorCmd(siteId, coordinatorId);
             var payload = new
             {
                 cmd = "flash_green",

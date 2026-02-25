@@ -29,7 +29,8 @@ import {
   lucideDownload,
   lucideActivity,
   lucideBarChart3,
-  lucideThermometer
+  lucideThermometer,
+  lucideShieldAlert
 } from '@ng-icons/lucide';
 import { WebSocketService } from '../../../core/services/websocket.service';
 import { IoTDataService } from '../../../core/services/iot-data.service';
@@ -85,7 +86,8 @@ type UserRole = 'admin' | 'user';
       lucideDownload,
       lucideActivity,
       lucideBarChart3,
-      lucideThermometer
+      lucideThermometer,
+      lucideShieldAlert
     })
   ],
   templateUrl: './sidebar.component.html',
@@ -123,7 +125,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
             { label: 'Logs', icon: 'lucideBell', route: '/logs' }
           ]
         },
-        { label: 'Towers', icon: 'lucideLightbulb', route: '/towers' }
+        { label: 'Towers', icon: 'lucideLightbulb', route: '/towers' },
+        { label: 'Alerts', icon: 'lucideShieldAlert', route: '/alerts-dashboard' }
       ]
     },
     {

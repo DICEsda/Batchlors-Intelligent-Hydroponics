@@ -10,10 +10,9 @@ import {
   WSConnectionStatusPayload,
   WSPairingStartedPayload,
   WSPairingStoppedPayload,
-  WSNodeDiscoveredPayload,
-  WSNodePairedPayload,
+  WSTowerDiscoveredPayload,
+  WSTowerPairedPayload,
   WSPairingTimeoutPayload,
-  DiscoveredNode,
   CoordinatorLog,
   WSCoordinatorRegistrationPayload,
   WSCoordinatorRegisteredPayload
@@ -103,14 +102,14 @@ export interface WSPairingStoppedMessage extends WSMessage {
   payload: WSPairingStoppedPayload;
 }
 
-export interface WSNodeDiscoveredMessage extends WSMessage {
+export interface WSTowerDiscoveredMessage extends WSMessage {
   type: 'node_discovered';
-  payload: WSNodeDiscoveredPayload;
+  payload: WSTowerDiscoveredPayload;
 }
 
-export interface WSNodePairedMessage extends WSMessage {
+export interface WSTowerPairedMessage extends WSMessage {
   type: 'node_paired';
-  payload: WSNodePairedPayload;
+  payload: WSTowerPairedPayload;
 }
 
 export interface WSPairingTimeoutMessage extends WSMessage {
@@ -132,8 +131,8 @@ export type HydroponicWSMessage =
   | WSCoordinatorLogMessage
   | WSPairingStartedMessage
   | WSPairingStoppedMessage
-  | WSNodeDiscoveredMessage
-  | WSNodePairedMessage
+  | WSTowerDiscoveredMessage
+  | WSTowerPairedMessage
   | WSPairingTimeoutMessage
   | WSMessage;
 
@@ -175,8 +174,8 @@ export class WebSocketService {
   // Pairing event streams
   private readonly pairingStartedSubject = new Subject<WSPairingStartedPayload>();
   private readonly pairingStoppedSubject = new Subject<WSPairingStoppedPayload>();
-  private readonly nodeDiscoveredSubject = new Subject<WSNodeDiscoveredPayload>();
-  private readonly nodePairedSubject = new Subject<WSNodePairedPayload>();
+  private readonly towerDiscoveredSubject = new Subject<WSTowerDiscoveredPayload>();
+  private readonly towerPairedSubject = new Subject<WSTowerPairedPayload>();
   private readonly pairingTimeoutSubject = new Subject<WSPairingTimeoutPayload>();
 
   // Coordinator registration event streams
@@ -199,8 +198,8 @@ export class WebSocketService {
   // Pairing observable streams
   public readonly pairingStarted$ = this.pairingStartedSubject.asObservable();
   public readonly pairingStopped$ = this.pairingStoppedSubject.asObservable();
-  public readonly nodeDiscovered$ = this.nodeDiscoveredSubject.asObservable();
-  public readonly nodePaired$ = this.nodePairedSubject.asObservable();
+  public readonly towerDiscovered$ = this.towerDiscoveredSubject.asObservable();
+  public readonly towerPaired$ = this.towerPairedSubject.asObservable();
   public readonly pairingTimeout$ = this.pairingTimeoutSubject.asObservable();
 
   // Coordinator registration observable streams
@@ -409,7 +408,61 @@ export class WebSocketService {
   }
 
   /**
-   * Handle incoming WebSocket message and route to appropriate stream
+   * Handle incoming WebSocket message and route to appropriate stream.
+   *
+   * -----------------------------------------------------------------------
+   * WSMessageType exhaustiveness checklist  (keep in sync with common.model.ts)
+   * -----------------------------------------------------------------------
+   * Telemetry:
+   *   reservoir_telemetry   -> reservoirTelemetrySubject
+   *   tower_telemetry       -> towerTelemetrySubject
+   *   node_telemetry        -> towerTelemetrySubject   (alias for tower_telemetry)
+   *   coord_telemetry       -> reservoirTelemetrySubject (alias for reservoir/coordinator telemetry)
+   *   telemetry_batch       -> routes entries to tower / reservoir subjects
+   *
+   * Device / Connection:
+   *   device_status         -> deviceStatusSubject
+   *   connection_status     -> connectionStatusSubject
+   *
+   * Alerts & Errors:
+   *   alert                 -> alertSubject
+   *   error                 -> errorSubject
+   *
+   * OTA:
+   *   ota_progress          -> otaProgressSubject
+   *
+   * AI / ML:
+   *   prediction_update     -> predictionSubject
+   *
+   * Digital Twin:
+   *   digital_twin_update   -> digitalTwinSubject
+   *
+   * Coordinator Logs:
+   *   coordinator_log       -> coordinatorLogSubject
+   *
+   * Pairing:
+   *   pairing_started       -> pairingStartedSubject
+   *   pairing_stopped       -> pairingStoppedSubject
+   *   node_discovered       -> towerDiscoveredSubject
+   *   node_paired           -> towerPairedSubject
+   *   pairing_timeout       -> pairingTimeoutSubject
+   *
+   * Coordinator Registration:
+   *   coordinator_registration_request -> coordinatorRegistrationSubject
+   *   coordinator_registered           -> coordinatorRegisteredSubject
+   *   coordinator_rejected             -> logged only
+   *   coordinator_removed              -> logged only
+   *
+   * Diagnostics:
+   *   diagnostics_update    -> handled via messages$ subscription
+   *
+   * No-op (server bookkeeping):
+   *   pong
+   *   subscribed
+   *   unsubscribed
+   *   heartbeat
+   *   command_ack
+   * -----------------------------------------------------------------------
    */
   private handleMessage(data: HydroponicWSMessage): void {
     // Emit to general message stream
@@ -417,186 +470,258 @@ export class WebSocketService {
 
     // Route to specific streams based on message type
     switch (data.type) {
-      case 'reservoir_telemetry':
+      // ====================================================================
+      // Telemetry
+      // ====================================================================
+      case 'reservoir_telemetry': {
         const reservoirMsg = data as WSReservoirTelemetryMessage;
         this.reservoirTelemetrySubject.next(reservoirMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Reservoir telemetry:', reservoirMsg.payload.coordId);
+          console.log('[WS] Reservoir telemetry:', reservoirMsg.payload.coordId);
         }
         break;
+      }
 
-      case 'tower_telemetry':
+      case 'tower_telemetry': {
         const towerMsg = data as WSTowerTelemetryMessage;
         this.towerTelemetrySubject.next(towerMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Tower telemetry:', towerMsg.payload.towerId);
+          console.log('[WS] Tower telemetry:', towerMsg.payload.towerId);
         }
         break;
+      }
 
-      case 'alert':
-        const alertMsg = data as WSAlertMessage;
-        this.alertSubject.next(alertMsg.payload);
+      case 'node_telemetry': {
+        // Backend alias for tower_telemetry — route to the same subject
+        const nodeTelemetryMsg = data as WSTowerTelemetryMessage;
+        this.towerTelemetrySubject.next(nodeTelemetryMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Alert:', alertMsg.payload.severity, alertMsg.payload.message);
+          console.log('[WS] Node telemetry (→ tower):', (nodeTelemetryMsg.payload as any)?.towerId);
         }
         break;
+      }
 
-      case 'device_status':
+      case 'coord_telemetry': {
+        // Backend alias for coordinator-level telemetry — route to reservoir subject
+        this.reservoirTelemetrySubject.next(data.payload as ReservoirTelemetry);
+        if (this.env.isDevelopment) {
+          console.log('[WS] Coord telemetry (→ reservoir):', (data.payload as any)?.coordId);
+        }
+        break;
+      }
+
+      case 'telemetry_batch': {
+        const batchPayload = data.payload as Array<{ type: string; payload: any }>;
+        if (Array.isArray(batchPayload)) {
+          for (const entry of batchPayload) {
+            if (entry.type === 'tower_telemetry' || entry.type === 'node_telemetry') {
+              this.towerTelemetrySubject.next(entry.payload);
+            } else if (entry.type === 'reservoir_telemetry' || entry.type === 'coord_telemetry') {
+              this.reservoirTelemetrySubject.next(entry.payload);
+            }
+          }
+          if (this.env.isDevelopment) {
+            console.log('[WS] Telemetry batch:', batchPayload.length, 'items');
+          }
+        }
+        break;
+      }
+
+      // ====================================================================
+      // Device / Connection
+      // ====================================================================
+      case 'device_status': {
         const statusMsg = data as WSDeviceStatusMessage;
         this.deviceStatusSubject.next(statusMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Device status:', statusMsg.payload.deviceId, statusMsg.payload.status);
+          console.log('[WS] Device status:', statusMsg.payload.deviceId, statusMsg.payload.status);
         }
         break;
+      }
 
-      case 'ota_progress':
-        const otaMsg = data as WSOtaProgressMessage;
-        this.otaProgressSubject.next(otaMsg.payload);
-        if (this.env.isDevelopment) {
-          console.log('[WebSocket] OTA progress:', otaMsg.payload.deviceId, otaMsg.payload.progress + '%');
-        }
-        break;
-
-      case 'digital_twin_update':
-        const twinMsg = data as WSDigitalTwinUpdateMessage;
-        this.digitalTwinSubject.next(twinMsg.payload);
-        if (this.env.isDevelopment) {
-          console.log('[WebSocket] Digital twin update received');
-        }
-        break;
-
-      case 'prediction_update':
-        const predMsg = data as WSPredictionUpdateMessage;
-        this.predictionSubject.next(predMsg.payload);
-        if (this.env.isDevelopment) {
-          console.log('[WebSocket] Prediction update:', predMsg.payload.towerId);
-        }
-        break;
-
-      case 'coordinator_log':
-        const logMsg = data as WSCoordinatorLogMessage;
-        this.coordinatorLogSubject.next(logMsg.payload);
-        if (this.env.isDevelopment) {
-          console.log('[WebSocket] Coordinator log:', logMsg.payload.coordId, logMsg.payload.level, logMsg.payload.message);
-        }
-        break;
-
-      case 'connection_status':
+      case 'connection_status': {
         const connMsg = data as WSMessage<WSConnectionStatusPayload>;
         this.connectionStatusSubject.next(connMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Connection status:', connMsg.payload.coordId, connMsg.payload.event, connMsg.payload);
+          console.log('[WS] Connection status:', connMsg.payload.coordId, connMsg.payload.event, connMsg.payload);
         }
         break;
+      }
 
-      case 'pong':
-        // Heartbeat response - no action needed
+      // ====================================================================
+      // Alerts & Errors
+      // ====================================================================
+      case 'alert': {
+        const alertMsg = data as WSAlertMessage;
+        this.alertSubject.next(alertMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WS] Alert:', alertMsg.payload.severity, alertMsg.payload.message);
+        }
         break;
+      }
 
-      case 'error':
+      case 'error': {
         this.errorSubject.next({
           message: (data.payload as { message?: string })?.message || 'Unknown error',
           error: data.payload
         });
         break;
+      }
 
-      // ========================================================================
+      // ====================================================================
+      // OTA
+      // ====================================================================
+      case 'ota_progress': {
+        const otaMsg = data as WSOtaProgressMessage;
+        this.otaProgressSubject.next(otaMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WS] OTA progress:', otaMsg.payload.deviceId, otaMsg.payload.progress + '%');
+        }
+        break;
+      }
+
+      // ====================================================================
+      // AI / ML
+      // ====================================================================
+      case 'prediction_update': {
+        const predMsg = data as WSPredictionUpdateMessage;
+        this.predictionSubject.next(predMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WS] Prediction update:', predMsg.payload.towerId);
+        }
+        break;
+      }
+
+      // ====================================================================
+      // Digital Twin
+      // ====================================================================
+      case 'digital_twin_update': {
+        const twinMsg = data as WSDigitalTwinUpdateMessage;
+        this.digitalTwinSubject.next(twinMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WS] Digital twin update received');
+        }
+        break;
+      }
+
+      // ====================================================================
+      // Coordinator Logs
+      // ====================================================================
+      case 'coordinator_log': {
+        const logMsg = data as WSCoordinatorLogMessage;
+        this.coordinatorLogSubject.next(logMsg.payload);
+        if (this.env.isDevelopment) {
+          console.log('[WS] Coordinator log:', logMsg.payload.coordId, logMsg.payload.level, logMsg.payload.message);
+        }
+        break;
+      }
+
+      // ====================================================================
       // Pairing Events
-      // ========================================================================
-      case 'pairing_started':
+      // ====================================================================
+      case 'pairing_started': {
         const pairingStartedMsg = data as WSPairingStartedMessage;
         this.pairingStartedSubject.next(pairingStartedMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Pairing started:', pairingStartedMsg.payload.coordinatorId);
+          console.log('[WS] Pairing started:', pairingStartedMsg.payload.coordinatorId);
         }
         break;
+      }
 
-      case 'pairing_stopped':
+      case 'pairing_stopped': {
         const pairingStoppedMsg = data as WSPairingStoppedMessage;
         this.pairingStoppedSubject.next(pairingStoppedMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Pairing stopped:', pairingStoppedMsg.payload.coordinatorId, pairingStoppedMsg.payload.reason);
+          console.log('[WS] Pairing stopped:', pairingStoppedMsg.payload.coordinatorId, pairingStoppedMsg.payload.reason);
         }
         break;
+      }
 
-      case 'node_discovered':
-        const nodeDiscoveredMsg = data as WSNodeDiscoveredMessage;
-        this.nodeDiscoveredSubject.next(nodeDiscoveredMsg.payload);
+      case 'node_discovered': {
+        const towerDiscoveredMsg = data as WSTowerDiscoveredMessage;
+        this.towerDiscoveredSubject.next(towerDiscoveredMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Node discovered:', nodeDiscoveredMsg.payload.nodeId, 'RSSI:', nodeDiscoveredMsg.payload.rssi);
+          console.log('[WS] Tower discovered:', towerDiscoveredMsg.payload.towerId, 'RSSI:', towerDiscoveredMsg.payload.rssi);
         }
         break;
+      }
 
-      case 'node_paired':
-        const nodePairedMsg = data as WSNodePairedMessage;
-        this.nodePairedSubject.next(nodePairedMsg.payload);
+      case 'node_paired': {
+        const towerPairedMsg = data as WSTowerPairedMessage;
+        this.towerPairedSubject.next(towerPairedMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Node paired:', nodePairedMsg.payload.nodeId);
+          console.log('[WS] Tower paired:', towerPairedMsg.payload.towerId);
         }
         break;
+      }
 
-      case 'pairing_timeout':
+      case 'pairing_timeout': {
         const pairingTimeoutMsg = data as WSPairingTimeoutMessage;
         this.pairingTimeoutSubject.next(pairingTimeoutMsg.payload);
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Pairing timeout:', pairingTimeoutMsg.payload.coordinatorId);
+          console.log('[WS] Pairing timeout:', pairingTimeoutMsg.payload.coordinatorId);
         }
         break;
+      }
 
-      // ========================================================================
+      // ====================================================================
       // Coordinator Registration Events
-      // ========================================================================
-      case 'coordinator_registration_request':
+      // ====================================================================
+      case 'coordinator_registration_request': {
         const regMsg = data as WSMessage<WSCoordinatorRegistrationPayload>;
         this.coordinatorRegistrationSubject.next(regMsg.payload);
-        console.log('[WebSocket] Coordinator registration request:', regMsg.payload.coordId);
+        console.log('[WS] Coordinator registration request:', regMsg.payload.coordId);
         break;
+      }
 
-      case 'coordinator_registered':
+      case 'coordinator_registered': {
         const regDoneMsg = data as WSMessage<WSCoordinatorRegisteredPayload>;
         this.coordinatorRegisteredSubject.next(regDoneMsg.payload);
-        console.log('[WebSocket] Coordinator registered:', regDoneMsg.payload.coordId, regDoneMsg.payload.name);
+        console.log('[WS] Coordinator registered:', regDoneMsg.payload.coordId, regDoneMsg.payload.name);
         break;
+      }
 
       case 'coordinator_rejected':
       case 'coordinator_removed':
-        // Just log, components can subscribe if needed
-        console.log('[WebSocket] Coordinator event:', data.type, data.payload);
+        // Just log — components can subscribe via messages$ if needed
+        console.log('[WS] Coordinator event:', data.type, data.payload);
         break;
 
-      // ========================================================================
-      // Throttled Telemetry Batch (from WsBroadcaster flush)
-      // ========================================================================
-      case 'telemetry_batch':
-        const batchPayload = data.payload as Array<{ type: string; payload: any }>;
-        if (Array.isArray(batchPayload)) {
-          for (const entry of batchPayload) {
-            if (entry.type === 'tower_telemetry') {
-              this.towerTelemetrySubject.next(entry.payload);
-            } else if (entry.type === 'reservoir_telemetry') {
-              this.reservoirTelemetrySubject.next(entry.payload);
-            }
-          }
-          if (this.env.isDevelopment) {
-            console.log('[WebSocket] Telemetry batch:', batchPayload.length, 'items');
-          }
-        }
-        break;
-
-      // ========================================================================
-      // Diagnostics Update (from DiagnosticsPushService)
-      // ========================================================================
+      // ====================================================================
+      // Diagnostics
+      // ====================================================================
       case 'diagnostics_update':
         // Handled by DiagnosticsService via messages$ subscription
         if (this.env.isDevelopment) {
-          console.log('[WebSocket] Diagnostics update received');
+          console.log('[WS] Diagnostics update received');
         }
         break;
 
-      default:
+      // ====================================================================
+      // No-op (server bookkeeping messages)
+      // ====================================================================
+      case 'pong':
+      case 'subscribed':
+      case 'unsubscribed':
+      case 'heartbeat':
+      case 'command_ack':
+        // Known server messages — no action needed
+        break;
+
+      // ====================================================================
+      // Catch-all for truly unknown / future message types from server
+      // ====================================================================
+      default: {
+        // All WSMessageType members are handled above. TypeScript narrows
+        // `data` to `never` here, proving exhaustiveness at compile time.
+        // We still keep a runtime guard for messages the server might send
+        // that are not yet in the WSMessageType union.
+        const _unhandled: never = data;
         if (this.env.isDevelopment) {
-          console.warn('[WebSocket] Unknown message type:', data.type);
+          console.warn('[WS] Unhandled message type:', (_unhandled as WSMessage).type);
         }
+        break;
+      }
     }
   }
 
