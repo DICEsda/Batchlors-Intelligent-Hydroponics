@@ -436,47 +436,47 @@ The coordinator publishes retained status:
 
 ### 6.1 Files to Modify
 
-#### Firmware/shared/src/EspNowMessage.h
+#### firmware/shared/src/EspNowMessage.h
 - [ ] Add `MessageType` enum values: `PAIRING_ADVERTISEMENT`, `PAIRING_OFFER`, `PAIRING_ACCEPT`, `PAIRING_CONFIRM`, `PAIRING_REJECT`, `PAIRING_ABORT`
 - [ ] Add message structs for each new type
 - [ ] Add `PairingRejectReason` enum
 - [ ] Add `DeviceType` enum if not present
 - [ ] Keep legacy `JOIN_REQUEST`/`JOIN_ACCEPT` for backward compatibility (deprecated)
 
-#### Firmware/coordinator/src/comm/EspNow.cpp/.h
+#### firmware/coordinator/src/comm/EspNow.cpp/.h
 - [ ] Add `onPairingAdvertisement()` callback registration
 - [ ] Modify `enablePairingMode()` to support passive listening vs active binding
 - [ ] Add `sendPairingOffer()`, `sendPairingConfirm()`, `sendPairingReject()`
 - [ ] Remove auto-accept logic from ESP-NOW receive handler
 
-#### Firmware/coordinator/src/towers/TowerRegistry.cpp/.h
+#### firmware/coordinator/src/towers/TowerRegistry.cpp/.h
 - [ ] Remove `processPairingRequest()` auto-accept logic
 - [ ] Add `registerBoundNode()` called only after full handshake
 - [ ] Keep node persistence logic (NVS)
 
-#### Firmware/coordinator/src/core/Coordinator.cpp/.h
+#### firmware/coordinator/src/core/Coordinator.cpp/.h
 - [ ] Integrate new `DiscoveryManager` and `PairingStateMachine`
 - [ ] Update MQTT command handlers for new pairing commands
 - [ ] Remove legacy pairing button handler (or redirect to permit-join)
 
-#### Firmware/coordinator/src/comm/Mqtt.cpp/.h
+#### firmware/coordinator/src/comm/Mqtt.cpp/.h
 - [ ] Add subscription to `.../pairing/permit_join`, `.../pairing/approve`, etc.
 - [ ] Add publish methods for pairing events
 - [ ] Add retained status publishing
 
-#### Firmware/node/src/main.cpp
+#### firmware/node/src/main.cpp
 - [ ] Replace current state machine with `NodePairingFSM`
 - [ ] Remove direct `JOIN_REQUEST` sending
 - [ ] Add advertisement loop in `PAIRING_ADVERTISE` state
 - [ ] Add `PAIRING_WAIT` state with timeout handling
 
-#### Firmware/node/src/config/TowerConfig.h
+#### firmware/node/src/config/TowerConfig.h
 - [ ] Add `pairing_state` field for persistence
 - [ ] Add `last_offer_token` for replay protection
 
 ### 6.2 New Files to Create
 
-#### Firmware/coordinator/src/pairing/DiscoveryManager.h/.cpp
+#### firmware/coordinator/src/pairing/DiscoveryManager.h/.cpp
 ```cpp
 class DiscoveryManager {
 public:
@@ -494,7 +494,7 @@ private:
 };
 ```
 
-#### Firmware/coordinator/src/pairing/PairingStateMachine.h/.cpp
+#### firmware/coordinator/src/pairing/PairingStateMachine.h/.cpp
 ```cpp
 class PairingStateMachine {
 public:
@@ -523,7 +523,7 @@ private:
 };
 ```
 
-#### Firmware/node/src/pairing/NodePairingFSM.h/.cpp
+#### firmware/node/src/pairing/NodePairingFSM.h/.cpp
 ```cpp
 class NodePairingFSM {
 public:

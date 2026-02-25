@@ -33,7 +33,7 @@ The following improvements have been implemented to enhance reliability, perform
 ### Files Created/Modified
 
 ```
-Firmware/coordinator/src/comm/
+firmware/coordinator/src/comm/
 ├── AsyncMqtt.h           # New async MQTT client
 ├── AsyncMqtt.cpp         # Implementation
 └── Mqtt.h/cpp            # Original (kept for compatibility)
@@ -133,7 +133,7 @@ void readTemperature() {
 ### Implementation Status
 
 - ⏳ **BACKLOG** - Waiting for hardware requirements finalization
-- See `Firmware/coordinator/src/sensors/UnifiedSensorAdapter.h` (to be created)
+- See `firmware/coordinator/src/sensors/UnifiedSensorAdapter.h` (to be created)
 
 ---
 
@@ -155,7 +155,7 @@ void readTemperature() {
 ### Files Created
 
 ```
-Firmware/coordinator/src/utils/
+firmware/coordinator/src/utils/
 ├── PowerManager.h        # Power management API
 └── PowerManager.cpp      # Implementation
 ```
@@ -266,7 +266,7 @@ ConfigStore::save(config);
 ### Files Created
 
 ```
-Firmware/coordinator/src/utils/
+firmware/coordinator/src/utils/
 ├── SystemWatchdog.h      # Watchdog API
 └── SystemWatchdog.cpp    # Implementation
 ```

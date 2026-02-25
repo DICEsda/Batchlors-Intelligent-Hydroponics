@@ -253,7 +253,7 @@ The duration drop from attempt 2 (228s) to attempt 3 (78s) is because the alert 
 #### Bug 1: Tower PUT endpoint produces duplicate `_id: null` in MongoDB
 
 - **Severity:** Critical
-- **File:** `Backend/src/IoT.Backend/Controllers/TowersController.cs:87`
+- **File:** `backend/src/IoT.Backend/Controllers/TowersController.cs:87`
 - **Discovered in:** Attempt 1 (18 setup errors + 1 failure, all from `_register_tower`)
 - **Symptom:** `PUT /api/towers/{farmId}/{coordId}/{towerId}` returns HTTP 500 on the second tower creation. The first tower succeeds because MongoDB allows one document with `_id: null`, but subsequent inserts fail with:
   ```
@@ -270,8 +270,8 @@ The duration drop from attempt 2 (228s) to attempt 3 (78s) is because the alert 
 
 - **Severity:** Critical
 - **Files:**
-  - `Backend/src/IoT.Backend/Services/TelemetryHandler.cs:368-386` (reservoir path)
-  - `Backend/src/IoT.Backend/Services/TelemetryHandler.cs:468-478` (tower path)
+  - `backend/src/IoT.Backend/Services/TelemetryHandler.cs:368-386` (reservoir path)
+  - `backend/src/IoT.Backend/Services/TelemetryHandler.cs:468-478` (tower path)
 - **Discovered in:** Attempt 2 (all 8 alert tests timed out waiting for alerts)
 - **Symptom:** Publishing telemetry with values that violate alert thresholds (pH=4.0, temp=40.0C, water=10%) never produces alerts. No error logs appear. Only connectivity alerts (based on `LastSeen` timestamps) fire.
 - **Root cause:** The data pipeline has three write targets for each telemetry message:

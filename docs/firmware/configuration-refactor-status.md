@@ -3,7 +3,7 @@
 ## Completed ✅
 
 ### 1. Created Unified Configuration Architecture
-- **File:** `Firmware/shared/src/Config.h`
+- **File:** `firmware/shared/src/Config.h`
   - Defined `WiFiConfig`, `MqttConfig`, `EspNowConfig`, `SystemConfig` structs
   - Unified `Config` struct with all settings
   - JSON serialization/deserialization built-in
@@ -11,7 +11,7 @@
   - Version field for future migrations
 
 ### 2. Created ConfigStore Class
-- **Files:** `Firmware/shared/src/ConfigStore.h` and `ConfigStore.cpp`
+- **Files:** `firmware/shared/src/ConfigStore.h` and `ConfigStore.cpp`
   - Single namespace: `coordinator_v1` (versioned)
   - Load/save/reset operations
   - JSON export/import for backup
@@ -88,19 +88,19 @@ coordinator.begin():
 ## Files Modified 📝
 
 ### New Files:
-- `Firmware/shared/src/Config.h` - Unified config structs
-- `Firmware/shared/src/ConfigStore.h` - Storage manager header
-- `Firmware/shared/src/ConfigStore.cpp` - Storage manager implementation
+- `firmware/shared/src/Config.h` - Unified config structs
+- `firmware/shared/src/ConfigStore.h` - Storage manager header
+- `firmware/shared/src/ConfigStore.cpp` - Storage manager implementation
 
 ### Files To Modify:
-- `Firmware/coordinator/src/main.cpp` - Add ConfigStore init
-- `Firmware/coordinator/src/core/Coordinator.cpp` - New init order
-- `Firmware/coordinator/src/comm/WifiManager.cpp` - Use ConfigStore, discover channel
-- `Firmware/coordinator/src/comm/EspNow.cpp` - Use stored channel
-- `Firmware/coordinator/src/comm/Mqtt.cpp` - Use ConfigStore, default credentials
+- `firmware/coordinator/src/main.cpp` - Add ConfigStore init
+- `firmware/coordinator/src/core/Coordinator.cpp` - New init order
+- `firmware/coordinator/src/comm/WifiManager.cpp` - Use ConfigStore, discover channel
+- `firmware/coordinator/src/comm/EspNow.cpp` - Use stored channel
+- `firmware/coordinator/src/comm/Mqtt.cpp` - Use ConfigStore, default credentials
 
 ### Files To Keep (Deprecated):
-- `Firmware/shared/src/ConfigManager.h/cpp` - Keep for 2 releases for rollback
+- `firmware/shared/src/ConfigManager.h/cpp` - Keep for 2 releases for rollback
 
 ## Testing Checklist ✓
 

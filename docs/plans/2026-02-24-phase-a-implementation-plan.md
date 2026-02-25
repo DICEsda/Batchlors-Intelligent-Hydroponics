@@ -36,12 +36,12 @@ Tasks 1-7 can all run in parallel. Task 8 depends on Task 2.
 
 **Domain:** Backend
 **Files:**
-- Create: `Backend/src/IoT.Backend/Middleware/ErrorHandlingMiddleware.cs`
-- Modify: `Backend/src/IoT.Backend/Program.cs` (lines 154-170)
+- Create: `backend/src/IoT.Backend/Middleware/ErrorHandlingMiddleware.cs`
+- Modify: `backend/src/IoT.Backend/Program.cs` (lines 154-170)
 
 ### Step 1: Create the error handling middleware
 
-Create `Backend/src/IoT.Backend/Middleware/ErrorHandlingMiddleware.cs`:
+Create `backend/src/IoT.Backend/Middleware/ErrorHandlingMiddleware.cs`:
 
 ```csharp
 using System.Diagnostics;
@@ -113,7 +113,7 @@ This must be the **first middleware** in the pipeline so it catches everything.
 
 ### Step 3: Verify
 
-Run: `dotnet build` in `Backend/src/IoT.Backend/`
+Run: `dotnet build` in `backend/src/IoT.Backend/`
 Expected: Build succeeds with no errors.
 
 ### Step 4: Commit
@@ -131,15 +131,15 @@ Development mode includes stack trace; production returns generic message.
 
 **Domain:** Backend
 **Files:**
-- Create: `Backend/src/IoT.Backend/Middleware/ApiKeyMiddleware.cs`
-- Modify: `Backend/src/IoT.Backend/Program.cs` (add middleware + config)
-- Modify: `Backend/src/IoT.Backend/appsettings.json` (add ApiSecurity section)
+- Create: `backend/src/IoT.Backend/Middleware/ApiKeyMiddleware.cs`
+- Modify: `backend/src/IoT.Backend/Program.cs` (add middleware + config)
+- Modify: `backend/src/IoT.Backend/appsettings.json` (add ApiSecurity section)
 - Modify: `docker-compose.yml` (add API_KEY env var)
 - Modify: `docker-compose.simulation.yml` (add API_KEY env var)
 
 ### Step 1: Create the API key middleware
 
-Create `Backend/src/IoT.Backend/Middleware/ApiKeyMiddleware.cs`:
+Create `backend/src/IoT.Backend/Middleware/ApiKeyMiddleware.cs`:
 
 ```csharp
 using System.Net;
@@ -250,7 +250,7 @@ In `docker-compose.simulation.yml`, add the same to the backend service environm
 
 ### Step 5: Verify
 
-Run: `dotnet build` in `Backend/src/IoT.Backend/`
+Run: `dotnet build` in `backend/src/IoT.Backend/`
 Expected: Build succeeds.
 
 ### Step 6: Commit
@@ -269,7 +269,7 @@ Disabled by default (null key) for dev; enabled via env var in Docker.
 
 **Domain:** Backend
 **Files:**
-- Modify: `Backend/src/IoT.Backend/Data/MongoRepository.cs` (add indexes in `EnsureIndexes` method)
+- Modify: `backend/src/IoT.Backend/Data/MongoRepository.cs` (add indexes in `EnsureIndexes` method)
 
 ### Step 1: Identify existing index code
 
@@ -323,7 +323,7 @@ await resTelCollection.Indexes.CreateOneAsync(
 
 ### Step 3: Verify
 
-Run: `dotnet build` in `Backend/src/IoT.Backend/`
+Run: `dotnet build` in `backend/src/IoT.Backend/`
 Expected: Build succeeds.
 
 ### Step 4: Commit
@@ -342,13 +342,13 @@ the most frequent query patterns.
 
 **Domain:** Backend
 **Files:**
-- Modify: `Backend/src/IoT.Backend/IoT.Backend.csproj` (add NuGet package)
-- Create: `Backend/src/IoT.Backend/Validators/` directory with validator classes
-- Modify: `Backend/src/IoT.Backend/Program.cs` (wire FluentValidation)
+- Modify: `backend/src/IoT.Backend/IoT.Backend.csproj` (add NuGet package)
+- Create: `backend/src/IoT.Backend/Validators/` directory with validator classes
+- Modify: `backend/src/IoT.Backend/Program.cs` (wire FluentValidation)
 
 ### Step 1: Add FluentValidation NuGet package
 
-Run in `Backend/src/IoT.Backend/`:
+Run in `backend/src/IoT.Backend/`:
 
 ```bash
 dotnet add package FluentValidation.AspNetCore --version 11.3.0
@@ -356,7 +356,7 @@ dotnet add package FluentValidation.AspNetCore --version 11.3.0
 
 ### Step 2: Create validators
 
-Create `Backend/src/IoT.Backend/Validators/PairingValidators.cs`:
+Create `backend/src/IoT.Backend/Validators/PairingValidators.cs`:
 
 ```csharp
 using FluentValidation;
@@ -414,7 +414,7 @@ public class ForgetDeviceRequestValidator : AbstractValidator<ForgetDeviceReques
 }
 ```
 
-Create `Backend/src/IoT.Backend/Validators/TowerValidators.cs`:
+Create `backend/src/IoT.Backend/Validators/TowerValidators.cs`:
 
 ```csharp
 using FluentValidation;
@@ -474,7 +474,7 @@ public class LedPreviewRequestValidator : AbstractValidator<LedPreviewRequest>
 }
 ```
 
-Create `Backend/src/IoT.Backend/Validators/ReservoirValidators.cs`:
+Create `backend/src/IoT.Backend/Validators/ReservoirValidators.cs`:
 
 ```csharp
 using FluentValidation;
@@ -528,7 +528,7 @@ public class ReservoirTargetsRequestValidator : AbstractValidator<ReservoirTarge
 }
 ```
 
-Create `Backend/src/IoT.Backend/Validators/OtaValidators.cs`:
+Create `backend/src/IoT.Backend/Validators/OtaValidators.cs`:
 
 ```csharp
 using FluentValidation;
@@ -559,7 +559,7 @@ public class CreateFirmwareRequestValidator : AbstractValidator<CreateFirmwareRe
 }
 ```
 
-Create `Backend/src/IoT.Backend/Validators/ZoneValidators.cs`:
+Create `backend/src/IoT.Backend/Validators/ZoneValidators.cs`:
 
 ```csharp
 using FluentValidation;
@@ -578,7 +578,7 @@ public class CreateZoneRequestValidator : AbstractValidator<CreateZoneRequest>
 }
 ```
 
-Create `Backend/src/IoT.Backend/Validators/CoordinatorValidators.cs`:
+Create `backend/src/IoT.Backend/Validators/CoordinatorValidators.cs`:
 
 ```csharp
 using FluentValidation;
@@ -611,7 +611,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 ### Step 4: Verify
 
-Run: `dotnet build` in `Backend/src/IoT.Backend/`
+Run: `dotnet build` in `backend/src/IoT.Backend/`
 Expected: Build succeeds.
 
 ### Step 5: Commit
@@ -630,10 +630,10 @@ Invalid requests return 400 with structured field-level errors.
 
 **Domain:** Frontend
 **Files:**
-- Create: `Frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.ts`
-- Create: `Frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.html`
-- Create: `Frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.scss`
-- Modify: `Frontend/src/app/app.routes.ts` (add route, before wildcard)
+- Create: `frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.ts`
+- Create: `frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.html`
+- Create: `frontend/src/app/pages/alerts-dashboard/alerts-dashboard.component.scss`
+- Modify: `frontend/src/app/app.routes.ts` (add route, before wildcard)
 
 ### Step 1: Create the alerts dashboard component
 
@@ -674,7 +674,7 @@ In the sidebar component, add "Alerts Dashboard" entry with a `bell-ring` Lucide
 
 ### Step 4: Verify
 
-Run: `npx ng build` in `Frontend/`
+Run: `npx ng build` in `frontend/`
 Expected: Build succeeds.
 
 ### Step 5: Commit
@@ -693,15 +693,15 @@ existing AlertService and WebSocket alert events.
 
 **Domain:** Frontend
 **Files:**
-- Create: `Frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.ts` (reusable ECharts wrapper)
-- Create: `Frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.html`
-- Create: `Frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.scss`
-- Modify: `Frontend/src/app/pages/coordinator-detail/coordinator-detail.component.ts` (add chart imports + data)
-- Modify: `Frontend/src/app/pages/coordinator-detail/coordinator-detail.component.html` (add chart section)
-- Modify: `Frontend/src/app/pages/node-detail/node-detail.component.ts` (add chart imports + data)
-- Modify: `Frontend/src/app/pages/node-detail/node-detail.component.html` (add chart section)
-- Modify: `Frontend/src/app/pages/farm-overview/farm-overview.component.ts` (add chart section)
-- Modify: `Frontend/src/app/pages/farm-overview/farm-overview.component.html` (add system health charts)
+- Create: `frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.ts` (reusable ECharts wrapper)
+- Create: `frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.html`
+- Create: `frontend/src/app/components/ui/telemetry-chart/telemetry-chart.component.scss`
+- Modify: `frontend/src/app/pages/coordinator-detail/coordinator-detail.component.ts` (add chart imports + data)
+- Modify: `frontend/src/app/pages/coordinator-detail/coordinator-detail.component.html` (add chart section)
+- Modify: `frontend/src/app/pages/node-detail/node-detail.component.ts` (add chart imports + data)
+- Modify: `frontend/src/app/pages/node-detail/node-detail.component.html` (add chart section)
+- Modify: `frontend/src/app/pages/farm-overview/farm-overview.component.ts` (add chart section)
+- Modify: `frontend/src/app/pages/farm-overview/farm-overview.component.html` (add system health charts)
 
 ### Step 1: Create reusable telemetry chart component
 
@@ -767,7 +767,7 @@ Template: 3 small sparklines in a row, compact height (120px).
 
 ### Step 5: Verify
 
-Run: `npx ng build` in `Frontend/`
+Run: `npx ng build` in `frontend/`
 Expected: Build succeeds.
 
 ### Step 6: Commit
@@ -787,12 +787,12 @@ and farm overview (system health sparklines).
 
 **Domain:** Frontend
 **Files:**
-- Create: `Frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.ts`
-- Create: `Frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.html`
-- Create: `Frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.scss`
-- Create: `Frontend/src/app/services/three-scene.service.ts` (optional — or inline in component)
-- Modify: `Frontend/src/app/pages/digital-twin/digital-twin.component.ts`
-- Modify: `Frontend/src/app/pages/digital-twin/digital-twin.component.html`
+- Create: `frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.ts`
+- Create: `frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.html`
+- Create: `frontend/src/app/components/ui/tower-rack-3d/tower-rack-3d.component.scss`
+- Create: `frontend/src/app/services/three-scene.service.ts` (optional — or inline in component)
+- Modify: `frontend/src/app/pages/digital-twin/digital-twin.component.ts`
+- Modify: `frontend/src/app/pages/digital-twin/digital-twin.component.html`
 
 ### Step 1: Create the 3D tower rack component
 
@@ -862,7 +862,7 @@ Modify `digital-twin.component.ts`:
 
 ### Step 5: Verify
 
-Run: `npx ng build` in `Frontend/`
+Run: `npx ng build` in `frontend/`
 Expected: Build succeeds. No Three.js import errors.
 
 ### Step 6: Commit
@@ -883,13 +883,13 @@ panel detail view. Real-time updates via WebSocket.
 **Domain:** Frontend
 **Depends on:** Task 2 (backend API key middleware must exist)
 **Files:**
-- Create: `Frontend/src/app/core/api-key.interceptor.ts`
-- Modify: `Frontend/src/app/app.config.ts` (register interceptor)
-- Modify: `Frontend/src/app/core/services/environment.service.ts` (add apiKey config)
+- Create: `frontend/src/app/core/api-key.interceptor.ts`
+- Modify: `frontend/src/app/app.config.ts` (register interceptor)
+- Modify: `frontend/src/app/core/services/environment.service.ts` (add apiKey config)
 
 ### Step 1: Create the API key interceptor
 
-Create `Frontend/src/app/core/api-key.interceptor.ts`:
+Create `frontend/src/app/core/api-key.interceptor.ts`:
 
 ```typescript
 import { HttpInterceptorFn } from '@angular/common/http';
@@ -929,7 +929,7 @@ In `app.config.ts`, add `apiKeyInterceptor` to the `provideHttpClient(withInterc
 
 ### Step 4: Verify
 
-Run: `npx ng build` in `Frontend/`
+Run: `npx ng build` in `frontend/`
 Expected: Build succeeds.
 
 ### Step 5: Commit
@@ -947,8 +947,8 @@ via runtime environment; defaults to match docker-compose default.
 
 After all 8 tasks are complete:
 
-1. **Backend builds:** `dotnet build` in `Backend/src/IoT.Backend/` — no errors
-2. **Frontend builds:** `npx ng build` in `Frontend/` — no errors
+1. **Backend builds:** `dotnet build` in `backend/src/IoT.Backend/` — no errors
+2. **Frontend builds:** `npx ng build` in `frontend/` — no errors
 3. **Docker compose up:** `docker-compose up --build` — all services healthy
 4. **API key enforcement:** `curl http://localhost:8000/api/farms` returns 401; `curl -H "X-API-Key: hydro-thesis-2026" http://localhost:8000/api/farms` returns 200
 5. **Validation:** `curl -X POST -H "X-API-Key: hydro-thesis-2026" -H "Content-Type: application/json" -d '{"farm_id":"","coord_id":""}' http://localhost:8000/api/pairing/start` returns 400 with field errors

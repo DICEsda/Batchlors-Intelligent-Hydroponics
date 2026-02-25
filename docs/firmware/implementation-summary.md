@@ -7,9 +7,9 @@
 **Status:** ✅ **FULLY IMPLEMENTED**
 
 **Files Created:**
-- `Firmware/coordinator/src/comm/AsyncMqtt.h` - Async MQTT client header
-- `Firmware/coordinator/src/comm/AsyncMqtt.cpp` - Implementation (600+ lines)
-- Updated `Firmware/coordinator/platformio.ini` with new dependencies
+- `firmware/coordinator/src/comm/AsyncMqtt.h` - Async MQTT client header
+- `firmware/coordinator/src/comm/AsyncMqtt.cpp` - Implementation (600+ lines)
+- Updated `firmware/coordinator/platformio.ini` with new dependencies
 
 **Key Features:**
 - Fully asynchronous operation (no blocking in loop)
@@ -38,11 +38,11 @@ mqtt->publishTowerTelemetry(telemetry);
 **Status:** ✅ **FULLY IMPLEMENTED & INTEGRATED**
 
 **Files Created:**
-- `Firmware/coordinator/src/utils/SystemWatchdog.h` - Watchdog API
-- `Firmware/coordinator/src/utils/SystemWatchdog.cpp` - ESP32 TWDT wrapper
+- `firmware/coordinator/src/utils/SystemWatchdog.h` - Watchdog API
+- `firmware/coordinator/src/utils/SystemWatchdog.cpp` - ESP32 TWDT wrapper
 
 **Integration Points:**
-- Modified `Firmware/coordinator/src/core/Coordinator.cpp`:
+- Modified `firmware/coordinator/src/core/Coordinator.cpp`:
   - Added `#include "utils/SystemWatchdog.h"`
   - Watchdog init in `Coordinator::begin()` (line 32)
   - Watchdog feeding in `Coordinator::loop()` (line 171)
@@ -80,8 +80,8 @@ while(true) { delay(1000); }
 **Status:** ✅ **FULLY IMPLEMENTED**
 
 **Files Created:**
-- `Firmware/coordinator/src/utils/PowerManager.h` - Power management API
-- `Firmware/coordinator/src/utils/PowerManager.cpp` - ESP-IDF PM wrapper
+- `firmware/coordinator/src/utils/PowerManager.h` - Power management API
+- `firmware/coordinator/src/utils/PowerManager.cpp` - ESP-IDF PM wrapper
 
 **Key Features:**
 - Three power modes: HIGH_PERFORMANCE, BALANCED, LOW_POWER
@@ -146,7 +146,7 @@ ConfigStore::save(config);
 **Priority:** LOW (current implementation sufficient)
 
 **Backlog Comments Added:**
-- See `Firmware/IMPROVEMENTS_README.md` section 6
+- See `firmware/IMPROVEMENTS_README.md` section 6
 - Implementation deferred until millisecond-accurate telemetry needed
 
 ---
@@ -310,7 +310,7 @@ Firmware/
 
 ## 📚 Documentation
 
-- **Full Guide:** `Firmware/IMPROVEMENTS_README.md` (comprehensive documentation)
+- **Full Guide:** `firmware/IMPROVEMENTS_README.md` (comprehensive documentation)
 - **This Summary:** Quick reference for developers
 - **Code Comments:** Inline documentation in all new files
 - **API Reference:** Latest ESP-IDF docs fetched and reviewed

@@ -6,11 +6,11 @@ ASP.NET Core 8 REST API server for the IoT Hydroponics System. Provides device m
 
 ```bash
 # Run with Docker
-cd Backend
+cd backend
 docker-compose up -d
 
 # Or run locally
-cd Backend/src/IoT.Backend
+cd backend/src/IoT.Backend
 dotnet run
 ```
 
@@ -703,14 +703,14 @@ All errors follow a consistent format:
 ### Running Tests
 
 ```bash
-cd Backend/src/IoT.Backend
+cd backend/src/IoT.Backend
 dotnet test
 ```
 
 ### Building Docker Image
 
 ```bash
-cd Backend/src/IoT.Backend
+cd backend/src/IoT.Backend
 docker build -t iot-backend:latest .
 ```
 

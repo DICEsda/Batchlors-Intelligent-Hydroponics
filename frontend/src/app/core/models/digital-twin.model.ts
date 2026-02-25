@@ -5,7 +5,7 @@
  * The snake_case REST API responses are automatically transformed
  * by the snakeCaseInterceptor (see core/snake-case.interceptor.ts).
  *
- * Backend source: Backend/src/IoT.Backend/Models/DigitalTwin/
+ * Backend source: backend/src/IoT.Backend/Models/DigitalTwin/
  */
 
 // ============================================================================

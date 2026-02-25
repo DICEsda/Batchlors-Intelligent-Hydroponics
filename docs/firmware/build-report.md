@@ -69,20 +69,20 @@ All new libraries installed successfully:
 ### New Files Created (8 files, 1,500+ lines)
 
 1. **Async MQTT Client**
-   - `Firmware/coordinator/src/comm/AsyncMqtt.h` (159 lines)
-   - `Firmware/coordinator/src/comm/AsyncMqtt.cpp` (567 lines)
+   - `firmware/coordinator/src/comm/AsyncMqtt.h` (159 lines)
+   - `firmware/coordinator/src/comm/AsyncMqtt.cpp` (567 lines)
 
 2. **System Watchdog**
-   - `Firmware/coordinator/src/utils/SystemWatchdog.h` (106 lines)
-   - `Firmware/coordinator/src/utils/SystemWatchdog.cpp` (103 lines)
+   - `firmware/coordinator/src/utils/SystemWatchdog.h` (106 lines)
+   - `firmware/coordinator/src/utils/SystemWatchdog.cpp` (103 lines)
 
 3. **Power Management**
-   - `Firmware/coordinator/src/utils/PowerManager.h` (120 lines)
-   - `Firmware/coordinator/src/utils/PowerManager.cpp` (192 lines)
+   - `firmware/coordinator/src/utils/PowerManager.h` (120 lines)
+   - `firmware/coordinator/src/utils/PowerManager.cpp` (192 lines)
 
 4. **Documentation**
-   - `Firmware/IMPROVEMENTS_README.md` (500+ lines)
-   - `Firmware/IMPLEMENTATION_SUMMARY.md` (300+ lines)
+   - `firmware/IMPROVEMENTS_README.md` (500+ lines)
+   - `firmware/IMPLEMENTATION_SUMMARY.md` (300+ lines)
 
 ### Modified Files (3 files)
 

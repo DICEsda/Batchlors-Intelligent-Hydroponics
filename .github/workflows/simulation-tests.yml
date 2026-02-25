@@ -5,13 +5,13 @@ on:
     branches: [main, develop]
     paths:
       - 'tools/simulator/**'
-      - 'Backend/src/**'
+      - 'backend/src/**'
       - 'docker-compose.simulation.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'tools/simulator/**'
-      - 'Backend/src/**'
+      - 'backend/src/**'
       - 'docker-compose.simulation.yml'
   workflow_dispatch:
     inputs:
@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-sim-${{ hashFiles('Backend/src/IoT.Backend/Dockerfile', 'tools/simulator/Dockerfile', 'tools/simulator/requirements.txt') }}
+          key: ${{ runner.os }}-buildx-sim-${{ hashFiles('backend/src/IoT.Backend/Dockerfile', 'tools/simulator/Dockerfile', 'tools/simulator/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-buildx-sim-
 

@@ -42,14 +42,14 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj
+        run: dotnet restore backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj
 
       - name: Build test project
-        run: dotnet build Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj --no-restore --configuration Release
+        run: dotnet build backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj --no-restore --configuration Release
 
       - name: Run integration tests
         run: |
-          dotnet test Backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj \
+          dotnet test backend/tests/IoT.Backend.IntegrationTests/IoT.Backend.IntegrationTests.csproj \
             --no-build \
             --configuration Release \
             --logger "trx;LogFileName=test-results.trx" \
@@ -135,7 +135,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: Frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Create Mosquitto config
         run: |
@@ -150,12 +150,12 @@ jobs:
 
       - name: Build Backend
         run: |
-          dotnet restore Backend/src/IoT.Backend/IoT.Backend.csproj
-          dotnet build Backend/src/IoT.Backend/IoT.Backend.csproj --configuration Release
+          dotnet restore backend/src/IoT.Backend/IoT.Backend.csproj
+          dotnet build backend/src/IoT.Backend/IoT.Backend.csproj --configuration Release
 
       - name: Start Backend
         run: |
-          dotnet run --project Backend/src/IoT.Backend/IoT.Backend.csproj --configuration Release &
+          dotnet run --project backend/src/IoT.Backend/IoT.Backend.csproj --configuration Release &
           echo "Waiting for backend to start..."
           for i in {1..30}; do
             if curl -f http://localhost:8000/health/live; then
@@ -174,15 +174,15 @@ jobs:
 
       - name: Install Frontend dependencies
         run: npm ci
-        working-directory: Frontend
+        working-directory: frontend
 
       - name: Build Frontend
         run: npm run build -- --configuration production
-        working-directory: Frontend
+        working-directory: frontend
 
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
-        working-directory: Frontend
+        working-directory: frontend
 
       - name: Start Frontend (production build)
         run: |
@@ -195,11 +195,11 @@ jobs:
             fi
             sleep 2
           done
-        working-directory: Frontend
+        working-directory: frontend
 
       - name: Run Playwright E2E tests
         run: npm run e2e
-        working-directory: Frontend
+        working-directory: frontend
         env:
           BACKEND_URL: http://localhost:8000
           FRONTEND_URL: http://localhost:4200
@@ -210,7 +210,7 @@ jobs:
         if: always()
         with:
           name: playwright-report
-          path: Frontend/e2e/playwright-report/
+          path: frontend/e2e/playwright-report/
           retention-days: 30
 
       - name: Upload Playwright test results
@@ -218,7 +218,7 @@ jobs:
         if: always()
         with:
           name: playwright-test-results
-          path: Frontend/e2e/test-results/
+          path: frontend/e2e/test-results/
           retention-days: 30
 
   # Full Stack Integration Test
@@ -235,13 +235,13 @@ jobs:
       - name: Create test Mosquitto config
         run: |
           mkdir -p Backend/config
-          cat > Backend/config/mosquitto.conf << 'EOF'
+          cat > backend/config/mosquitto.conf << 'EOF'
           listener 1883
           allow_anonymous true
           log_type all
           log_dest stdout
           EOF
-          touch Backend/config/pwfile
+          touch backend/config/pwfile
 
       - name: Build and start services
         run: |

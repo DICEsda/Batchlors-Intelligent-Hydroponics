@@ -41,8 +41,8 @@ A distributed IoT platform for monitoring and controlling hydroponic farming sys
 ## Project Structure
 
 ```
-├── Backend/                    # ASP.NET Core 8 Backend API
-│   ├── src/IoT.Backend/        # Main API project
+├── backend/                    # ASP.NET Core 8 Backend API
+│   ├── src/IoT.backend/        # Main API project
 │   │   ├── Controllers/        # REST API endpoints
 │   │   ├── Models/             # Domain models and DTOs
 │   │   ├── Repositories/       # MongoDB data access
@@ -50,7 +50,7 @@ A distributed IoT platform for monitoring and controlling hydroponic farming sys
 │   │   └── WebSockets/         # Real-time communication
 │   └── config/                 # MQTT broker configuration
 │
-├── Firmware/                   # ESP32 Firmware (PlatformIO)
+├── firmware/                   # ESP32 Firmware (PlatformIO)
 │   ├── coordinator/            # ESP32-S3 coordinator firmware
 │   │   └── src/
 │   │       ├── comm/           # MQTT & ESP-NOW communication
@@ -64,10 +64,10 @@ A distributed IoT platform for monitoring and controlling hydroponic farming sys
 │   │       └── pairing/        # Coordinator pairing
 │   └── shared/                 # Shared ESP-NOW message types
 │
-├── Frontend/                   # Angular 19 Dashboard
+├── frontend/                   # Angular 19 Dashboard
 │   └── src/app/
 │
-├── Assets/                     # Diagrams & datasheets
+├── docs/                     # Documentation, diagrams & datasheets
 │   └── Diagrams/               # PlantUML architecture diagrams
 │
 ├── docs/                       # Unified documentation
@@ -131,7 +131,7 @@ WS_URL=ws://backend:8000/ws
 
 ## API Documentation
 
-See [Backend/README.md](Backend/src/IoT.Backend/README.md) for detailed API documentation.
+See [backend/README.md](backend/src/IoT.backend/README.md) for detailed API documentation.
 
 ### Key Endpoints
 
@@ -236,7 +236,7 @@ farm/{farmId}/coord/{coordId}/ota                    # Firmware updates
 ### Backend Development
 
 ```bash
-cd Backend/src/IoT.Backend
+cd backend/src/IoT.Backend
 
 # Restore dependencies
 dotnet restore
@@ -251,7 +251,7 @@ docker build -t iot-backend .
 ### Firmware Development
 
 ```bash
-cd Firmware/coordinator  # or Firmware/node
+cd firmware/coordinator  # or firmware/node
 
 # Build
 pio run

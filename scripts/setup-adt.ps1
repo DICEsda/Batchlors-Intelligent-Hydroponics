@@ -154,10 +154,10 @@ if (-not (Test-Path $repoRoot)) {
     $repoRoot = Split-Path -Parent $PSScriptRoot
 }
 
-$dtdlDir = Join-Path $repoRoot "ML" "models" "dtdl"
+$dtdlDir = Join-Path $repoRoot "infrastructure" "dtdl"
 if (-not (Test-Path $dtdlDir)) {
     # Try relative to script location
-    $dtdlDir = Join-Path (Split-Path -Parent $PSScriptRoot) "ML" "models" "dtdl"
+    $dtdlDir = Join-Path (Split-Path -Parent $PSScriptRoot) "infrastructure" "dtdl"
 }
 
 # Upload order matters: models referenced by relationships must exist first

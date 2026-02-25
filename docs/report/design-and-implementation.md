@@ -771,7 +771,7 @@ func (h *Handler) handleCoordTelemetry(client mqtt.Client, msg mqtt.Message) {
 
 This Angular service demonstrates modern reactive programming with Signals and RxJS, enabling real-time updates to the dashboard without polling.
 
-**File:** `Frontend/src/app/core/services/websocket.service.ts`
+**File:** `frontend/src/app/core/services/websocket.service.ts`
 
 ```typescript
 @Injectable({ providedIn: 'root' })

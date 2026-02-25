@@ -4,12 +4,12 @@
 
 | Layer | Technology | Location | Port |
 |---|---|---|---|
-| Node Firmware | ESP32-C3, Arduino, PlatformIO | `Firmware/node/` | ESP-NOW |
-| Coordinator Firmware | ESP32-S3, Arduino, PlatformIO | `Firmware/coordinator/` | ESP-NOW + MQTT |
+| Node Firmware | ESP32-C3, Arduino, PlatformIO | `firmware/node/` | ESP-NOW |
+| Coordinator Firmware | ESP32-S3, Arduino, PlatformIO | `firmware/coordinator/` | ESP-NOW + MQTT |
 | MQTT Broker | Eclipse Mosquitto 2.0 | Docker container | 1883 (TCP), 9001 (WS) |
-| Backend API | ASP.NET Core 8, C# | `Backend/src/IoT.Backend/` | 8000 |
-| Frontend | Angular 19, TypeScript | `Frontend/` | 4200 |
-| ML Service | Python, FastAPI | `ML/` | 8001 |
+| Backend API | ASP.NET Core 8, C# | `backend/src/IoT.Backend/` | 8000 |
+| Frontend | Angular 19, TypeScript | `frontend/` | 4200 |
+| ML Service | Python, FastAPI | `ml/` | 8001 |
 | Database | MongoDB 7.0 | Docker container | 27017 |
 
 ## 2. Data Flow Summary

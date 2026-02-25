@@ -7,13 +7,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Backend", "Backend", "{1AE8
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{0F9113EE-888A-26D2-68B0-4A7D0A2A8745}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoT.Backend", "Backend\src\IoT.Backend\IoT.Backend.csproj", "{9758669B-0BC0-2EAC-0189-1EB330F26836}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoT.Backend", "src\IoT.Backend\IoT.Backend.csproj", "{9758669B-0BC0-2EAC-0189-1EB330F26836}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{F57642F3-C37C-D174-720E-6A6AAD5BEE22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoT.Backend.UnitTests", "Backend\tests\IoT.Backend.UnitTests\IoT.Backend.UnitTests.csproj", "{D6C9D347-96FD-4CAE-A13D-4F5B0D267AE9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoT.Backend.UnitTests", "tests\IoT.Backend.UnitTests\IoT.Backend.UnitTests.csproj", "{D6C9D347-96FD-4CAE-A13D-4F5B0D267AE9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoT.Backend.IntegrationTests", "Backend\tests\IoT.Backend.IntegrationTests\IoT.Backend.IntegrationTests.csproj", "{5D3FD425-ADB0-4483-B352-36C6B20E0C32}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoT.Backend.IntegrationTests", "tests\IoT.Backend.IntegrationTests\IoT.Backend.IntegrationTests.csproj", "{5D3FD425-ADB0-4483-B352-36C6B20E0C32}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -47,7 +47,7 @@ The .NET backend has a **solid foundation** with core CRUD operations, MQTT inte
 
 **Go Backend:**
 ```
-Backend/internal/
+backend/internal/
 ├── config/           # Configuration loading
 ├── db/               # MongoDB connection
 ├── googlehome/       # Google Home integration
@@ -65,7 +65,7 @@ Backend/internal/
 
 **.NET Backend:**
 ```
-Backend/src/IoT.Backend/
+backend/src/IoT.Backend/
 ├── Controllers/      # HTTP endpoints (7 controllers)
 ├── Models/           # Domain models (8 files)
 ├── Repositories/     # Data access (interface + impl)
@@ -506,7 +506,7 @@ public class RadarCache : IRadarCache
 
 ### 3.9 Google Home Integration (OPTIONAL)
 
-**Go Implementation:** `Backend/internal/googlehome/`
+**Go Implementation:** `backend/internal/googlehome/`
 
 This is a complete module with:
 - OAuth2 flow handlers

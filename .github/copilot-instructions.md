@@ -3,21 +3,21 @@
 Purpose: keep the ESP32 firmware, ASP.NET Core backend, ML service, and Angular UI moving fast without breaking the tight real-time control loops. Favor incremental fixes, follow existing patterns, and document any workflow changes.
 
 ## Architecture snapshot
-- Coordinator (ESP32-S3, PlatformIO/Arduino) orchestrates ESP-NOW tower nodes, MQTT uplink, Wi-Fi setup, and serial diagnostics; entry point lives in `Firmware/coordinator/src/core/Coordinator.*`.
-- Tower nodes (ESP32-C3/C6) share code via `Firmware/shared/` and talk ESP-NOW only; backend (`Backend/src/IoT.Backend`) and Angular frontend (`Frontend/src/app`) consume/publish MQTT + WebSockets.
-- ML service (`ML/src/`) provides anomaly detection, crop clustering, drift forecasting via FastAPI.
+- Coordinator (ESP32-S3, PlatformIO/Arduino) orchestrates ESP-NOW tower nodes, MQTT uplink, Wi-Fi setup, and serial diagnostics; entry point lives in `firmware/coordinator/src/core/Coordinator.*`.
+- Tower nodes (ESP32-C3/C6) share code via `firmware/shared/` and talk ESP-NOW only; backend (`backend/src/IoT.Backend`) and Angular frontend (`frontend/src/app`) consume/publish MQTT + WebSockets.
+- ML service (`ml/src/`) provides anomaly detection, crop clustering, drift forecasting via FastAPI.
 - Data path: Tower telemetry -> ESP-NOW -> Coordinator -> MQTT (`farm/{farmId}/coord/{coordId}/...`) -> backend -> MongoDB + WebSocket broadcast -> frontend dashboard.
 
 ## Project structure
-- `Backend/` — ASP.NET Core 8 API (C#), MongoDB, MQTT bridge, Digital Twin service
-- `Frontend/` — Angular 19 dashboard with Tailwind, ECharts, Three.js, spartan-ng UI
-- `Firmware/coordinator/` — ESP32-S3 coordinator firmware
-- `Firmware/node/` — ESP32-C3/C6 tower node firmware
-- `Firmware/shared/` — Shared ESP-NOW message types and config
-- `ML/` — Python FastAPI ML service (scikit-learn models)
+- `backend/` — ASP.NET Core 8 API (C#), MongoDB, MQTT bridge, Digital Twin service
+- `frontend/` — Angular 19 dashboard with Tailwind, ECharts, Three.js, spartan-ng UI
+- `firmware/coordinator/` — ESP32-S3 coordinator firmware
+- `firmware/node/` — ESP32-C3/C6 tower node firmware
+- `firmware/shared/` — Shared ESP-NOW message types and config
+- `ml/` — Python FastAPI ML service (scikit-learn models)
 - `tools/simulator/` — Python telemetry simulator for testing
 - `docs/` — Unified documentation (plans, reports, architecture, logging, pairing)
-- `Assets/Diagrams/` — PlantUML architecture diagrams
+- `docs/diagrams/` — PlantUML architecture diagrams
 
 ## Coordinator subsystems
 - Startup (`src/main.cpp`): Serial banner -> `Logger::begin` -> NVS init -> `coordinator.begin()` -> tight loop with `delay(1)`.
@@ -37,11 +37,11 @@ Purpose: keep the ESP32 firmware, ASP.NET Core backend, ML service, and Angular 
   - `.../cmd` topics deliver downlink commands. Keep schema additive.
 
 ## Developer workflows
-- Build & flash coordinator: `cd Firmware/coordinator && pio run -e esp32-s3-devkitc-1 -t upload -t monitor`
-- Build tower nodes: `cd Firmware/node && pio run -e esp32-c3-mini-1`
-- Backend: `cd Backend/src/IoT.Backend && dotnet run`
-- Frontend: `cd Frontend && npm install && npm start`
-- ML service: `cd ML && pip install -r requirements.txt && uvicorn src.api.main:app`
+- Build & flash coordinator: `cd firmware/coordinator && pio run -e esp32-s3-devkitc-1 -t upload -t monitor`
+- Build tower nodes: `cd firmware/node && pio run -e esp32-c3-mini-1`
+- Backend: `cd backend/src/IoT.Backend && dotnet run`
+- Frontend: `cd frontend && npm install && npm start`
+- ML service: `cd ml && pip install -r requirements.txt && uvicorn src.api.main:app`
 - Simulator: `cd tools/simulator && python run.py --scenario steady-state`
 - Docker: `docker compose up -d` (full stack)
 

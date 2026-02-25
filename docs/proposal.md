@@ -166,7 +166,7 @@ These challenges result in reduced crop yields, increased labor costs, and inabi
 
 The **Intelligent Hydroponics IoT System** addresses these challenges through a comprehensive distributed architecture that optimizes and scales hydroponic farming operations:
 
-![System Architecture](Assets/Diagrams/system-architecture.png)
+![System Architecture](docs/diagrams/system-architecture.png)
 
 *Figure 1: High-Level System Architecture - Intelligent Hydroponics IoT System*
 
@@ -188,12 +188,12 @@ The system includes a virtual replica of the entire farm, enabling simulation, t
 
 > **To View the Diagram:**  
 > 1. Go to http://www.plantuml.com/plantuml/uml/
-> 2. Open `Assets/Diagrams/system-architecture-simple.puml` in a text editor
+> 2. Open `docs/diagrams/system-architecture-simple.puml` in a text editor
 > 3. Copy all content and paste into the website
 > 4. The diagram will render automatically
 > 5. Download as PNG or SVG for your document
 >
-> **Note:** The PlantUML source file (`system-architecture-simple.puml`) contains no external dependencies and will render reliably. See `Assets/Diagrams/HOWTO-RENDER.md` for alternative rendering methods (VS Code, command line, Docker).
+> **Note:** The PlantUML source file (`system-architecture-simple.puml`) contains no external dependencies and will render reliably. See `docs/diagrams/HOWTO-RENDER.md` for alternative rendering methods (VS Code, command line, Docker).
 
 **Key Features:**
 - Real-time monitoring of pH, EC, TDS, water temperature, and water levels

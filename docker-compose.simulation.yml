@@ -36,8 +36,8 @@ services:
     ports:
       - "1884:1883"
     volumes:
-      - ./Backend/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
-      - ./Backend/config/pwfile:/mosquitto/config/pwfile
+      - ./backend/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./backend/config/pwfile:/mosquitto/config/pwfile
       - sim_mosquitto_data:/mosquitto/data
     networks:
       - sim-network
@@ -51,7 +51,7 @@ services:
   # ASP.NET Core Backend (simulation)
   backend-sim:
     build:
-      context: ./Backend/src/IoT.Backend
+      context: ./backend/src/IoT.Backend
       dockerfile: Dockerfile
     container_name: sim-backend
     restart: unless-stopped
