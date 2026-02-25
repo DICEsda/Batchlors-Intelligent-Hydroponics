@@ -40,10 +40,7 @@ build/
 *.so
 *.dylib
 
-# Go
-vendor/
-*.test
-*.out
+
 
 # Node
 node_modules/
@@ -87,8 +84,15 @@ nul
 # Session files
 session-*.md
 
-# PlantUML rendered output
+# PlantUML
 out/
+plantuml.jar
+
+# Credentials (generate on deploy)
+backend/config/pwfile
+*.pem
+*.key
+*.crt
 
 # OpenCode configuration (contains API keys)
 opencode.json
