@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace IoT.Backend.Repositories;
@@ -24,7 +25,7 @@ public abstract class MongoRepository<T> where T : class
 
     public virtual async Task<T?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         return await Collection.Find(filter).FirstOrDefaultAsync(ct);
     }
 
@@ -48,7 +49,7 @@ public abstract class MongoRepository<T> where T : class
             return await InsertAsync(entity, ct);
         }
 
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         var options = new ReplaceOptions { IsUpsert = true };
         
         await Collection.ReplaceOneAsync(filter, entity, options, ct);
@@ -57,7 +58,7 @@ public abstract class MongoRepository<T> where T : class
 
     public virtual async Task<T> UpdateAsync(string id, UpdateDefinition<T> update, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         var options = new FindOneAndUpdateOptions<T>
         {
             ReturnDocument = ReturnDocument.After
@@ -68,7 +69,7 @@ public abstract class MongoRepository<T> where T : class
 
     public virtual async Task DeleteAsync(string id, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         await Collection.DeleteOneAsync(filter, ct);
     }
 }
