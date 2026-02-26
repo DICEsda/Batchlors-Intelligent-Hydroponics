@@ -413,8 +413,7 @@ public class TwinService : ITwinService
             return;
         }
 
-        // Publish to MQTT topic: hydro/{farm_id}/{coord_id}/tower/{tower_id}/cmd
-        var topic = $"hydro/{twin.FarmId}/{twin.CoordId}/tower/{twin.TowerId}/cmd";
+        var topic = MqttTopics.TowerCmd(twin.FarmId, twin.CoordId, twin.TowerId);
         var payload = System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(delta));
 
         await _mqttService.PublishAsync(topic, payload, ct: ct);
@@ -433,8 +432,7 @@ public class TwinService : ITwinService
             return;
         }
 
-        // Publish to MQTT topic: hydro/{farm_id}/{coord_id}/cmd
-        var topic = $"hydro/{twin.FarmId}/{twin.CoordId}/cmd";
+        var topic = MqttTopics.CoordinatorCmd(twin.FarmId, twin.CoordId);
         var payload = System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(delta));
 
         await _mqttService.PublishAsync(topic, payload, ct: ct);
