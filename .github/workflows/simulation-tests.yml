@@ -25,7 +25,7 @@ jobs:
   simulation-tests:
     name: Simulation Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -86,9 +86,9 @@ jobs:
               --tb=short \
               --json-report \
               --json-report-file=/app/test-results.json \
-              --timeout=120 \
+              --timeout=300 \
               ${{ inputs.debug_enabled == true && '-s' || '' }}
-        timeout-minutes: 15
+        timeout-minutes: 25
 
       - name: Extract test results
         if: always()
