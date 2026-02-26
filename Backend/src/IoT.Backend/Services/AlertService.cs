@@ -151,19 +151,12 @@ public class AlertService : IAlertService
             }
         }
 
-        // 6. Check pump status (if available)
-        if (coordinator.MainPumpOn == false) // Assume false means pump failure
-        {
-            await CreateAlertAsync(
-                farmId, coordId, null,
-                "critical", "pump_failure",
-                $"Coordinator {coordId} pump has failed or is not running",
-                ct);
-        }
-        else if (coordinator.MainPumpOn == true)
-        {
-            await AutoResolveAlertAsync($"{farmId}:{coordId}:pump_failure", ct);
-        }
+        // 6. Pump failure detection disabled — MainPumpOn == false is normal
+        //    scheduled operation, not a hardware failure. True pump failure
+        //    detection requires comparing desired vs reported state via the
+        //    digital twin system. See GitHub issue #68.
+        //    Auto-resolve any existing pump_failure alerts from the old logic.
+        await AutoResolveAlertAsync($"{farmId}:{coordId}:pump_failure", ct);
     }
 
     /// <summary>
