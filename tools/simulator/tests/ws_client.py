@@ -18,8 +18,15 @@ from typing import Any, Dict, List, Optional
 try:
     import websockets
     import websockets.client
+
+    # Detect which API generation is available.
+    # websockets < 14  → legacy API  (extra_headers, websockets.client.connect)
+    # websockets >= 14 → new API     (additional_headers, websockets.asyncio.client.connect)
+    _ws_major = int(getattr(websockets, "__version__", "0").split(".")[0])
+    _WS_LEGACY = _ws_major < 14
 except ImportError:
     websockets = None  # type: ignore
+    _WS_LEGACY = True
 
 
 API_URL = os.environ.get("SIM_API_URL", "http://backend-sim:8000").rstrip("/")
@@ -67,6 +74,7 @@ class WebSocketTestClient:
         self._ws: Optional[Any] = None
         self._connected = threading.Event()
         self._stop_event: Optional[asyncio.Event] = None
+        self._connect_error: Optional[Exception] = None
         self._client_id = f"ws-test-{uuid.uuid4().hex[:8]}"
 
     def connect(self, timeout: float = 15):
@@ -80,6 +88,13 @@ class WebSocketTestClient:
                 f"within {timeout}s"
             )
 
+        # If the background loop caught an exception during connect, propagate it.
+        if self._connect_error is not None:
+            raise ConnectionError(
+                f"WebSocketTestClient connection to {self._ws_url} failed: "
+                f"{self._connect_error}"
+            ) from self._connect_error
+
     def _run_loop(self):
         """Background thread: create event loop, connect, and receive."""
         self._loop = asyncio.new_event_loop()
@@ -90,12 +105,21 @@ class WebSocketTestClient:
     async def _receive_loop(self):
         """Async receive loop — connects and processes messages."""
         try:
+            # Build keyword arguments compatible with the installed websockets version.
+            # Legacy (< 14) uses ``extra_headers``; new (>= 14) uses ``additional_headers``.
+            header_kwarg = (
+                "extra_headers" if _WS_LEGACY else "additional_headers"
+            )
+            connect_kwargs = {
+                header_kwarg: {"X-Client-Id": self._client_id},
+                "ping_interval": 20,
+                "ping_timeout": 10,
+                "close_timeout": 5,
+            }
+
             async with websockets.client.connect(
                 self._ws_url,
-                additional_headers={"X-Client-Id": self._client_id},
-                ping_interval=20,
-                ping_timeout=10,
-                close_timeout=5,
+                **connect_kwargs,
             ) as ws:
                 self._ws = ws
                 self._connected.set()
@@ -103,14 +127,17 @@ class WebSocketTestClient:
                 while not self._stop_event.is_set():
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                        if isinstance(raw, bytes):
+                            raw = raw.decode("utf-8", errors="replace")
                         self._process_message(raw)
                     except asyncio.TimeoutError:
                         continue
                     except websockets.exceptions.ConnectionClosed:
                         break
         except Exception as e:
-            # Connection failed — set connected event anyway so connect()
-            # doesn't hang forever, caller will see empty messages
+            # Connection failed — store the error and set connected event
+            # so connect() doesn't hang forever. Caller can inspect _connect_error.
+            self._connect_error = e
             self._connected.set()
 
     def _process_message(self, raw: str):

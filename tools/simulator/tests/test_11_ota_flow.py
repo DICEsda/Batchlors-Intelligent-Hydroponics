@@ -13,7 +13,7 @@ Addresses GitHub issues: #111 (OTA flow)
 import time
 import pytest
 
-from device_simulator import DeviceSimulator
+from .device_simulator import DeviceSimulator
 
 pytestmark = pytest.mark.timeout(120)
 

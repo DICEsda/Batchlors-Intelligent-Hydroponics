@@ -14,7 +14,7 @@ import uuid
 import pytest
 
 try:
-    from ws_client import WebSocketTestClient
+    from .ws_client import WebSocketTestClient
     WS_AVAILABLE = True
 except ImportError:
     WS_AVAILABLE = False
@@ -170,8 +170,9 @@ class TestConnectionStatusBroadcast:
         try:
             msg = ws_client.wait_for_message("connection_status", timeout=15)
             assert msg.type == "connection_status"
-            assert msg.payload.get("coord_id") == coord_id or \
-                   msg.payload.get("coordId") == coord_id
+            inner = msg.payload.get("payload", msg.payload)
+            assert inner.get("coord_id") == coord_id or \
+                   inner.get("coordId") == coord_id
         except TimeoutError:
             # Connection status might be delivered under a different type
             all_msgs = ws_client.get_messages()
@@ -214,8 +215,9 @@ class TestRegistrationBroadcast:
             msg = ws_client.wait_for_message(
                 "coordinator_registration_request", timeout=15
             )
-            assert msg.payload.get("coord_id") == unique_id or \
-                   msg.payload.get("coordId") == unique_id
+            inner = msg.payload.get("payload", msg.payload)
+            assert inner.get("coord_id") == unique_id or \
+                   inner.get("coordId") == unique_id
         except TimeoutError:
             # Registration broadcast might use a different type name
             all_msgs = ws_client.get_messages()

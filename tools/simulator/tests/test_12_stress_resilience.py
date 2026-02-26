@@ -17,7 +17,7 @@ import uuid
 import threading
 import pytest
 
-from conftest import (
+from .conftest import (
     MqttTestClient, ApiTestClient,
     MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASS,
     _create_farm, _register_coordinator, _register_tower,

@@ -14,7 +14,7 @@ Addresses GitHub issues: #105 (downlink commands), #106 (twin sync)
 import time
 import pytest
 
-from device_simulator import DeviceSimulator
+from .device_simulator import DeviceSimulator
 
 pytestmark = pytest.mark.timeout(120)
 
@@ -65,7 +65,7 @@ class TestTowerCommands:
                 f"/api/twins/towers/{tower_id}/desired",
                 json_data={"light_on": True, "light_brightness": 180},
             )
-            assert r.status_code in (200, 204), (
+            assert r.status_code in (200, 202, 204), (
                 f"Twin desired state update returned {r.status_code}: {r.text}"
             )
 
@@ -118,7 +118,7 @@ class TestTowerCommands:
             f"/api/twins/towers/{tower_id}/desired",
             json_data={"pump_on": True},
         )
-        assert r.status_code in (200, 204), (
+        assert r.status_code in (200, 202, 204), (
             f"Twin desired state update returned {r.status_code}: {r.text}"
         )
         
@@ -233,11 +233,11 @@ class TestCoordinatorCommands:
         
         device_sim.clear()
         
-        r = api_client.post(
-            "/api/coordinators/restart",
-            json_data={"coord_id": coord_id},
+        r = api_client.put(
+            f"/api/twins/coordinators/{coord_id}/desired",
+            json_data={"status_mode": "restart"},
         )
-        assert r.status_code in (200, 204), (
+        assert r.status_code in (200, 202, 204), (
             f"Restart command returned {r.status_code}: {r.text}"
         )
         
@@ -265,7 +265,7 @@ class TestTwinDesiredReportedSync:
             f"/api/twins/towers/{tower_id}/desired",
             json_data={"light_on": True, "light_brightness": 200},
         )
-        assert r.status_code in (200, 204), (
+        assert r.status_code in (200, 202, 204), (
             f"PUT desired returned {r.status_code}: {r.text}"
         )
         
@@ -288,7 +288,7 @@ class TestTwinDesiredReportedSync:
             f"/api/twins/towers/{tower_id}/desired",
             json_data={"light_brightness": 255},
         )
-        assert r.status_code in (200, 204)
+        assert r.status_code in (200, 202, 204)
         
         # Check delta
         r = api_client.get(f"/api/twins/towers/{tower_id}/delta")
