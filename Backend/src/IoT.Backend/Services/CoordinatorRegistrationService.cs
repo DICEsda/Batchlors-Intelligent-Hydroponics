@@ -382,6 +382,18 @@ public class CoordinatorRegistrationService : ICoordinatorRegistrationService
     }
 
     /// <inheritdoc />
+    public void ResetAll()
+    {
+        _registeredCache.Clear();
+        _pendingRegistrations.Clear();
+        lock (_rejectedLock)
+        {
+            _rejectedCoordinators.Clear();
+        }
+        _logger.LogInformation("Coordinator registration caches cleared (registered, pending, rejected)");
+    }
+
+    /// <inheritdoc />
     public async Task RefreshCacheAsync(CancellationToken ct = default)
     {
         try

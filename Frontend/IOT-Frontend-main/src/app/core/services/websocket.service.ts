@@ -182,6 +182,9 @@ export class WebSocketService {
   private readonly coordinatorRegistrationSubject = new Subject<WSCoordinatorRegistrationPayload>();
   private readonly coordinatorRegisteredSubject = new Subject<WSCoordinatorRegisteredPayload>();
 
+  // System events
+  private readonly systemResetSubject = new Subject<{ resetAt: string; collectionsDropped: string[] }>();
+
   // Observable streams for consumers
   public readonly messages$ = this.messageSubject.asObservable();
   public readonly reservoirTelemetry$ = this.reservoirTelemetrySubject.asObservable();
@@ -205,6 +208,9 @@ export class WebSocketService {
   // Coordinator registration observable streams
   public readonly coordinatorRegistration$ = this.coordinatorRegistrationSubject.asObservable();
   public readonly coordinatorRegistered$ = this.coordinatorRegisteredSubject.asObservable();
+
+  // System event observable streams
+  public readonly systemReset$ = this.systemResetSubject.asObservable();
 
   constructor() {
     if (this.env.isDevelopment) {
@@ -686,6 +692,19 @@ export class WebSocketService {
         // Just log — components can subscribe via messages$ if needed
         console.log('[WS] Coordinator event:', data.type, data.payload);
         break;
+
+      // ====================================================================
+      // System Events
+      // ====================================================================
+      case 'system_reset': {
+        const resetPayload = data.payload as any;
+        this.systemResetSubject.next({
+          resetAt: resetPayload?.resetAt ?? resetPayload?.reset_at ?? new Date().toISOString(),
+          collectionsDropped: resetPayload?.collectionsDropped ?? resetPayload?.collections_dropped ?? []
+        });
+        console.log('[WS] System reset event received:', data.payload);
+        break;
+      }
 
       // ====================================================================
       // Diagnostics

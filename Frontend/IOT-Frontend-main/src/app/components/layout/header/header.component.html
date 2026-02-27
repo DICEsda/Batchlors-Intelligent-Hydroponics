@@ -39,8 +39,11 @@
            [title]="wsConnected() ? 'Real-time connection active' : 'Real-time connection lost'">
         <span class="ws-dot"></span>
       </div>
-      <button hlmBtn variant="outline" size="sm" (click)="refreshData()" class="refresh-btn">
+      <button hlmBtn variant="outline" size="sm" (click)="refreshData()" class="refresh-btn" title="Refresh data">
         <ng-icon hlmIcon name="lucideRefreshCw" size="sm" />
+      </button>
+      <button hlmBtn variant="outline" size="sm" (click)="openResetDialog()" class="reset-btn" title="Factory reset — clear all data">
+        <ng-icon hlmIcon name="lucideDatabaseZap" size="sm" />
       </button>
     </div>
 
@@ -231,6 +234,42 @@
         } @else {
           <ng-icon name="lucideCheck" size="16" />
           Approve & Register
+        }
+      </button>
+    </div>
+  </div>
+</hlm-dialog>
+
+<!-- Factory Reset Confirmation Dialog -->
+<hlm-dialog [isOpen]="showResetDialog()" [size]="'sm'" (closed)="closeResetDialog()">
+  <div class="reset-dialog">
+    <button hlmDialogClose (click)="closeResetDialog()" class="dialog-close-btn">
+      <ng-icon name="lucideX" size="20" />
+    </button>
+
+    <div hlmDialogHeader>
+      <div class="dialog-icon danger">
+        <ng-icon name="lucideDatabaseZap" size="32" />
+      </div>
+      <h2 hlmDialogTitle>Factory Reset</h2>
+      <p hlmDialogDescription>
+        This will <strong>permanently delete all data</strong> from the system:
+        farms, coordinators, towers, telemetry history, alerts, and digital twins.
+        The simulator will need to re-register all devices.
+      </p>
+    </div>
+
+    <div hlmDialogFooter>
+      <button hlmBtn variant="outline" (click)="closeResetDialog()" [disabled]="isResetting()">
+        Cancel
+      </button>
+      <button hlmBtn variant="destructive" (click)="confirmFactoryReset()" [disabled]="isResetting()">
+        @if (isResetting()) {
+          <ng-icon name="lucideRefreshCw" size="16" class="animate-spin" />
+          Resetting...
+        } @else {
+          <ng-icon name="lucideDatabaseZap" size="16" />
+          Reset Everything
         }
       </button>
     </div>

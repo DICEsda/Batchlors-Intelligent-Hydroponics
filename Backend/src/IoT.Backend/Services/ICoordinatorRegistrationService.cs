@@ -55,6 +55,12 @@ public interface ICoordinatorRegistrationService
     /// Called on startup.
     /// </summary>
     Task RefreshCacheAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Clear all in-memory caches (registered, pending, rejected).
+    /// Used during factory reset to allow coordinators to re-register cleanly.
+    /// </summary>
+    void ResetAll();
 }
 
 /// <summary>

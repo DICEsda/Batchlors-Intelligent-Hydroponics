@@ -89,7 +89,9 @@ export type WSMessageType =
   // Diagnostics
   | 'diagnostics_update'
   // Throttled telemetry batch
-  | 'telemetry_batch';
+  | 'telemetry_batch'
+  // System operations
+  | 'system_reset';
 
 export interface WSMessage<T = unknown> {
   type: WSMessageType;

@@ -17,7 +17,8 @@ import {
   lucideRadioTower,
   lucideX,
   lucideCheck,
-  lucideAlertTriangle
+  lucideAlertTriangle,
+  lucideDatabaseZap
 } from '@ng-icons/lucide';
 
 import { ThemeService, Theme } from '../../../core/services/theme.service';
@@ -77,7 +78,8 @@ import { NotificationsDropdownComponent } from '../../ui/notifications-dropdown/
       lucideRadioTower,
       lucideX,
       lucideCheck,
-      lucideAlertTriangle
+      lucideAlertTriangle,
+      lucideDatabaseZap
     })
   ],
   templateUrl: './header.component.html',
@@ -118,6 +120,10 @@ export class HeaderComponent implements OnDestroy {
   readonly regFormFarmId = signal<string>('');
   readonly regFormTags = signal<string>('');
   readonly isSubmitting = signal<boolean>(false);
+
+  // Factory reset state
+  readonly showResetDialog = signal<boolean>(false);
+  readonly isResetting = signal<boolean>(false);
   
   constructor() {
     // Setup debounced search
@@ -145,6 +151,14 @@ export class HeaderComponent implements OnDestroy {
           return [...regs, registration];
         });
         // Urgent toast + notification center are handled by NotificationListenerService
+      })
+    );
+
+    // Listen for system reset events from other clients
+    this.subscriptions.push(
+      this.wsService.systemReset$.subscribe(() => {
+        this.dataService.clearAll();
+        this.toastService.info('System Reset', 'All data has been cleared by a system reset.');
       })
     );
 
@@ -301,6 +315,43 @@ export class HeaderComponent implements OnDestroy {
         this.toastService.error(
           'Rejection Failed',
           `Could not reject coordinator: ${err.message || 'Unknown error'}`
+        );
+      }
+    });
+  }
+
+  // ============================================================================
+  // Factory Reset Methods
+  // ============================================================================
+
+  openResetDialog(): void {
+    this.showResetDialog.set(true);
+  }
+
+  closeResetDialog(): void {
+    this.showResetDialog.set(false);
+    this.isResetting.set(false);
+  }
+
+  confirmFactoryReset(): void {
+    this.isResetting.set(true);
+
+    this.apiService.factoryReset().subscribe({
+      next: (res) => {
+        // Clear all local data immediately (WS event will also do this for other clients)
+        this.dataService.clearAll();
+        this.pendingCoordinatorRegistrations.set([]);
+        this.closeResetDialog();
+        this.toastService.success(
+          'Factory Reset Complete',
+          res.message || `Dropped ${res.collectionsDropped?.length ?? 0} collections.`
+        );
+      },
+      error: (err) => {
+        this.isResetting.set(false);
+        this.toastService.error(
+          'Factory Reset Failed',
+          `Could not reset system: ${err.message || 'Unknown error'}`
         );
       }
     });

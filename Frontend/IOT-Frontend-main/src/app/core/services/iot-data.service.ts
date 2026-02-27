@@ -670,6 +670,30 @@ export class IoTDataService {
   }
 
   // ============================================================================
+  // Factory Reset — clear all local state
+  // ============================================================================
+
+  /**
+   * Clear all data signals. Called after a factory reset or when receiving
+   * a system_reset WebSocket event.
+   */
+  clearAll(): void {
+    this.sites.set([]);
+    this.coordinators.set([]);
+    this.nodes.set([]);
+    this.zones.set([]);
+    this.alerts.set([]);
+    this.selectedSite.set(null);
+    this.selectedCoordinator.set(null);
+    this.selectedNode.set(null);
+    this.selectedZone.set(null);
+    this.nodeTelemetry.set(new Map());
+    this.healthStatus.set(null);
+    this.systemMetrics.set(null);
+    this.error.set(null);
+  }
+
+  // ============================================================================
   // Cleanup
   // ============================================================================
 

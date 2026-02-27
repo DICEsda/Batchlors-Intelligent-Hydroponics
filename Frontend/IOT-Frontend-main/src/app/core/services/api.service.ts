@@ -637,6 +637,17 @@ export class ApiService {
   }
 
   // ============================================================================
+  // System Operations
+  // ============================================================================
+
+  /**
+   * Factory reset — drops all MongoDB collections and clears caches
+   */
+  factoryReset(): Observable<{ success: boolean; collectionsDropped: string[]; message: string }> {
+    return this.post('/api/system/factory-reset', {});
+  }
+
+  // ============================================================================
   // Private HTTP Methods
   // ============================================================================
 
