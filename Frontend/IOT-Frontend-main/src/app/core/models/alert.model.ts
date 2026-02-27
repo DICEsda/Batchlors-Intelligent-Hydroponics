@@ -41,6 +41,11 @@ export interface Alert {
   resolvedAt?: Date | string;
   resolvedBy?: string;
   metadata?: Record<string, unknown>;
+
+  /** Farm / site identifier (populated from backend farm_id) */
+  farmId?: string;
+  /** Coordinator / reservoir identifier (populated from backend coord_id) */
+  coordId?: string;
 }
 
 /**

@@ -2,6 +2,7 @@ import { Component, OnInit, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AlertService } from '../../core/services/alert.service';
+import { IoTDataService } from '../../core/services/iot-data.service';
 import { Alert, AlertSeverity, AlertStatus } from '../../core/models';
 
 import { HlmBadgeDirective } from '../../components/ui/badge';
@@ -30,6 +31,8 @@ import {
   lucideServer,
   lucideLightbulb,
   lucideMonitor,
+  lucideMapPin,
+  lucideDroplets,
 } from '@ng-icons/lucide';
 
 @Component({
@@ -66,6 +69,8 @@ import {
       lucideServer,
       lucideLightbulb,
       lucideMonitor,
+      lucideMapPin,
+      lucideDroplets,
     }),
   ],
   templateUrl: './alerts-dashboard.component.html',
@@ -73,6 +78,7 @@ import {
 })
 export class AlertsDashboardComponent implements OnInit {
   readonly alertService = inject(AlertService);
+  private readonly iotData = inject(IoTDataService);
 
   // Expose service signals to template
   readonly stats = this.alertService.alertStats;
@@ -97,6 +103,14 @@ export class AlertsDashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.alertService.loadAlerts();
+
+    // Ensure sites & coordinators are loaded for farm/reservoir name lookups
+    if (this.iotData.sites().length === 0) {
+      this.iotData.loadSites().catch(() => {});
+    }
+    if (this.iotData.coordinators().length === 0) {
+      this.iotData.loadCoordinators().catch(() => {});
+    }
   }
 
   // ---- Filter Handlers ----
@@ -170,5 +184,37 @@ export class AlertsDashboardComponent implements OnInit {
 
   trackByAlertId(_index: number, alert: Alert): string {
     return alert._id;
+  }
+
+  // ---- Location Helpers ----
+
+  /**
+   * Look up farm/site name from IoTDataService.sites() signal.
+   * The snakeCaseInterceptor converts _id to _id (preserved) and site_id to siteId at runtime.
+   */
+  getFarmName(farmId: string | undefined): string {
+    if (!farmId) return '';
+    const sites = this.iotData.sites();
+    // The API returns farm_id -> farmId (after interceptor), plus id/_id for MongoDB ObjectId
+    const site = sites.find(s => {
+      const a = s as any;
+      return a.farmId === farmId || a.farm_id === farmId
+        || a._id === farmId || a.id === farmId;
+    });
+    return site?.name ?? farmId;
+  }
+
+  /**
+   * Look up coordinator/reservoir name from IoTDataService.coordinators() signal.
+   */
+  getCoordinatorName(coordId: string | undefined): string {
+    if (!coordId) return '';
+    const coords = this.iotData.coordinators();
+    const coord = coords.find(c => {
+      const a = c as any;
+      return a.coordId === coordId || a.coord_id === coordId
+        || a._id === coordId || a.macAddress === coordId || a.mac_address === coordId;
+    });
+    return coord?.name ?? coordId;
   }
 }

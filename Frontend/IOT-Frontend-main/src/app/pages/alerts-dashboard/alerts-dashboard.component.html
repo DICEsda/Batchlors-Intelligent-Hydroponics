@@ -160,16 +160,27 @@
             <!-- Message -->
             <p class="alert-message">{{ alert.message }}</p>
 
+            <!-- Location Context: Farm + Reservoir -->
+            @if (alert.farmId || alert.coordId) {
+              <div class="alert-location-row">
+                @if (alert.farmId) {
+                  <span class="location-tag farm-tag">
+                    <ng-icon name="lucideMapPin" size="12" />
+                    {{ getFarmName(alert.farmId) }}
+                  </span>
+                }
+                @if (alert.coordId) {
+                  <span class="location-tag reservoir-tag">
+                    <ng-icon name="lucideDroplets" size="12" />
+                    {{ getCoordinatorName(alert.coordId) }}
+                  </span>
+                }
+              </div>
+            }
+
             <!-- Bottom Row: Source + Metadata + Actions -->
             <div class="alert-bottom-row">
               <div class="alert-details">
-                @if (alert.source) {
-                  <span class="alert-source">
-                    <ng-icon [name]="getSourceIcon(alert.source.type)" size="14" />
-                    {{ alert.source.name }}
-                    <span class="source-id">({{ alert.source.id }})</span>
-                  </span>
-                }
                 @if (alert.metadata) {
                   <span class="alert-metadata">
                     @if (alert.metadata['reading'] !== undefined && alert.metadata['threshold'] !== undefined) {

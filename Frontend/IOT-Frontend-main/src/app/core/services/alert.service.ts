@@ -369,15 +369,19 @@ export class AlertService {
    * (after the snakeCaseInterceptor converts snake_case keys to camelCase).
    */
   private normalizeAlert(raw: any): Alert {
+    const farmId: string = raw.farmId ?? raw.farm_id ?? '';
+    const coordId: string = raw.coordId ?? raw.coord_id ?? '';
+
     // Already normalised (has source object)?
     if (raw.source && typeof raw.source === 'object') {
       return {
         ...raw,
         _id: raw._id ?? raw.id ?? '',
+        farmId: raw.farmId ?? raw.farm_id ?? farmId,
+        coordId: raw.coordId ?? raw.coord_id ?? coordId,
       } as Alert;
     }
 
-    const coordId: string = raw.coordId ?? raw.coord_id ?? '';
     const category: string = raw.category ?? 'sensor';
 
     // Derive a human-readable title from the category
@@ -399,6 +403,8 @@ export class AlertService {
       acknowledgedAt: raw.acknowledgedAt ?? raw.acknowledged_at,
       resolvedAt: raw.resolvedAt ?? raw.resolved_at,
       metadata: raw.metadata ?? undefined,
+      farmId,
+      coordId,
     };
   }
 

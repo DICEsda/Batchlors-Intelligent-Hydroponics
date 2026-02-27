@@ -48,7 +48,7 @@ import { HlmIconDirective } from '../icon';
         [attr.aria-expanded]="isOpen()"
         aria-label="Notifications"
       >
-        <ng-icon hlmIcon name="lucideBell" size="sm" />
+        <ng-icon hlmIcon name="lucideBell" size="sm" class="bell-icon" />
         @if (notificationService.unreadCount() > 0) {
           <span class="notification-badge">
             {{ notificationService.unreadCount() > 9 ? '9+' : notificationService.unreadCount() }}
@@ -162,6 +162,17 @@ import { HlmIconDirective } from '../icon';
 
     .notifications-trigger {
       position: relative;
+      color: var(--muted-foreground);
+
+      &:hover {
+        color: var(--foreground);
+      }
+    }
+
+    .bell-icon {
+      --ng-icon__size: 20px !important;
+      width: 20px !important;
+      height: 20px !important;
     }
 
     .notification-badge {
