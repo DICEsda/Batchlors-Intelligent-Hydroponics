@@ -20,7 +20,7 @@ import { HlmBadgeDirective } from '../../components/ui/badge';
 import { HlmButtonDirective } from '../../components/ui/button';
 import { IoTDataService } from '../../core/services/iot-data.service';
 import { ApiService } from '../../core/services/api.service';
-import { Farm, FarmSummary, CoordinatorSummary, NodeSummary } from '../../core/models';
+import { Farm, FarmSummary, CoordinatorSummary, NodeSummary, getCoordinatorStatus, CoordinatorStatus } from '../../core/models';
 import { FarmDialogComponent, FarmDialogData } from '../../components/farm-dialog/farm-dialog.component';
 
 @Component({
@@ -80,11 +80,17 @@ export class FarmsListComponent implements OnInit {
         farmReservoirs.some(r => r._id === n.coordinator_id || r.coord_id === n.coordinator_id)
       );
 
+      // Compute live connection status for each reservoir using getCoordinatorStatus
+      const reservoirsWithStatus = farmReservoirs.map(r => ({
+        ...r,
+        status: getCoordinatorStatus(r)
+      }));
+
       return {
         ...farm,
-        reservoirs: farmReservoirs,
+        reservoirs: reservoirsWithStatus,
         towers: farmTowers,
-        onlineReservoirs: farmReservoirs.filter(r => r.status === 'online').length,
+        onlineReservoirs: reservoirsWithStatus.filter(r => r.status === 'online').length,
         onlineTowers: farmTowers.filter(t => t.status_mode === 'operational').length
       };
     });
@@ -133,7 +139,7 @@ export class FarmsListComponent implements OnInit {
           plantType: farm.plantType,
           reservoirCount: farmCoords.length,
           towerCount: farmTowers.length,
-          onlineReservoirs: farmCoords.filter(c => c.status === 'online').length,
+          onlineReservoirs: farmCoords.filter(c => getCoordinatorStatus(c) === 'online').length,
           onlineTowers: farmTowers.filter(t => t.status_mode === 'operational').length,
           color: farm.color ?? '#22c55e'
         };
@@ -248,6 +254,16 @@ export class FarmsListComponent implements OnInit {
     if (confirm('Are you sure you want to delete this farm?')) {
       this.farms.update(farms => farms.filter(f => f._id !== farmId));
       delete this.farmReservoirMap[farmId];
+    }
+  }
+
+  getStatusLabel(status: CoordinatorStatus): string {
+    switch (status) {
+      case 'online': return 'Online';
+      case 'offline': return 'Offline';
+      case 'warning': return 'Stale';
+      case 'error': return 'Error';
+      default: return status;
     }
   }
 

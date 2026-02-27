@@ -102,15 +102,29 @@ export interface CoordinatorConfigUpdate {
 // Status Helper Functions
 // ============================================================================
 
+/**
+ * Compute coordinator connection status from last_seen timestamp.
+ * Thresholds aligned with the backend TwinSyncBackgroundService stale check
+ * (default StaleThresholdSeconds = 120).
+ */
 export function getCoordinatorStatus(coordinator: Coordinator | CoordinatorSummary): CoordinatorStatus {
-  const lastSeen = new Date(coordinator.last_seen);
+  // Handle the snakeCaseInterceptor: runtime may have camelCase keys
+  const a = coordinator as any;
+  const raw = a.lastSeen ?? a.last_seen ?? coordinator.last_seen;
+  if (!raw) return 'offline';
+
+  const lastSeen = new Date(raw);
   const now = new Date();
   const diffMs = now.getTime() - lastSeen.getTime();
-  const diffMinutes = diffMs / (1000 * 60);
-  
-  if (diffMinutes > 5) return 'offline';
-  if (diffMinutes > 2) return 'warning';
-  if (coordinator.wifi_rssi < -80) return 'warning';
+  const diffSeconds = diffMs / 1000;
+
+  // >120s  (2 min) without telemetry = offline  (matches backend stale threshold)
+  if (diffSeconds > 120) return 'offline';
+  // >60s   (1 min) = warning (may be lagging)
+  if (diffSeconds > 60) return 'warning';
+  // Very weak signal
+  const rssi = a.wifiRssi ?? a.wifi_rssi ?? coordinator.wifi_rssi;
+  if (rssi != null && rssi < -80) return 'warning';
   return 'online';
 }
 

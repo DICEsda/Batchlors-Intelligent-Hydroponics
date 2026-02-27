@@ -125,14 +125,17 @@
                 } @else {
                   <div class="reservoirs-grid">
                     @for (reservoir of farm.reservoirs; track reservoir._id) {
-                      <a [routerLink]="['/reservoirs', reservoir.coord_id]" class="reservoir-card">
+                      <a [routerLink]="['/reservoirs', reservoir.coord_id]" class="reservoir-card" [class.reservoir-offline]="reservoir.status === 'offline'">
                         <div class="reservoir-header">
-                          <span class="reservoir-name">{{ reservoir.name || reservoir.coord_id }}</span>
+                          <div class="reservoir-name-row">
+                            <span class="connection-dot" [class]="'dot-' + reservoir.status"></span>
+                            <span class="reservoir-name">{{ reservoir.name || reservoir.coord_id }}</span>
+                          </div>
                           <span hlmBadge 
                                 [variant]="getStatusBadgeVariant(reservoir.status)" 
                                 size="sm"
                                 [class]="'status-' + reservoir.status">
-                            {{ reservoir.status }}
+                            {{ getStatusLabel(reservoir.status) }}
                           </span>
                         </div>
                         <div class="reservoir-meta">

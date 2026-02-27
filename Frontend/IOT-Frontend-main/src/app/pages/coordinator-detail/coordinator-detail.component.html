@@ -12,9 +12,9 @@
           <h1 class="page-title">{{ coordinator()?.name || 'Coordinator' }}</h1>
           <p class="page-description">
             @if (coordinator()) {
-              <span hlmBadge [variant]="getStatusBadgeVariant(coordinatorStatus())">
+              <span hlmBadge [variant]="getStatusBadgeVariant(coordinatorStatus())" [class]="'status-badge-' + coordinatorStatus()">
                 <ng-icon hlmIcon [name]="coordinatorStatus() === 'online' ? 'lucideWifi' : 'lucideWifiOff'" size="xs" />
-                {{ coordinatorStatus() }}
+                {{ coordinatorStatus() === 'online' ? 'Online' : coordinatorStatus() === 'warning' ? 'Stale' : coordinatorStatus() === 'offline' ? 'Offline' : coordinatorStatus() }}
               </span>
               <span class="separator">|</span>
               <span>{{ onlineNodeCount() }}/{{ totalNodeCount() }} nodes online</span>
