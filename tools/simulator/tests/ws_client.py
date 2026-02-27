@@ -29,7 +29,7 @@ except ImportError:
     _WS_LEGACY = True
 
 
-API_URL = os.environ.get("SIM_API_URL", "http://backend-sim:8000").rstrip("/")
+API_URL = os.environ.get("SIM_API_URL", "http://backend:8000").rstrip("/")
 
 
 @dataclass

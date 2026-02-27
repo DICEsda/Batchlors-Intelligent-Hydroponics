@@ -101,21 +101,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Infrastructure
     p.add_argument(
-        "--mqtt-host", default="localhost", help="MQTT broker host (default: localhost)"
+        "--mqtt-host", default=os.environ.get("SIM_MQTT_HOST", "localhost"),
+        help="MQTT broker host (env: SIM_MQTT_HOST, default: localhost)"
     )
     p.add_argument(
-        "--mqtt-port", type=int, default=1883, help="MQTT broker port (default: 1883)"
+        "--mqtt-port", type=int, default=int(os.environ.get("SIM_MQTT_PORT", "1883")),
+        help="MQTT broker port (env: SIM_MQTT_PORT, default: 1883)"
     )
     p.add_argument(
-        "--mqtt-user", default="user1", help="MQTT username (default: user1)"
+        "--mqtt-user", default=os.environ.get("SIM_MQTT_USER", "user1"),
+        help="MQTT username (env: SIM_MQTT_USER, default: user1)"
     )
     p.add_argument(
-        "--mqtt-pass", default="user1", help="MQTT password (default: user1)"
+        "--mqtt-pass", default=os.environ.get("SIM_MQTT_PASS", "user1"),
+        help="MQTT password (env: SIM_MQTT_PASS, default: user1)"
     )
     p.add_argument(
         "--api-url",
-        default="http://localhost:8000",
-        help="Backend REST API URL (default: http://localhost:8000)",
+        default=os.environ.get("SIM_API_URL", "http://localhost:8000"),
+        help="Backend REST API URL (env: SIM_API_URL, default: http://localhost:8000)",
     )
     p.add_argument(
         "--no-bootstrap",

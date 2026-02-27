@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 import paho.mqtt.client as mqtt
 
 
-MQTT_HOST = os.environ.get("SIM_MQTT_HOST", "mosquitto-sim")
+MQTT_HOST = os.environ.get("SIM_MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.environ.get("SIM_MQTT_PORT", "1883"))
 MQTT_USER = os.environ.get("SIM_MQTT_USER", "user1")
 MQTT_PASS = os.environ.get("SIM_MQTT_PASS", "user1")

@@ -90,7 +90,9 @@ export class IoTDataService {
   readonly totalSiteCount = computed(() => this.sites().length);
 
   readonly onlineCoordinatorCount = computed(() =>
-    this.coordinators().filter(c => c.status === 'online').length
+    this.coordinators().filter(c =>
+      c.status === 'online' || (c as any).status_mode === 'operational'
+    ).length
   );
 
   readonly totalCoordinatorCount = computed(() =>
@@ -386,8 +388,11 @@ export class IoTDataService {
   loadAlerts(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.api.getAlerts({ page: 1, pageSize: 50 }).subscribe({
-        next: (data) => {
-          this.alerts.set(data.items);
+        next: (data: any) => {
+          // Backend returns { data: [...], page, page_size, total_count, total_pages }
+          // PaginatedResponse interface expects { items: [...] }
+          const alerts = data.items ?? data.data ?? [];
+          this.alerts.set(Array.isArray(alerts) ? alerts : []);
           resolve();
         },
         error: (err) => {
@@ -444,11 +449,12 @@ export class IoTDataService {
       switchMap(() => this.api.getNodes()),
       tap(data => this.nodes.set(data)),
       switchMap(() => this.api.getAlerts({ page: 1, pageSize: 50 })),
-      tap(data => {
+      tap((data: any) => {
         if (Array.isArray(data)) {
           this.alerts.set(data);
         } else {
-          this.alerts.set(data.items);
+          const alerts = data.items ?? data.data ?? [];
+          this.alerts.set(Array.isArray(alerts) ? alerts : []);
         }
       }),
       catchError(err => {

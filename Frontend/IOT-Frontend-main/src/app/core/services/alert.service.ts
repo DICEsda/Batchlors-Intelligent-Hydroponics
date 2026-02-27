@@ -165,8 +165,9 @@ export class AlertService {
     this.error.set(null);
 
     try {
-      const response = await firstValueFrom(this.api.getAlerts({ page: 1, pageSize: 100 }));
-      this.alerts.set(response.items || []);
+      const response: any = await firstValueFrom(this.api.getAlerts({ page: 1, pageSize: 100 }));
+      const alerts = response.items ?? response.data ?? [];
+      this.alerts.set(Array.isArray(alerts) ? alerts : []);
     } catch (err) {
       console.error('Failed to load alerts:', err);
       this.error.set('Failed to load alerts. Please check if the server is running.');

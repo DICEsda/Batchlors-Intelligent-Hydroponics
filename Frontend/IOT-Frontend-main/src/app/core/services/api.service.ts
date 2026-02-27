@@ -114,15 +114,15 @@ export class ApiService {
   }
 
   // ============================================================================
-  // Sites API
+  // Sites API — redirected to /api/farms (legacy "sites" concept = farms)
   // ============================================================================
 
   getSites(): Observable<Site[]> {
-    return this.get<Site[]>('/api/sites');
+    return this.get<Site[]>('/api/farms');
   }
 
   getSite(siteId: string): Observable<Site> {
-    return this.get<Site>(`/api/sites/${siteId}`);
+    return this.get<Site>(`/api/farms/${siteId}`);
   }
 
   // ============================================================================
@@ -142,9 +142,11 @@ export class ApiService {
 
   /**
    * Get coordinator by site and coordinator ID
+   * (Legacy: /api/sites/{siteId}/coordinators/{coordId} no longer exists,
+   *  use the flat coordinators endpoint instead)
    */
   getCoordinator(siteId: string, coordId: string): Observable<Coordinator> {
-    return this.get<Coordinator>(`/api/sites/${siteId}/coordinators/${coordId}`);
+    return this.get<Coordinator>(`/api/coordinators/${coordId}`);
   }
 
   /**
@@ -279,7 +281,7 @@ export class ApiService {
   getNodes(siteId: string, coordId: string): Observable<Node[]>;
   getNodes(siteId?: string, coordId?: string): Observable<Node[] | NodeSummary[]> {
     if (siteId && coordId) {
-      return this.get<Node[]>(`/api/sites/${siteId}/coordinators/${coordId}/nodes`);
+      return this.get<Node[]>(`/api/nodes/farm/${siteId}/coord/${coordId}`);
     }
     // Get all nodes across the system
     return this.get<NodeSummary[]>('/api/nodes');
@@ -296,7 +298,7 @@ export class ApiService {
    * Delete a node
    */
   deleteNode(siteId: string, coordId: string, nodeId: string): Observable<ApiResponse<void>> {
-    return this.delete<ApiResponse<void>>(`/api/sites/${siteId}/coordinators/${coordId}/nodes/${nodeId}`);
+    return this.delete<ApiResponse<void>>(`/api/towers/${siteId}/${coordId}/${nodeId}`);
   }
 
   /**

@@ -2,11 +2,11 @@
 Shared fixtures for simulation integration tests.
 
 Environment variables (defaults assume Docker internal networking):
-    SIM_MQTT_HOST   - MQTT broker host       (default: mosquitto-sim)
+    SIM_MQTT_HOST   - MQTT broker host       (default: mosquitto)
     SIM_MQTT_PORT   - MQTT broker port       (default: 1883)
     SIM_MQTT_USER   - MQTT username           (default: user1)
     SIM_MQTT_PASS   - MQTT password           (default: user1)
-    SIM_API_URL     - Backend REST API URL    (default: http://backend-sim:8000)
+    SIM_API_URL     - Backend REST API URL    (default: http://backend:8000)
     API_KEY         - Backend API key         (default: hydro-thesis-2026)
 """
 
@@ -27,11 +27,11 @@ import requests
 # Environment configuration
 # ---------------------------------------------------------------------------
 
-MQTT_HOST = os.environ.get("SIM_MQTT_HOST", "mosquitto-sim")
+MQTT_HOST = os.environ.get("SIM_MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.environ.get("SIM_MQTT_PORT", "1883"))
 MQTT_USER = os.environ.get("SIM_MQTT_USER", "user1")
 MQTT_PASS = os.environ.get("SIM_MQTT_PASS", "user1")
-API_URL = os.environ.get("SIM_API_URL", "http://backend-sim:8000").rstrip("/")
+API_URL = os.environ.get("SIM_API_URL", "http://backend:8000").rstrip("/")
 API_KEY = os.environ.get("API_KEY", "hydro-thesis-2026")
 
 # Timeouts

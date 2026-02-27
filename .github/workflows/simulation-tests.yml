@@ -6,13 +6,13 @@ on:
     paths:
       - 'tools/simulator/**'
       - 'Backend/src/**'
-      - 'docker-compose.simulation.yml'
+      - 'docker-compose.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'tools/simulator/**'
       - 'Backend/src/**'
-      - 'docker-compose.simulation.yml'
+      - 'docker-compose.yml'
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -42,9 +42,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-sim-
 
-      - name: Build and start simulation environment
+      - name: Build and start services
         run: |
-          docker compose -f docker-compose.simulation.yml up -d --build --wait
+          docker compose --profile test up -d --build --wait
         timeout-minutes: 10
 
       - name: Verify services are healthy
@@ -52,33 +52,28 @@ jobs:
           echo "Checking service health..."
           
           # Check MongoDB
-          docker compose -f docker-compose.simulation.yml exec -T mongodb-sim \
+          docker compose exec -T mongodb \
             mongosh --quiet --eval "db.adminCommand('ping')"
           echo "MongoDB: OK"
           
           # Check MQTT broker
-          docker compose -f docker-compose.simulation.yml exec -T mosquitto-sim \
+          docker compose exec -T mosquitto \
             mosquitto_sub -t '$SYS/#' -C 1 -u user1 -P user1 -W 5 || true
           echo "Mosquitto: OK"
           
           # Check Backend health
-          curl -f http://localhost:8010/health/live
+          curl -f http://localhost:8000/health/live
           echo ""
           echo "Backend: OK"
           
-          curl -f http://localhost:8010/health/ready
+          curl -f http://localhost:8000/health/ready
           echo ""
           echo "Backend ready: OK"
 
       - name: Run simulation tests
         run: |
-          docker compose -f docker-compose.simulation.yml run \
+          docker compose run \
             --rm \
-            -e SIM_MQTT_HOST=mosquitto-sim \
-            -e SIM_MQTT_PORT=1883 \
-            -e SIM_MQTT_USER=user1 \
-            -e SIM_MQTT_PASS=user1 \
-            -e SIM_API_URL=http://backend-sim:8000 \
             --entrypoint python \
             simulator \
             -m pytest tests/ \
@@ -94,7 +89,7 @@ jobs:
         if: always()
         run: |
           # Copy test results from the simulator container (if it still exists)
-          docker cp sim-simulator:/app/test-results.json ./test-results.json 2>/dev/null || \
+          docker cp iot-simulator:/app/test-results.json ./test-results.json 2>/dev/null || \
             echo '{"summary": {"failed": "unknown"}}' > ./test-results.json
 
       - name: Upload test results
@@ -109,16 +104,16 @@ jobs:
         if: failure()
         run: |
           echo "=== MongoDB Logs ==="
-          docker compose -f docker-compose.simulation.yml logs mongodb-sim --tail=50
+          docker compose logs mongodb --tail=50
           echo ""
           echo "=== Mosquitto Logs ==="
-          docker compose -f docker-compose.simulation.yml logs mosquitto-sim --tail=50
+          docker compose logs mosquitto --tail=50
           echo ""
           echo "=== Backend Logs ==="
-          docker compose -f docker-compose.simulation.yml logs backend-sim --tail=100
+          docker compose logs backend --tail=100
           echo ""
           echo "=== Simulator Logs ==="
-          docker compose -f docker-compose.simulation.yml logs simulator --tail=100
+          docker compose logs simulator --tail=100
 
       - name: Upload service logs on failure
         uses: actions/upload-artifact@v4
@@ -132,7 +127,7 @@ jobs:
 
       - name: Teardown
         if: always()
-        run: docker compose -f docker-compose.simulation.yml down -v
+        run: docker compose --profile test down -v
 
       - name: Test summary
         if: always()
