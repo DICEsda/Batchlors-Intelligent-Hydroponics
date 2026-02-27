@@ -1,6 +1,6 @@
 """S01 -- Steady-State Farm.
 
-Everything runs normally.  5 farms x 5 coordinators x 10 towers.
+Everything runs normally.  2 farms x 3 coordinators x 5 towers.
 Temperature follows day/night cycle, pH drifts slowly, EC depletes,
 water level drops.  This is the baseline "everything works" scenario.
 """

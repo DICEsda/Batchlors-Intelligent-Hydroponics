@@ -216,6 +216,21 @@ class MqttPublisher:
             },
         )
 
+    def publish_serial_log(
+        self, coord: "Coordinator", level: str, message: str, tag: str = "system"
+    ) -> None:
+        """Publish a serial log line for a coordinator."""
+        topic = f"farm/{coord.farm_id}/coord/{coord.coord_id}/serial"
+        self._pub(
+            topic,
+            {
+                "ts": int(time.time()),
+                "message": message,
+                "level": level,
+                "tag": tag,
+            },
+        )
+
 
 # ---------------------------------------------------------------------------
 # REST API bootstrapper -- create farms & approve coordinators

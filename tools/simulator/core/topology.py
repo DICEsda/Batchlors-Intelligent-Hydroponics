@@ -19,15 +19,15 @@ def _mac(prefix: int, farm_idx: int, coord_idx: int, tower_idx: int = 0) -> str:
 
 
 def generate_topology(
-    n_farms: int = 5,
-    n_coords_per_farm: int = 5,
-    n_towers_per_coord: int = 10,
+    n_farms: int = 2,
+    n_coords_per_farm: int = 3,
+    n_towers_per_coord: int = 5,
     randomize_crops: bool = True,
     seed: int | None = 42,
 ) -> List[Farm]:
     """Build the full farm hierarchy.
 
-    Default: 5 farms x 5 coordinators x 10 towers = 250 towers.
+    Default: 2 farms x 3 coordinators x 5 towers = 30 towers.
 
     Returns a list of :class:`Farm` objects with fully wired coordinators,
     reservoirs, and towers.

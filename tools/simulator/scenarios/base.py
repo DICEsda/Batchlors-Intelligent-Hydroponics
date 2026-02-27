@@ -236,6 +236,42 @@ class BaseScenario:
                         if tower._online:
                             self.mqtt.publish_tower_telemetry(tower)
 
+                    # Publish serial logs (realistic ESP32 output)
+                    import random as _rng
+                    # Always log a telemetry summary
+                    r = coord.reservoir
+                    self.mqtt.publish_serial_log(
+                        coord, "INFO",
+                        f"[Telemetry] pH={r.ph:.2f} EC={r.ec_ms_cm:.2f} WL={r.water_level_pct:.1f}% WT={r.water_temp_c:.1f}C",
+                        tag="telemetry",
+                    )
+                    # Occasionally log other system info
+                    if tick_count % 6 == 0:
+                        self.mqtt.publish_serial_log(
+                            coord, "INFO",
+                            f"[System] heap={coord.free_heap}B uptime={coord.uptime_s}s wifi={coord.wifi_rssi}dBm towers={len([t for t in coord.towers if t._online])}/{len(coord.towers)}",
+                            tag="system",
+                        )
+                    if tick_count % 12 == 0:
+                        self.mqtt.publish_serial_log(
+                            coord, "DEBUG",
+                            f"[MQTT] Published reservoir + {len([t for t in coord.towers if t._online])} tower telemetry msgs",
+                            tag="mqtt",
+                        )
+                    # Random warnings/errors (rare)
+                    if _rng.random() < 0.02:
+                        self.mqtt.publish_serial_log(
+                            coord, "WARN",
+                            f"[WiFi] RSSI dropped to {coord.wifi_rssi}dBm, reconnection may be needed",
+                            tag="wifi",
+                        )
+                    if _rng.random() < 0.005:
+                        self.mqtt.publish_serial_log(
+                            coord, "ERROR",
+                            f"[Sensor] pH probe read timeout (retry 1/3)",
+                            tag="sensor",
+                        )
+
             tick_count += 1
 
             # Periodic status line (every 10 s real-time)
