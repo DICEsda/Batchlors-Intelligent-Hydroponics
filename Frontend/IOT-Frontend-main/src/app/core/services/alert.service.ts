@@ -69,9 +69,9 @@ export class AlertService {
     const search = this.searchTerm().toLowerCase().trim();
     if (search) {
       result = result.filter(a =>
-        a.title.toLowerCase().includes(search) ||
-        a.message.toLowerCase().includes(search) ||
-        a.source.name.toLowerCase().includes(search)
+        (a.title ?? '').toLowerCase().includes(search) ||
+        (a.message ?? '').toLowerCase().includes(search) ||
+        (a.source?.name ?? '').toLowerCase().includes(search)
       );
     }
 
@@ -166,8 +166,9 @@ export class AlertService {
 
     try {
       const response: any = await firstValueFrom(this.api.getAlerts({ page: 1, pageSize: 100 }));
-      const alerts = response.items ?? response.data ?? [];
-      this.alerts.set(Array.isArray(alerts) ? alerts : []);
+      const raw = response.items ?? response.data ?? [];
+      const alerts: Alert[] = (Array.isArray(raw) ? raw : []).map((a: any) => this.normalizeAlert(a));
+      this.alerts.set(alerts);
     } catch (err) {
       console.error('Failed to load alerts:', err);
       this.error.set('Failed to load alerts. Please check if the server is running.');
@@ -335,7 +336,8 @@ export class AlertService {
    * Add new alert from WebSocket
    */
   addAlert(alert: Alert): void {
-    this.alerts.update(alerts => [alert, ...alerts]);
+    const normalised = this.normalizeAlert(alert);
+    this.alerts.update(alerts => [normalised, ...alerts]);
   }
 
   /**
@@ -354,6 +356,64 @@ export class AlertService {
    */
   removeAlert(alertId: string): void {
     this.alerts.update(alerts => alerts.filter(a => a._id !== alertId));
+  }
+
+  // ============================================================================
+  // Data Normalisation
+  // ============================================================================
+
+  /**
+   * Map the flat backend alert shape into the rich Alert interface the
+   * template expects.  The backend returns:
+   *   { id, farmId, coordId, severity, status, message, category, createdAt, alertKey }
+   * (after the snakeCaseInterceptor converts snake_case keys to camelCase).
+   */
+  private normalizeAlert(raw: any): Alert {
+    // Already normalised (has source object)?
+    if (raw.source && typeof raw.source === 'object') {
+      return {
+        ...raw,
+        _id: raw._id ?? raw.id ?? '',
+      } as Alert;
+    }
+
+    const coordId: string = raw.coordId ?? raw.coord_id ?? '';
+    const category: string = raw.category ?? 'sensor';
+
+    // Derive a human-readable title from the category
+    const title = this.categoryToTitle(category);
+
+    return {
+      _id: raw._id ?? raw.id ?? '',
+      title,
+      message: raw.message ?? '',
+      severity: raw.severity ?? 'warning',
+      status: raw.status ?? 'active',
+      category: (category as AlertCategory) ?? 'sensor',
+      source: {
+        type: 'coordinator' as const,
+        id: coordId,
+        name: coordId || 'System',
+      },
+      createdAt: raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
+      acknowledgedAt: raw.acknowledgedAt ?? raw.acknowledged_at,
+      resolvedAt: raw.resolvedAt ?? raw.resolved_at,
+      metadata: raw.metadata ?? undefined,
+    };
+  }
+
+  private categoryToTitle(category: string): string {
+    switch (category) {
+      case 'ph_out_of_range':      return 'pH Out of Range';
+      case 'temperature_high':     return 'High Temperature';
+      case 'temperature_low':      return 'Low Temperature';
+      case 'water_level_low':      return 'Low Water Level';
+      case 'ec_out_of_range':      return 'EC Out of Range';
+      case 'pump_failure':         return 'Pump Failure';
+      case 'battery_low':          return 'Low Battery';
+      case 'device_offline':       return 'Device Offline';
+      default:                     return category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
   }
 
   // ============================================================================

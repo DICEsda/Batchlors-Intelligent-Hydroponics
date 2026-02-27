@@ -163,11 +163,13 @@
             <!-- Bottom Row: Source + Metadata + Actions -->
             <div class="alert-bottom-row">
               <div class="alert-details">
-                <span class="alert-source">
-                  <ng-icon [name]="getSourceIcon(alert.source.type)" size="14" />
-                  {{ alert.source.name }}
-                  <span class="source-id">({{ alert.source.id }})</span>
-                </span>
+                @if (alert.source) {
+                  <span class="alert-source">
+                    <ng-icon [name]="getSourceIcon(alert.source.type)" size="14" />
+                    {{ alert.source.name }}
+                    <span class="source-id">({{ alert.source.id }})</span>
+                  </span>
+                }
                 @if (alert.metadata) {
                   <span class="alert-metadata">
                     @if (alert.metadata['reading'] !== undefined && alert.metadata['threshold'] !== undefined) {
