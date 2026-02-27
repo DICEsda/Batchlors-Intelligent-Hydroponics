@@ -32,7 +32,8 @@ import {
   lucideHash,
   lucideServer,
   lucideSave,
-  lucideAlertCircle
+  lucideAlertCircle,
+  lucideExternalLink
 } from '@ng-icons/lucide';
 import { IoTDataService, WebSocketService, ApiService } from '../../core/services';
 import { ToastService } from '../../core/services/toast.service';
@@ -93,7 +94,8 @@ export interface CoordinatorConfig {
       lucideHash,
       lucideServer,
       lucideSave,
-      lucideAlertCircle
+      lucideAlertCircle,
+      lucideExternalLink
     })
   ],
   templateUrl: './reservoirs-list.component.html',

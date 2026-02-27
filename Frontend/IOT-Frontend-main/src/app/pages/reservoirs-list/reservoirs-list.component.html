@@ -87,6 +87,9 @@
               <button class="icon-btn danger" title="Delete Coordinator" (click)="deleteReservoir(reservoir._id, $event)">
                 <ng-icon name="lucideTrash2" size="16" />
               </button>
+              <a class="icon-btn view-details" title="View Details" [routerLink]="['/reservoirs', reservoir._id]" (click)="$event.stopPropagation()">
+                <ng-icon name="lucideExternalLink" size="16" />
+              </a>
               <ng-icon 
                 [name]="isExpanded(reservoir._id) ? 'lucideChevronDown' : 'lucideChevronRight'" 
                 size="20" 

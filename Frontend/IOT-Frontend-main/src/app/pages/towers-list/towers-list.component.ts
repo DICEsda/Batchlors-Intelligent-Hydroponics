@@ -144,6 +144,11 @@ export class TowersListComponent implements OnInit {
   readonly pairingCoordinatorId = signal<string>('');
 
   ngOnInit(): void {
+    // Ensure data is loaded (covers direct navigation to /towers)
+    if (this.nodes().length === 0 && !this.loading()) {
+      this.dataService.loadDashboardData();
+    }
+
     // Check for query parameters to auto-open pairing dialog
     this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       if (params['action'] === 'pair' && params['towerId']) {

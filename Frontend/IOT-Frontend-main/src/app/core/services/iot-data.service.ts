@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { Subscription, interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom } from 'rxjs';
+import { Subscription, interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom, forkJoin } from 'rxjs';
 import { ApiService } from './api.service';
 import { EnvironmentService } from './environment.service';
 import {
@@ -20,6 +20,7 @@ import {
   getCoordinatorStatus,
   getBatteryStatus,
 } from '../models';
+import { TowerTwin } from '../models/digital-twin.model';
 
 /**
  * IoT Data Service - Smart Tile System
@@ -151,11 +152,13 @@ export class IoTDataService {
     try {
       await this.checkHealth();
 
+      // Load coordinators first — loadNodes may need them for the twin fallback
+      await this.loadCoordinators().catch(err => {
+        console.warn('Failed to load coordinators:', err);
+        this.coordinators.set([]);
+      });
+
       await Promise.all([
-        this.loadCoordinators().catch(err => {
-          console.warn('Failed to load coordinators:', err);
-          this.coordinators.set([]);
-        }),
         this.loadNodes().catch(err => {
           console.warn('Failed to load nodes:', err);
           this.nodes.set([]);
@@ -279,19 +282,75 @@ export class IoTDataService {
   }
 
   /**
-   * Load all nodes
+   * Load all nodes — falls back to tower digital twins when the nodes
+   * collection is empty (e.g. simulator creates towers via telemetry
+   * rather than the pairing flow).
    */
   loadNodes(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.api.getNodes().subscribe({
         next: (data) => {
-          this.nodes.set(data);
-          resolve();
+          if (data.length > 0) {
+            this.nodes.set(data);
+            resolve();
+          } else {
+            // Nodes collection empty — build list from tower twins
+            this.loadNodesFromTwins().then(resolve).catch(reject);
+          }
         },
         error: (err) => {
           console.error('Failed to load nodes:', err);
           reject(err);
         }
+      });
+    });
+  }
+
+  /**
+   * Build NodeSummary[] from tower digital twins for every known coordinator.
+   */
+  private loadNodesFromTwins(): Promise<void> {
+    const coords = this.coordinators();
+    if (coords.length === 0) {
+      return Promise.resolve();
+    }
+
+    // The snakeCaseInterceptor converts response keys from snake_case to camelCase,
+    // so runtime objects have siteId/coordId/farmId despite the TypeScript interfaces
+    // still declaring snake_case names (site_id/coord_id/farm_id).
+    const twinRequests = coords.map(c => {
+      const a = c as any;
+      const farmId = a.siteId || a.site_id || a.farmId || a.farm_id || '';
+      const coordId = a.coordId || a.coord_id || '';
+      return this.api.getTowerTwins(farmId, coordId).pipe(
+        catchError(() => of([] as TowerTwin[]))
+      );
+    });
+
+    return new Promise((resolve) => {
+      forkJoin(twinRequests).subscribe({
+        next: (results) => {
+          const nodes: NodeSummary[] = results.flat().map(twin => {
+            // API may return camelCase or snake_case — handle both via any
+            const t = twin as any;
+            const rep = t.reported ?? {};
+            const meta = t.metadata ?? {};
+            return {
+              _id: t._id || t.towerId || t.tower_id,
+              light_id: t.towerId || t.tower_id,
+              name: t.name || t.towerId || t.tower_id,
+              status_mode: rep.statusMode ?? rep.status_mode ?? 'operational',
+              temp_c: rep.airTempC ?? rep.air_temp_c ?? 0,
+              vbat_mv: rep.vbatMv ?? rep.vbat_mv ?? 0,
+              avg_r: rep.signalQuality ?? rep.signal_quality ?? 0,
+              coordinator_id: t.coordId || t.coord_id,
+              last_seen: new Date(meta.lastReportedAt || meta.last_reported_at || meta.updatedAt || meta.updated_at || Date.now()),
+            };
+          });
+          this.nodes.set(nodes);
+          resolve();
+        },
+        error: () => resolve()
       });
     });
   }
@@ -448,7 +507,12 @@ export class IoTDataService {
         }
       }),
       switchMap(() => this.api.getNodes()),
-      tap(data => this.nodes.set(data)),
+      tap(data => {
+        if (data.length > 0) {
+          this.nodes.set(data);
+        }
+        // If nodes API returns empty, keep existing twin-based nodes (don't overwrite)
+      }),
       switchMap(() => this.api.getAlerts({ page: 1, pageSize: 50 })),
       tap((data: any) => {
         if (Array.isArray(data)) {
