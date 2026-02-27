@@ -254,7 +254,8 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
    * Accumulates readings across all coordinators and emits running averages.
    */
   private subscribeToReservoirTelemetry(): void {
-    const sub = this.wsService.reservoirTelemetry$.subscribe((t: ReservoirTelemetry) => {
+    const sub = this.wsService.reservoirTelemetry$.subscribe({
+      next: (t: ReservoirTelemetry) => {
       // Accumulate values
       if (t.ph != null) { this.phAccum.sum += t.ph; this.phAccum.count++; }
       if (t.ec != null) { this.ecAccum.sum += t.ec; this.ecAccum.count++; }
@@ -279,6 +280,8 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
           this.waterLevelAccum = { sum: 0, count: 0 };
         }
       }
+      },
+      error: (err) => console.error('FarmOverview: reservoir telemetry stream error', err),
     });
     this.telemetrySubs.push(sub);
   }

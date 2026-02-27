@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom } from 'rxjs';
+import { Subscription, interval, switchMap, tap, catchError, of, Subject, takeUntil, firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
 import { EnvironmentService } from './environment.service';
 import {
@@ -34,6 +34,7 @@ export class IoTDataService {
   private readonly http = inject(HttpClient);
   private readonly env = inject(EnvironmentService);
   private readonly destroy$ = new Subject<void>();
+  private autoRefreshSub: Subscription | null = null;
 
   // ============================================================================
   // State Signals
@@ -438,8 +439,8 @@ export class IoTDataService {
    * Start auto-refresh of dashboard data
    */
   startAutoRefresh(): void {
-    this.refreshInterval$.pipe(
-      takeUntil(this.destroy$),
+    this.stopAutoRefresh();
+    this.autoRefreshSub = this.refreshInterval$.pipe(
       switchMap(() => this.api.getCoordinators()),
       tap(data => {
         if (Array.isArray(data)) {
@@ -468,7 +469,8 @@ export class IoTDataService {
    * Stop auto-refresh
    */
   stopAutoRefresh(): void {
-    this.destroy$.next();
+    this.autoRefreshSub?.unsubscribe();
+    this.autoRefreshSub = null;
   }
 
   // ============================================================================
@@ -608,6 +610,7 @@ export class IoTDataService {
   // ============================================================================
 
   ngOnDestroy(): void {
+    this.stopAutoRefresh();
     this.destroy$.next();
     this.destroy$.complete();
   }

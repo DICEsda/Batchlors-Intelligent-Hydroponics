@@ -121,12 +121,14 @@ export class HeaderComponent implements OnDestroy {
   
   constructor() {
     // Setup debounced search
-    this.searchSubject.pipe(
-      debounceTime(300),
-      distinctUntilChanged()
-    ).subscribe(query => {
-      this.performSearch(query);
-    });
+    this.subscriptions.push(
+      this.searchSubject.pipe(
+        debounceTime(300),
+        distinctUntilChanged()
+      ).subscribe(query => {
+        this.performSearch(query);
+      })
+    );
 
     // Register this component as the dialog opener for coordinator registration.
     // The NotificationListenerService fires the urgent toast; its "Register" button

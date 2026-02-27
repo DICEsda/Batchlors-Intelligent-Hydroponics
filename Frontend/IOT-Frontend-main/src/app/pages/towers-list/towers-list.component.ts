@@ -1,4 +1,5 @@
-import { Component, inject, computed, signal, OnInit, effect } from '@angular/core';
+import { Component, inject, computed, signal, OnInit, effect, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -95,6 +96,7 @@ export class TowersListComponent implements OnInit {
   private readonly wsService = inject(WebSocketService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly nodes = this.dataService.nodes;
   readonly coordinators = this.dataService.coordinators;
@@ -143,7 +145,7 @@ export class TowersListComponent implements OnInit {
 
   ngOnInit(): void {
     // Check for query parameters to auto-open pairing dialog
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       if (params['action'] === 'pair' && params['towerId']) {
         this.pairingTowerId.set(params['towerId']);
         this.showPairingDialog.set(true);

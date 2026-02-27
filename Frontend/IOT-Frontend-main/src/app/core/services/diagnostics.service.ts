@@ -54,11 +54,14 @@ export class DiagnosticsService {
 
   constructor() {
     // Subscribe to the general message stream from WebSocket
-    this.ws.messages$.subscribe(msg => {
-      if (msg.type === 'diagnostics_update') {
-        const snapshot = msg.payload as SystemMetricsSnapshot;
-        this.onSnapshot(snapshot);
-      }
+    this.ws.messages$.subscribe({
+      next: (msg) => {
+        if (msg.type === 'diagnostics_update') {
+          const snapshot = msg.payload as SystemMetricsSnapshot;
+          this.onSnapshot(snapshot);
+        }
+      },
+      error: (err) => console.error('DiagnosticsService: WebSocket stream error', err),
     });
   }
 
