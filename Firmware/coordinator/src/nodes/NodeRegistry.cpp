@@ -5,8 +5,7 @@ const char* NodeRegistry::STORAGE_NAMESPACE = "nodes";
 
 NodeRegistry::NodeRegistry()
     : prefsInitialized(false)
-    , pairingActive(false)
-    , pairingEndTime(0) {
+    , pairingActive(false) {
 }
 
 NodeRegistry::~NodeRegistry() {
@@ -30,7 +29,7 @@ void NodeRegistry::loop() {
     uint32_t now = millis();
     
     // Check pairing timeout
-    if (pairingActive && now >= pairingEndTime) {
+    if (pairingActive && pairingDl.expired()) {
         pairingActive = false;
         Logger::info("Pairing window closed");
     }
@@ -94,12 +93,13 @@ void NodeRegistry::clearAllNodes() {
 
 void NodeRegistry::startPairing(uint32_t durationMs) {
     pairingActive = true;
-    pairingEndTime = millis() + durationMs;
+    pairingDl.set(durationMs);
     Logger::info("Started pairing window for %d ms", durationMs);
 }
 
 void NodeRegistry::stopPairing() {
     pairingActive = false;
+    pairingDl.clear();
     Logger::info("Pairing window closed manually");
 }
 
@@ -108,7 +108,7 @@ void NodeRegistry::setNodeRegisteredCallback(std::function<void(const String& no
 }
 
 bool NodeRegistry::isPairingActive() const {
-    return pairingActive && millis() < pairingEndTime;
+    return pairingActive && pairingDl.running();
 }
 
 bool NodeRegistry::processPairingRequest(const uint8_t* mac, const String& nodeId) {

@@ -12,7 +12,7 @@ void LedController::begin() {
     groupCount_ = Pins::RgbLed::NUM_PIXELS / 4;
     groupToNode_.assign(groupCount_, String());
     groupConnected_.assign(groupCount_, false);
-    groupFlashUntilMs_.assign(groupCount_, 0);
+    groupFlashDl_.assign(groupCount_, Deadline());
     nodeToGroup_.clear();
 }
 
@@ -20,7 +20,7 @@ void LedController::rebuildMapping(const std::vector<NodeInfo>& nodeList) {
     nodeToGroup_.clear();
     std::fill(groupToNode_.begin(), groupToNode_.end(), String());
     std::fill(groupConnected_.begin(), groupConnected_.end(), false);
-    std::fill(groupFlashUntilMs_.begin(), groupFlashUntilMs_.end(), 0);
+    for (auto& dl : groupFlashDl_) dl.clear();
 
     // Sort by towerId for deterministic assignment
     std::vector<NodeInfo> sorted = nodeList;
@@ -81,7 +81,7 @@ bool LedController::isConnected(const String& nodeId) const {
 void LedController::flash(const String& nodeId, uint32_t durationMs) {
     int idx = getGroupIndex(nodeId);
     if (idx >= 0) {
-        groupFlashUntilMs_[idx] = millis() + durationMs;
+        groupFlashDl_[idx].set(durationMs);
     }
 }
 
@@ -90,7 +90,7 @@ void LedController::setManualMode(uint8_t r, uint8_t g, uint8_t b, uint32_t time
     manualR_ = r;
     manualG_ = g;
     manualB_ = b;
-    manualTimeoutMs_ = (timeoutMs > 0) ? (millis() + timeoutMs) : 0;
+    if (timeoutMs > 0) { manualTimeoutDl_.set(timeoutMs); } else { manualTimeoutDl_.clear(); }
 }
 
 void LedController::clearManualMode() {
@@ -98,10 +98,8 @@ void LedController::clearManualMode() {
 }
 
 void LedController::update() {
-    uint32_t now = millis();
-    
     // Check for manual LED override timeout
-    if (manualMode_ && manualTimeoutMs_ > 0 && now > manualTimeoutMs_) {
+    if (manualMode_ && manualTimeoutDl_.expired()) {
         manualMode_ = false;
         Logger::info("Manual LED override timed out");
     }
@@ -114,7 +112,7 @@ void LedController::update() {
             r = manualR_;
             gc = manualG_;
             b = manualB_;
-        } else if (groupFlashUntilMs_[g] > now) {
+        } else if (groupFlashDl_[g].running()) {
             // Bright green flash (activity) at 50%
             r = 0; gc = 128; b = 0;
         } else if (groupToNode_[g].length() > 0) {

@@ -196,6 +196,7 @@ void loop() { app.loop(); }
 
 #include "EspNowMessage.h"
 #include "ConfigManager.h"
+#include "utils/SafeTimer.h"
 // RGBW LED + button
 #include "led/LedController.h"
 #include "input/ButtonInput.h"
@@ -228,7 +229,7 @@ private:
     LedController leds{4}; // PRD: 4 pixels per node
     uint8_t curR = 0, curG = 0, curB = 0, curW = 0;
     bool statusOverrideActive = false;
-    uint32_t statusOverrideUntilMs = 0;
+    Deadline statusOverrideDl;
     
     // Temperature sensor (Adafruit TMP117)
     Adafruit_TMP117 tempSensor;
@@ -856,7 +857,7 @@ void SmartTileNode::processReceivedMessage(const String& json) {
                 // Always clear status animation when receiving manual commands
                 leds.setStatus(LedController::StatusMode::None);
                 statusOverrideActive = true;
-                statusOverrideUntilMs = millis() + (setLight->ttl_ms > 0 ? setLight->ttl_ms : 10000);
+                statusOverrideDl.set(setLight->ttl_ms > 0 ? setLight->ttl_ms : 10000);
 
                 uint8_t r = setLight->r, g = setLight->g, b = setLight->b, w = setLight->w;
                 if (r == 0 && g == 0 && b == 0 && w == 0) {
@@ -929,7 +930,7 @@ bool SmartTileNode::isRxWindowActive() {
 void SmartTileNode::handleButton() {
     button.loop();
     // Clear status override when TTL expires - but stay in None mode (don't revert to animations)
-    if (statusOverrideActive && millis() > statusOverrideUntilMs) {
+    if (statusOverrideActive && statusOverrideDl.expired()) {
         statusOverrideActive = false;
         // Only go back to pairing animation if we're actually in PAIRING state
         // In OPERATIONAL, stay in None mode so manual control persists

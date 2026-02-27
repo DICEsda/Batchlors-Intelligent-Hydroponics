@@ -5,8 +5,7 @@ const char* TowerRegistry::STORAGE_NAMESPACE = "towers";
 
 TowerRegistry::TowerRegistry()
     : prefsInitialized(false)
-    , pairingActive(false)
-    , pairingEndTime(0) {
+    , pairingActive(false) {
 }
 
 TowerRegistry::~TowerRegistry() {
@@ -30,7 +29,7 @@ void TowerRegistry::loop() {
     uint32_t now = millis();
     
     // Check pairing timeout
-    if (pairingActive && now >= pairingEndTime) {
+    if (pairingActive && pairingDl.expired()) {
         pairingActive = false;
         Logger::info("Pairing window closed");
     }
@@ -94,12 +93,13 @@ void TowerRegistry::clearAllTowers() {
 
 void TowerRegistry::startPairing(uint32_t durationMs) {
     pairingActive = true;
-    pairingEndTime = millis() + durationMs;
+    pairingDl.set(durationMs);
     Logger::info("Started pairing window for %d ms", durationMs);
 }
 
 void TowerRegistry::stopPairing() {
     pairingActive = false;
+    pairingDl.clear();
     Logger::info("Pairing window closed manually");
 }
 
@@ -108,7 +108,7 @@ void TowerRegistry::setTowerRegisteredCallback(std::function<void(const String& 
 }
 
 bool TowerRegistry::isPairingActive() const {
-    return pairingActive && millis() < pairingEndTime;
+    return pairingActive && pairingDl.running();
 }
 
 bool TowerRegistry::processPairingRequest(const uint8_t* mac, const String& towerId) {

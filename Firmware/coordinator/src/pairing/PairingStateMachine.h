@@ -4,6 +4,7 @@
 #include <functional>
 #include "DiscoveryManager.h"
 #include "EspNowMessage.h"
+#include "utils/SafeTimer.h"
 
 // Default permit-join window duration (60 seconds as per spec)
 constexpr uint32_t DEFAULT_PERMIT_JOIN_DURATION_MS = 60000;
@@ -209,7 +210,7 @@ private:
     uint16_t nextTowerId;
     
     // Permit-join timing
-    uint32_t permitJoinEndMs;
+    Deadline permitJoinDl;
     
     // Active binding attempt
     BindingAttempt currentBinding;

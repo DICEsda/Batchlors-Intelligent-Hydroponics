@@ -7,7 +7,7 @@ PairingStateMachine::PairingStateMachine(DiscoveryManager& discoveryMgr) :
     coordinatorId(0),
     farmId(0),
     nextTowerId(1),
-    permitJoinEndMs(0),
+    permitJoinDl(),
     bindingActive(false),
     onPermitJoinChanged(nullptr),
     onBindingStarted(nullptr),
@@ -24,7 +24,7 @@ void PairingStateMachine::begin(const uint8_t* coordMac, uint16_t coordId, uint1
     farmId = fId;
     state = CoordinatorPairingState::OPERATIONAL;
     bindingActive = false;
-    permitJoinEndMs = 0;
+    permitJoinDl.clear();
     
     char macStr[18];
     snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -38,7 +38,7 @@ void PairingStateMachine::tick() {
     
     // Handle permit-join timeout
     if (state == CoordinatorPairingState::DISCOVERY_ACTIVE) {
-        if (now >= permitJoinEndMs) {
+        if (permitJoinDl.expired()) {
             Serial.println("[PairingStateMachine] Permit-join window expired");
             disablePermitJoin();
         }
@@ -59,11 +59,7 @@ uint32_t PairingStateMachine::getPermitJoinRemainingMs() const {
         return 0;
     }
     
-    uint32_t now = millis();
-    if (now >= permitJoinEndMs) {
-        return 0;
-    }
-    return permitJoinEndMs - now;
+    return permitJoinDl.remainingMs();
 }
 
 bool PairingStateMachine::enablePermitJoin(uint32_t duration_ms) {
@@ -79,7 +75,7 @@ bool PairingStateMachine::enablePermitJoin(uint32_t duration_ms) {
         return false;
     }
     
-    permitJoinEndMs = millis() + duration_ms;
+    permitJoinDl.set(duration_ms);
     
     if (state == CoordinatorPairingState::OPERATIONAL) {
         transitionTo(CoordinatorPairingState::DISCOVERY_ACTIVE);
@@ -101,7 +97,7 @@ void PairingStateMachine::disablePermitJoin() {
         completeBinding(BindingResult::INTERNAL_ERROR);
     }
     
-    permitJoinEndMs = 0;
+    permitJoinDl.clear();
     transitionTo(CoordinatorPairingState::OPERATIONAL);
     
     // Clear discovered nodes that aren't bound
@@ -446,7 +442,7 @@ void PairingStateMachine::completeBinding(BindingResult result) {
     currentBinding.offer_token = 0;
     
     // Transition back to discovery if permit-join still active, otherwise operational
-    if (millis() < permitJoinEndMs) {
+    if (permitJoinDl.running()) {
         transitionTo(CoordinatorPairingState::DISCOVERY_ACTIVE);
     } else {
         transitionTo(CoordinatorPairingState::OPERATIONAL);

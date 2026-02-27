@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../config/PinConfig.h"
+#include "../../shared/src/utils/SafeTimer.h"
 #include <Adafruit_NeoPixel.h>
 
 class StatusLed {
@@ -18,7 +19,7 @@ public:
 
     // Non-blocking pulse: set color for durationMs starting now (affects all pixels)
     void pulse(uint8_t r, uint8_t g, uint8_t b, uint32_t durationMs = 1000) {
-        pulseEnd = millis() + durationMs;
+        pulseDl_.set(durationMs);
         targetR = r; targetG = g; targetB = b;
         active = true;
         setAll(r, g, b);
@@ -26,7 +27,7 @@ public:
 
     void loop() {
         uint32_t now = millis();
-        if (active && now >= pulseEnd) {
+        if (active && pulseDl_.expired()) {
             // End pulse
             active = false;
         }
@@ -82,7 +83,7 @@ public:
 private:
     Adafruit_NeoPixel strip;
     bool active = false;
-    uint32_t pulseEnd = 0;
+    Deadline pulseDl_;
     uint8_t targetR = 0, targetG = 0, targetB = 0;
     bool idleBreathing = false;
 };

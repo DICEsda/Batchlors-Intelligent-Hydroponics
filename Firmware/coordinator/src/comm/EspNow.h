@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include "../Models.h"
+#include "../../shared/src/utils/SafeTimer.h"
 
 // Forward declarations for ESP-NOW callback functions
 class EspNow;
@@ -78,7 +79,7 @@ public:
 private:
     bool initialized;
     bool pairingEnabled;
-    uint32_t pairingEndTime;
+    Deadline pairingDl;
     std::function<void(const String& nodeId, const uint8_t* data, size_t len)> messageCallback;
     std::function<void(const uint8_t* mac, const uint8_t* data, size_t len)> pairingCallback;
     std::function<void(const String& nodeId)> sendErrorCallback;

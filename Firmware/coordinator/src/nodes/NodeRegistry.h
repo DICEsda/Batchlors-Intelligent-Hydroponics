@@ -6,6 +6,7 @@
 #include <functional>
 #include <Preferences.h>
 #include "../Models.h"
+#include "../../shared/src/utils/SafeTimer.h"
 
 class NodeRegistry {
 public:
@@ -51,7 +52,7 @@ private:
     bool prefsInitialized;
     
     bool pairingActive;
-    uint32_t pairingEndTime;
+    Deadline pairingDl;
     void cleanupStaleNodes();
     std::function<void(const String& nodeId, const String& lightId)> nodeRegisteredCallback = nullptr;
     

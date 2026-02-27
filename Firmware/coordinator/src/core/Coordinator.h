@@ -5,6 +5,7 @@
 #include "../comm/WifiManager.h"
 #include "../comm/Mqtt.h"
 #include "../nodes/NodeRegistry.h"
+#include "../../shared/src/utils/SafeTimer.h"
 
 // Coordinator with full pairing functionality (WiFi + MQTT + ESP-NOW)
 class Coordinator {
@@ -29,7 +30,7 @@ private:
     
     // Pairing
     bool pairingActive;
-    uint32_t pairingEndTime;
+    Deadline pairingDl;
     
     // Callbacks
     void handleNodeMessage(const String& nodeId, const uint8_t* data, size_t len);

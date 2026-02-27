@@ -15,8 +15,7 @@ Coordinator::Coordinator()
     , lastHealthPingMs(0)
     , lastStatusLogMs(0)
     , lastMqttPublishMs(0)
-    , pairingActive(false)
-    , pairingEndTime(0) {}
+    , pairingActive(false) {}
 
 Coordinator::~Coordinator() {
     if (nodes) { delete nodes; nodes = nullptr; }
@@ -193,7 +192,7 @@ void Coordinator::loop() {
     }
     
     // Check if pairing should end
-    if (pairingActive && now >= pairingEndTime) {
+    if (pairingActive && pairingDl.expired()) {
         stopPairing();
     }
     
@@ -261,81 +260,82 @@ void Coordinator::handlePairingRequest(const uint8_t* mac, const uint8_t* data, 
     String payload((const char*)data, len);
     EspNowMessage* msg = MessageFactory::createMessage(payload);
     
-    if (msg && msg->type == MessageType::JOIN_REQUEST) {
-        JoinRequestMessage* joinReq = static_cast<JoinRequestMessage*>(msg);
-        
-        Logger::info("  Join Request:");
-        Logger::info("    MAC: %s", joinReq->mac.c_str());
-        Logger::info("    FW: %s", joinReq->fw.c_str());
-        Logger::info("    RGBW: %s", joinReq->caps.rgbw ? "Yes" : "No");
-        Logger::info("    LEDs: %d", joinReq->caps.led_count);
-        
-        // Generate node ID and light ID
-        String nodeId = joinReq->mac;
-        nodeId.replace(":", "");
-        nodeId = "N" + nodeId.substring(nodeId.length() - 6);
-        
-        String lightId = "L" + nodeId.substring(1);
-        
-        // Notify via MQTT that a node wants to pair
-        if (mqtt && mqtt->isConnected()) {
-            StaticJsonDocument<512> doc;
-            doc["event"] = "pairing_request";
-            doc["mac"] = joinReq->mac;
-            doc["node_id"] = nodeId;
-            doc["light_id"] = lightId;
-            doc["firmware"] = joinReq->fw;
-            doc["rssi"] = espNow->getPeerRssi(joinReq->mac);
-            doc["capabilities"]["rgbw"] = joinReq->caps.rgbw;
-            doc["capabilities"]["led_count"] = joinReq->caps.led_count;
-            doc["capabilities"]["temp_sensor"] = joinReq->caps.temp_i2c;
-            doc["capabilities"]["button"] = joinReq->caps.button;
+    if (msg) {
+        if (msg->type == MessageType::JOIN_REQUEST) {
+            JoinRequestMessage* joinReq = static_cast<JoinRequestMessage*>(msg);
             
-            String topicBase = mqtt->getFarmId() + "/" + mqtt->getCoordinatorId();
-            String topic = topicBase + "/pairing/events";
+            Logger::info("  Join Request:");
+            Logger::info("    MAC: %s", joinReq->mac.c_str());
+            Logger::info("    FW: %s", joinReq->fw.c_str());
+            Logger::info("    RGBW: %s", joinReq->caps.rgbw ? "Yes" : "No");
+            Logger::info("    LEDs: %d", joinReq->caps.led_count);
             
-            String jsonStr;
-            serializeJson(doc, jsonStr);
-            // Note: We can't publish directly here without PubSubClient access
-            // The MQTT class would need a publishJson() method
-            Logger::info("  Pairing request detected - waiting for frontend approval via MQTT");
+            // Generate node ID and light ID
+            String nodeId = joinReq->mac;
+            nodeId.replace(":", "");
+            nodeId = "N" + nodeId.substring(nodeId.length() - 6);
+            
+            String lightId = "L" + nodeId.substring(1);
+            
+            // Notify via MQTT that a node wants to pair
+            if (mqtt && mqtt->isConnected()) {
+                StaticJsonDocument<512> doc;
+                doc["event"] = "pairing_request";
+                doc["mac"] = joinReq->mac;
+                doc["node_id"] = nodeId;
+                doc["light_id"] = lightId;
+                doc["firmware"] = joinReq->fw;
+                doc["rssi"] = espNow->getPeerRssi(joinReq->mac);
+                doc["capabilities"]["rgbw"] = joinReq->caps.rgbw;
+                doc["capabilities"]["led_count"] = joinReq->caps.led_count;
+                doc["capabilities"]["temp_sensor"] = joinReq->caps.temp_i2c;
+                doc["capabilities"]["button"] = joinReq->caps.button;
+                
+                String topicBase = mqtt->getFarmId() + "/" + mqtt->getCoordinatorId();
+                String topic = topicBase + "/pairing/events";
+                
+                String jsonStr;
+                serializeJson(doc, jsonStr);
+                // Note: We can't publish directly here without PubSubClient access
+                // The MQTT class would need a publishJson() method
+                Logger::info("  Pairing request detected - waiting for frontend approval via MQTT");
+            }
+            
+            // For now, auto-accept (frontend can control via MQTT commands)
+            Logger::info("  Auto-accepting pairing request...");
+            
+            // Add to registry
+            if (nodes) {
+                nodes->registerNode(nodeId, lightId);
+                nodes->saveToStorage();
+            }
+            
+            // Add peer
+            uint8_t macBytes[6];
+            if (EspNow::macStringToBytes(joinReq->mac, macBytes)) {
+                espNow->addPeer(macBytes);
+                espNow->savePeersToStorage();
+            }
+            
+            // Send acceptance
+            JoinAcceptMessage accept;
+            accept.node_id = nodeId;
+            accept.light_id = lightId;
+            accept.wifi_channel = WiFi.channel();
+            accept.cfg.pwm_freq = 5000;
+            accept.cfg.rx_window_ms = 100;
+            accept.cfg.rx_period_ms = 1000;
+            
+            String acceptJson = accept.toJson();
+            espNow->sendToMac(macBytes, acceptJson);
+            
+            Logger::info("  Paired: %s -> %s", nodeId.c_str(), lightId.c_str());
+            
+            // Publish updated node list
+            if (mqtt && mqtt->isConnected()) {
+                publishNodeList();
+            }
         }
-        
-        // For now, auto-accept (frontend can control via MQTT commands)
-        Logger::info("  Auto-accepting pairing request...");
-        
-        // Add to registry
-        if (nodes) {
-            nodes->registerNode(nodeId, lightId);
-            nodes->saveToStorage();
-        }
-        
-        // Add peer
-        uint8_t macBytes[6];
-        if (EspNow::macStringToBytes(joinReq->mac, macBytes)) {
-            espNow->addPeer(macBytes);
-            espNow->savePeersToStorage();
-        }
-        
-        // Send acceptance
-        JoinAcceptMessage accept;
-        accept.node_id = nodeId;
-        accept.light_id = lightId;
-        accept.wifi_channel = WiFi.channel();
-        accept.cfg.pwm_freq = 5000;
-        accept.cfg.rx_window_ms = 100;
-        accept.cfg.rx_period_ms = 1000;
-        
-        String acceptJson = accept.toJson();
-        espNow->sendToMac(macBytes, acceptJson);
-        
-        Logger::info("  ✓ Paired: %s -> %s", nodeId.c_str(), lightId.c_str());
-        
-        // Publish updated node list
-        if (mqtt && mqtt->isConnected()) {
-            publishNodeList();
-        }
-        
         delete msg;
     }
 }
@@ -453,7 +453,7 @@ void Coordinator::sendHealthPings() {
 
 void Coordinator::startPairing(uint32_t durationMs) {
     pairingActive = true;
-    pairingEndTime = millis() + durationMs;
+    pairingDl.set(durationMs);
     
     if (espNow) {
         espNow->enablePairingMode(durationMs);
@@ -464,6 +464,7 @@ void Coordinator::startPairing(uint32_t durationMs) {
 
 void Coordinator::stopPairing() {
     pairingActive = false;
+    pairingDl.clear();
     
     if (espNow) {
         espNow->disablePairingMode();
@@ -478,7 +479,7 @@ void Coordinator::publishPairingStatus() {
     StaticJsonDocument<256> doc;
     doc["pairing_active"] = pairingActive;
     if (pairingActive) {
-        doc["time_remaining_ms"] = pairingEndTime - millis();
+        doc["time_remaining_ms"] = pairingDl.remainingMs();
     } else {
         doc["time_remaining_ms"] = 0;
     }

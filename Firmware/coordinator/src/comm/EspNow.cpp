@@ -116,7 +116,6 @@ bool EspNow::macStringToBytes(const String& macStr, uint8_t out[6]) {
 EspNow::EspNow()
     : initialized(false)
     , pairingEnabled(false)
-    , pairingEndTime(0)
     , messageCallback(nullptr)
     , pairingCallback(nullptr)
     , sendErrorCallback(nullptr) {}
@@ -334,9 +333,8 @@ void EspNow::loop() {
     // Optimized pairing beacon with adaptive frequency
     if (isPairingEnabled()) {
         static uint32_t lastBeacon = 0;
-        uint32_t elapsed = now - (pairingEndTime - 30000); // Time since pairing started (assume 30s window)
         // Faster beacons in first 10 seconds, slower after
-        uint32_t beaconInterval = (elapsed < 10000) ? 800 : 2000;
+        uint32_t beaconInterval = 2000; // Default slower interval
         
         if (now - lastBeacon > beaconInterval) {
             uint8_t bcast[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
@@ -350,7 +348,7 @@ void EspNow::loop() {
     }
 
     // Check pairing timeout
-    if (pairingEnabled && now > pairingEndTime) {
+    if (pairingEnabled && pairingDl.expired()) {
         pairingEnabled = false;
         Logger::info("ESP-NOW: Pairing window closed");
     }
@@ -425,15 +423,16 @@ bool EspNow::broadcastPairingMessage() {
 
 void EspNow::enablePairingMode(uint32_t durationMs) {
     pairingEnabled = true;
-    pairingEndTime = millis() + durationMs;
+    pairingDl.set(durationMs);
 }
 
 void EspNow::disablePairingMode() {
     pairingEnabled = false;
+    pairingDl.clear();
 }
 
 bool EspNow::isPairingEnabled() const {
-    return pairingEnabled && millis() < pairingEndTime;
+    return pairingEnabled && pairingDl.running();
 }
 
 void EspNow::setMessageCallback(std::function<void(const String& nodeId, const uint8_t* data, size_t len)> callback) {

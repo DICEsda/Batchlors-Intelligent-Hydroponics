@@ -24,7 +24,7 @@ Reservoir::Reservoir()
     , manualR(0)
     , manualG(0)
     , manualB(0)
-    , manualLedTimeoutMs(0) {}
+    {}
 
 
 Reservoir::~Reservoir() {
@@ -255,7 +255,7 @@ bool Reservoir::begin() {
     int groupCount = Pins::RgbLed::NUM_PIXELS / 4;
     groupToTower.assign(groupCount, String());
     groupConnected.assign(groupCount, false);
-    groupFlashUntilMs.assign(groupCount, 0);
+    groupFlashDl.assign(groupCount, Deadline());
     rebuildLedMappingFromRegistry();
 
     bool zonesOk = zones->begin();
@@ -509,23 +509,24 @@ void Reservoir::handleTowerMessage(const String& towerId, const uint8_t* data, s
         
         // Parse and log sensor data from telemetry
         EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::NODE_STATUS) {
-            NodeStatusMessage* statusMsg = static_cast<NodeStatusMessage*>(msg);
-            updateTowerTelemetryCache(towerId, *statusMsg);
-            
-            // Log temperature if available
-            if (statusMsg->temperature > -50.0f && statusMsg->temperature < 150.0f) {
-                Logger::info("  [Tower %d] Temperature: %.2f C", 
-                             idx >= 0 ? idx + 1 : 0, 
-                             statusMsg->temperature);
+        if (msg) {
+            if (msg->type == MessageType::NODE_STATUS) {
+                NodeStatusMessage* statusMsg = static_cast<NodeStatusMessage*>(msg);
+                updateTowerTelemetryCache(towerId, *statusMsg);
+                
+                // Log temperature if available
+                if (statusMsg->temperature > -50.0f && statusMsg->temperature < 150.0f) {
+                    Logger::info("  [Tower %d] Temperature: %.2f C", 
+                                 idx >= 0 ? idx + 1 : 0, 
+                                 statusMsg->temperature);
+                }
+                
+                // Log button state
+                Logger::info("  [Tower %d] Button: %s, RGBW: (%d,%d,%d,%d)", 
+                             idx >= 0 ? idx + 1 : 0,
+                             statusMsg->button_pressed ? "PRESSED" : "Released",
+                             statusMsg->avg_r, statusMsg->avg_g, statusMsg->avg_b, statusMsg->avg_w);
             }
-            
-            // Log button state
-            Logger::info("  [Tower %d] Button: %s, RGBW: (%d,%d,%d,%d)", 
-                         idx >= 0 ? idx + 1 : 0,
-                         statusMsg->button_pressed ? "PRESSED" : "Released",
-                         statusMsg->avg_r, statusMsg->avg_g, statusMsg->avg_b, statusMsg->avg_w);
-            
             delete msg;
         }
         
@@ -545,35 +546,36 @@ void Reservoir::handleTowerMessage(const String& towerId, const uint8_t* data, s
     // Forward tower telemetry from ESP-NOW to MQTT for backend/dashboard consumption
     if (mt == MessageType::TOWER_TELEMETRY && mqtt) {
         EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::TOWER_TELEMETRY) {
-            TowerTelemetryMessage* telemetry = static_cast<TowerTelemetryMessage*>(msg);
-            
-            // Log tower environmental data
-            Logger::info("[Tower %s] Air: %.1f C, Humidity: %.1f%%, Light: %.0f lux", 
-                         telemetry->tower_id.c_str(),
-                         telemetry->air_temp_c, 
-                         telemetry->humidity_pct,
-                         telemetry->light_lux);
-            Logger::info("[Tower %s] Pump: %s, Light: %s (brightness: %d)", 
-                         telemetry->tower_id.c_str(),
-                         telemetry->pump_on ? "ON" : "OFF",
-                         telemetry->light_on ? "ON" : "OFF",
-                         telemetry->light_brightness);
-            
-            // Forward to MQTT broker
-            mqtt->publishTowerTelemetry(*telemetry);
-            
-            // Send ACK back to tower
-            uint8_t mac[6];
-            if (EspNow::macStringToBytes(towerId, mac)) {
-                AckMessage ack;
-                ack.cmd_id = "tower_telemetry_ack";
-                String ackJson = ack.toJson();
-                if (!espNow->sendToMac(mac, ackJson)) {
-                    Logger::debug("Failed to send tower telemetry ACK to %s", towerId.c_str());
+        if (msg) {
+            if (msg->type == MessageType::TOWER_TELEMETRY) {
+                TowerTelemetryMessage* telemetry = static_cast<TowerTelemetryMessage*>(msg);
+                
+                // Log tower environmental data
+                Logger::info("[Tower %s] Air: %.1f C, Humidity: %.1f%%, Light: %.0f lux", 
+                             telemetry->tower_id.c_str(),
+                             telemetry->air_temp_c, 
+                             telemetry->humidity_pct,
+                             telemetry->light_lux);
+                Logger::info("[Tower %s] Pump: %s, Light: %s (brightness: %d)", 
+                             telemetry->tower_id.c_str(),
+                             telemetry->pump_on ? "ON" : "OFF",
+                             telemetry->light_on ? "ON" : "OFF",
+                             telemetry->light_brightness);
+                
+                // Forward to MQTT broker
+                mqtt->publishTowerTelemetry(*telemetry);
+                
+                // Send ACK back to tower
+                uint8_t mac[6];
+                if (EspNow::macStringToBytes(towerId, mac)) {
+                    AckMessage ack;
+                    ack.cmd_id = "tower_telemetry_ack";
+                    String ackJson = ack.toJson();
+                    if (!espNow->sendToMac(mac, ackJson)) {
+                        Logger::debug("Failed to send tower telemetry ACK to %s", towerId.c_str());
+                    }
                 }
             }
-            
             delete msg;
         }
     }
@@ -582,55 +584,56 @@ void Reservoir::handleTowerMessage(const String& towerId, const uint8_t* data, s
     // Handle tower-specific join requests (different from legacy join)
     if (mt == MessageType::TOWER_JOIN_REQUEST && mqtt) {
         EspNowMessage* msg = MessageFactory::createMessage(payload);
-        if (msg && msg->type == MessageType::TOWER_JOIN_REQUEST) {
-            TowerJoinRequestMessage* joinReq = static_cast<TowerJoinRequestMessage*>(msg);
-            
-            // Add as ESP-NOW peer
-            uint8_t mac[6];
-            if (EspNow::macStringToBytes(towerId, mac)) {
-                espNow->addPeer(mac);
-            }
-            
-            // Generate tower ID from MAC
-            char towerIdBuf[24];
-            snprintf(towerIdBuf, sizeof(towerIdBuf), "T%s", towerId.substring(towerId.length() - 8).c_str());
-            String assignedTowerId = String(towerIdBuf);
-            assignedTowerId.replace(":", "");
-            
-            Logger::info("Tower join request from %s (FW: %s), assigning ID: %s", 
-                         towerId.c_str(), joinReq->fw.c_str(), assignedTowerId.c_str());
-            Logger::info("  Capabilities: DHT=%d, Light=%d, Pump=%d, GrowLight=%d, Slots=%d",
-                         joinReq->caps.dht_sensor, joinReq->caps.light_sensor,
-                         joinReq->caps.pump_relay, joinReq->caps.grow_light,
-                         joinReq->caps.slot_count);
-            
-            // Send join accept response
-            TowerJoinAcceptMessage accept;
-            accept.tower_id = assignedTowerId;
-            accept.coord_id = mqtt->getCoordinatorId();
-            accept.farm_id = mqtt->getFarmId();
-            accept.lmk = "";  // TODO: implement secure pairing with LMK
-            
-            // Get current WiFi channel
-            uint8_t currentChannel = 1;
-            wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
-            esp_wifi_get_channel(&currentChannel, &second);
-            accept.wifi_channel = currentChannel;
-            
-            // Default configuration
-            accept.cfg.telemetry_interval_ms = 30000;  // 30 seconds
-            accept.cfg.pump_max_duration_s = 300;      // 5 minutes max
-            
-            String json = accept.toJson();
-            if (EspNow::macStringToBytes(towerId, mac)) {
-                if (!espNow->sendToMac(mac, json)) {
-                    Logger::warn("Failed to send tower_join_accept to %s", towerId.c_str());
-                } else {
-                    Logger::info("Sent tower_join_accept to %s (tower_id: %s)", 
-                                 towerId.c_str(), assignedTowerId.c_str());
+        if (msg) {
+            if (msg->type == MessageType::TOWER_JOIN_REQUEST) {
+                TowerJoinRequestMessage* joinReq = static_cast<TowerJoinRequestMessage*>(msg);
+                
+                // Add as ESP-NOW peer
+                uint8_t mac[6];
+                if (EspNow::macStringToBytes(towerId, mac)) {
+                    espNow->addPeer(mac);
+                }
+                
+                // Generate tower ID from MAC
+                char towerIdBuf[24];
+                snprintf(towerIdBuf, sizeof(towerIdBuf), "T%s", towerId.substring(towerId.length() - 8).c_str());
+                String assignedTowerId = String(towerIdBuf);
+                assignedTowerId.replace(":", "");
+                
+                Logger::info("Tower join request from %s (FW: %s), assigning ID: %s", 
+                             towerId.c_str(), joinReq->fw.c_str(), assignedTowerId.c_str());
+                Logger::info("  Capabilities: DHT=%d, Light=%d, Pump=%d, GrowLight=%d, Slots=%d",
+                             joinReq->caps.dht_sensor, joinReq->caps.light_sensor,
+                             joinReq->caps.pump_relay, joinReq->caps.grow_light,
+                             joinReq->caps.slot_count);
+                
+                // Send join accept response
+                TowerJoinAcceptMessage accept;
+                accept.tower_id = assignedTowerId;
+                accept.coord_id = mqtt->getCoordinatorId();
+                accept.farm_id = mqtt->getFarmId();
+                accept.lmk = "";  // TODO: implement secure pairing with LMK
+                
+                // Get current WiFi channel
+                uint8_t currentChannel = 1;
+                wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
+                esp_wifi_get_channel(&currentChannel, &second);
+                accept.wifi_channel = currentChannel;
+                
+                // Default configuration
+                accept.cfg.telemetry_interval_ms = 30000;  // 30 seconds
+                accept.cfg.pump_max_duration_s = 300;      // 5 minutes max
+                
+                String json = accept.toJson();
+                if (EspNow::macStringToBytes(towerId, mac)) {
+                    if (!espNow->sendToMac(mac, json)) {
+                        Logger::warn("Failed to send tower_join_accept to %s", towerId.c_str());
+                    } else {
+                        Logger::info("Sent tower_join_accept to %s (tower_id: %s)", 
+                                     towerId.c_str(), assignedTowerId.c_str());
+                    }
                 }
             }
-            
             delete msg;
         }
     }
@@ -641,7 +644,7 @@ void Reservoir::rebuildLedMappingFromRegistry() {
     towerToGroup.clear();
     std::fill(groupToTower.begin(), groupToTower.end(), String());
     std::fill(groupConnected.begin(), groupConnected.end(), false);
-    std::fill(groupFlashUntilMs.begin(), groupFlashUntilMs.end(), 0);
+    for (auto& dl : groupFlashDl) dl.clear();
 
     if (!towers) return;
     // Assign deterministically by sorted towerId up to available groups
@@ -686,14 +689,12 @@ int Reservoir::assignGroupForTower(const String& towerId) {
 void Reservoir::flashLedForTower(const String& towerId, uint32_t durationMs) {
     int idx = getGroupIndexForTower(towerId);
     if (idx < 0) return;
-    groupFlashUntilMs[idx] = millis() + durationMs;
+    groupFlashDl[idx].set(durationMs);
 }
 
 void Reservoir::updateLeds() {
-    uint32_t now = millis();
-    
     // Check for manual LED override timeout
-    if (manualLedMode && manualLedTimeoutMs > 0 && now > manualLedTimeoutMs) {
+    if (manualLedMode && manualLedTimeoutDl.expired()) {
         manualLedMode = false;
         Logger::info("Manual LED override timed out");
     }
@@ -707,7 +708,7 @@ void Reservoir::updateLeds() {
             r = manualR;
             gc = manualG;
             b = manualB;
-        } else if (groupFlashUntilMs[g] > now) {
+        } else if (groupFlashDl[g].running()) {
             // Bright green flash (activity) at 50%
             r=0; gc=128; b=0;
         } else if (groupToTower[g].length() > 0) {
@@ -936,9 +937,9 @@ void Reservoir::handleMqttCommand(const String& topic, const String& payload) {
         
         manualLedMode = true;
         if (duration > 0) {
-            manualLedTimeoutMs = millis() + duration;
+            manualLedTimeoutDl.set(duration);
         } else {
-            manualLedTimeoutMs = 0; // Indefinite
+            manualLedTimeoutDl.clear();
         }
         Logger::info("Manual LED override: RGB(%d,%d,%d)", manualR, manualG, manualB);
         updateLeds();

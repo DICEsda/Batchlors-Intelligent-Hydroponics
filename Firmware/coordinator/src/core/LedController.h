@@ -6,6 +6,7 @@
 #include <functional>
 #include "../utils/StatusLed.h"
 #include "../config/PinConfig.h"
+#include "../../shared/src/utils/SafeTimer.h"
 #include "../Models.h"  // Include Models.h for NodeInfo/TowerInfo
 
 /**
@@ -128,12 +129,12 @@ private:
     std::map<String, int> nodeToGroup_;
     std::vector<String> groupToNode_;
     std::vector<bool> groupConnected_;
-    std::vector<uint32_t> groupFlashUntilMs_;
+    std::vector<Deadline> groupFlashDl_;
 
     // Manual override state
     bool manualMode_ = false;
     uint8_t manualR_ = 0;
     uint8_t manualG_ = 0;
     uint8_t manualB_ = 0;
-    uint32_t manualTimeoutMs_ = 0;
+    Deadline manualTimeoutDl_;
 };

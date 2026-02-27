@@ -6,6 +6,7 @@
 #include <functional>
 #include <Preferences.h>
 #include "../Models.h"
+#include "../../shared/src/utils/SafeTimer.h"
 
 class TowerRegistry {
 public:
@@ -59,7 +60,7 @@ private:
     bool prefsInitialized;
     
     bool pairingActive;
-    uint32_t pairingEndTime;
+    Deadline pairingDl;
     
     void loadFromStorage();
     void saveToStorage();

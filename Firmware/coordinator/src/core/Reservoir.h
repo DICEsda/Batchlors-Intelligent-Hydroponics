@@ -10,6 +10,7 @@
 #include "../input/ButtonControl.h"
 #include "../sensors/ThermalControl.h"
 #include "../utils/StatusLed.h"
+#include "../../shared/src/utils/SafeTimer.h"
 
 class WifiManager;
 class AmbientLightSensor;
@@ -61,7 +62,7 @@ private:
     std::map<String, int> towerToGroup;         // towerId -> group index (0..groups-1)
     std::vector<String> groupToTower;           // size = NUM_PIXELS/4
     std::vector<bool> groupConnected;           // true if connected
-    std::vector<uint32_t> groupFlashUntilMs;    // activity flash until ts
+    std::vector<Deadline> groupFlashDl;          // activity flash deadlines
 
     // Helpers for LED mapping and updates
     void rebuildLedMappingFromRegistry();
@@ -89,7 +90,7 @@ private:
     uint8_t manualR = 0;
     uint8_t manualG = 0;
     uint8_t manualB = 0;
-    uint32_t manualLedTimeoutMs = 0;
+    Deadline manualLedTimeoutDl;
     
     // Zone presence mode
     bool zonePresenceMode = true;  // When enabled, towers glow green when presence detected
