@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, DestroyRef } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, interval, takeWhile, finalize, filter, forkJoin } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IoTDataService, WebSocketService, ApiService } from '../../core/services';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { 
@@ -65,6 +66,7 @@ import {
   standalone: true,
   imports: [
     CommonModule,
+    DatePipe,
     RouterLink,
     HlmCardDirective,
     HlmCardHeaderDirective,
@@ -111,7 +113,11 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
   private readonly wsService = inject(WebSocketService);
   private readonly apiService = inject(ApiService);
   private readonly confirmService = inject(ConfirmDialogService);
+  private readonly destroyRef = inject(DestroyRef);
   private subscriptions: Subscription[] = [];
+
+  // Serial log entries from WebSocket
+  readonly logs = signal<{ timestamp: Date; level: string; message: string; tag: string }[]>([]);
 
   // State
   readonly coordinatorId = signal<string>('');
@@ -190,6 +196,24 @@ export class CoordinatorDetailComponent implements OnInit, OnDestroy {
     
     // Subscribe to pairing WebSocket events
     this.subscribeToPairingEvents();
+
+    // Subscribe to coordinator serial logs
+    this.wsService.coordinatorLogs$.pipe(
+      filter(log => log.coordId === this.coordinatorId()),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(log => {
+      this.logs.update(entries => {
+        const newEntry = {
+          timestamp: new Date(log.timestamp * 1000),
+          level: log.level,
+          message: log.message,
+          tag: log.tag ?? '',
+        };
+        const updated = [...entries, newEntry];
+        // Keep last 200 entries
+        return updated.length > 200 ? updated.slice(-200) : updated;
+      });
+    });
   }
 
   ngOnDestroy(): void {

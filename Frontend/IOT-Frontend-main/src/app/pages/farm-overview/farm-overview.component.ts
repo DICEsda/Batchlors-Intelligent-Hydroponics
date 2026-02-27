@@ -229,16 +229,18 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
 
   // ---- Lifecycle ----
   ngOnInit(): void {
-    this.dataService.loadDashboardData();
+    this.dataService.loadDashboardData().then(() => {
+      // Use first available farm ID from API, fallback to 'farm-001'
+      const farms = this.dataService.sites?.() ?? [];
+      const farmId = farms.length > 0 ? ((farms[0] as any).farm_id ?? farms[0]._id ?? 'farm-001') : 'farm-001';
+      this.twinService.loadFarmTwins(farmId);
+    });
 
     if (!this.wsService.connected()) {
       this.wsService.connect();
     }
 
     this.dataService.startAutoRefresh();
-
-    // Load digital twin data
-    this.twinService.loadFarmTwins('farm-alpha');
 
     // Subscribe to reservoir telemetry for system health sparklines
     this.subscribeToReservoirTelemetry();
@@ -287,8 +289,11 @@ export class FarmOverviewComponent implements OnInit, OnDestroy {
   }
 
   refreshData(): void {
-    this.dataService.loadDashboardData();
-    this.twinService.loadFarmTwins('farm-alpha');
+    this.dataService.loadDashboardData().then(() => {
+      const farms = this.dataService.sites?.() ?? [];
+      const farmId = farms.length > 0 ? ((farms[0] as any).farm_id ?? farms[0]._id ?? 'farm-001') : 'farm-001';
+      this.twinService.loadFarmTwins(farmId);
+    });
   }
 
   // ---- Template helpers ----

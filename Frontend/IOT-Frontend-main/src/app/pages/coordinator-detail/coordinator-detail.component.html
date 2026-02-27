@@ -460,5 +460,26 @@
         </div>
       }
     </section>
+
+    <!-- Serial Log Panel -->
+    <section class="mt-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Serial Logs</h2>
+        <span class="text-sm text-muted-foreground">Live from coordinator</span>
+      </div>
+      <div class="bg-gray-950 rounded-lg p-4 font-mono text-xs max-h-80 overflow-y-auto" #logContainer>
+        @for (entry of logs(); track entry.timestamp) {
+          <div class="flex gap-2 py-0.5"
+               [class]="entry.level === 'ERROR' ? 'text-red-400' : entry.level === 'WARN' ? 'text-yellow-400' : entry.level === 'DEBUG' ? 'text-gray-500' : 'text-green-400'">
+            <span class="text-gray-600 shrink-0">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
+            <span class="shrink-0 w-12">{{ entry.level }}</span>
+            <span class="text-gray-400 shrink-0">[{{ entry.tag }}]</span>
+            <span>{{ entry.message }}</span>
+          </div>
+        } @empty {
+          <div class="text-gray-600 italic">Waiting for serial log data...</div>
+        }
+      </div>
+    </section>
   }
 </div>

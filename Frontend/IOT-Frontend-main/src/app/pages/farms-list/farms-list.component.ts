@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideBuilding,
@@ -18,6 +19,7 @@ import {
 import { HlmBadgeDirective } from '../../components/ui/badge';
 import { HlmButtonDirective } from '../../components/ui/button';
 import { IoTDataService } from '../../core/services/iot-data.service';
+import { ApiService } from '../../core/services/api.service';
 import { Farm, FarmSummary, CoordinatorSummary, NodeSummary } from '../../core/models';
 import { FarmDialogComponent, FarmDialogData } from '../../components/farm-dialog/farm-dialog.component';
 
@@ -45,6 +47,7 @@ import { FarmDialogComponent, FarmDialogData } from '../../components/farm-dialo
 })
 export class FarmsListComponent implements OnInit {
   private readonly dataService = inject(IoTDataService);
+  private readonly apiService = inject(ApiService);
 
   readonly loading = signal(false);
   readonly farms = signal<FarmSummary[]>([]);
@@ -99,57 +102,55 @@ export class FarmsListComponent implements OnInit {
     try {
       // Load dashboard data which includes coordinators and nodes
       await this.dataService.loadDashboardData();
-      
-      // Generate mock farms from existing data
-      this.generateMockFarms();
+      await this.loadFarmsFromApi();
     } finally {
       this.loading.set(false);
     }
   }
 
-  private generateMockFarms(): void {
-    const coords = this.coordinators();
-    
-    // Create mock farms based on existing coordinators
-    const mockFarms: FarmSummary[] = [
-      {
-        _id: 'farm-001',
-        name: 'Main Hydroponic Facility',
-        description: 'Primary growing facility with multiple reservoir systems',
-        location: 'Building A, Floor 1',
-        reservoirCount: 2,
-        towerCount: 6,
-        onlineReservoirs: 2,
-        onlineTowers: 5,
-        color: '#22c55e'
-      },
-      {
-        _id: 'farm-002',
-        name: 'Research Lab',
-        description: 'Experimental growing systems for R&D',
-        location: 'Building B, Floor 2',
-        reservoirCount: 1,
-        towerCount: 4,
-        onlineReservoirs: 1,
-        onlineTowers: 3,
-        color: '#3b82f6'
+  private async loadFarmsFromApi(): Promise<void> {
+    try {
+      const farmsData = await firstValueFrom(this.apiService.getFarms());
+      const coords = this.coordinators();
+      const nodesList = this.dataService.nodes?.() ?? [];
+
+      const farmSummaries: FarmSummary[] = (farmsData ?? []).map((farm: Farm) => {
+        const farmId = farm._id;
+        // Use reservoir_ids from the farm object to find coordinators
+        const reservoirIds = farm.reservoir_ids ?? [];
+        const farmCoords = coords.filter(c =>
+          reservoirIds.includes(c.coord_id) || reservoirIds.includes(c._id)
+        );
+        const farmTowers = nodesList.filter(n =>
+          farmCoords.some(c => c.coord_id === n.coordinator_id || c._id === n.coordinator_id)
+        );
+
+        return {
+          _id: farmId,
+          name: farm.name ?? `Farm ${farmId}`,
+          description: farm.description ?? '',
+          location: farm.location ?? '',
+          plantType: farm.plantType,
+          reservoirCount: farmCoords.length,
+          towerCount: farmTowers.length,
+          onlineReservoirs: farmCoords.filter(c => c.status === 'online').length,
+          onlineTowers: farmTowers.filter(t => t.status_mode === 'operational').length,
+          color: farm.color ?? '#22c55e'
+        };
+      });
+
+      // Build reservoir map
+      const resMap: Record<string, string[]> = {};
+      for (const farm of farmsData ?? []) {
+        resMap[farm._id] = farm.reservoir_ids ?? [];
       }
-    ];
-
-    // Map reservoirs to farms
-    if (coords.length >= 2) {
-      this.farmReservoirMap = {
-        'farm-001': [coords[0]?.coord_id, coords[1]?.coord_id].filter(Boolean),
-        'farm-002': coords[2] ? [coords[2].coord_id] : []
-      };
-    } else if (coords.length === 1) {
-      this.farmReservoirMap = {
-        'farm-001': [coords[0].coord_id],
-        'farm-002': []
-      };
+      this.farmReservoirMap = resMap;
+      this.farms.set(farmSummaries);
+    } catch (err) {
+      console.error('Failed to load farms from API, using fallback', err);
+      // Keep empty rather than mock
+      this.farms.set([]);
     }
-
-    this.farms.set(mockFarms);
   }
 
   private getFarmReservoirIds(farmId: string): string[] {
