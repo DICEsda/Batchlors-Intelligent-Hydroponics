@@ -347,27 +347,25 @@ public class AlertServiceTests
     }
 
     [Fact]
-    public async Task CheckCoordinatorAlertsAsync_PumpOff_CreatesCriticalPumpFailureAlert()
+    public async Task CheckCoordinatorAlertsAsync_PumpOff_DoesNotCreatePumpFailureAlert()
     {
-        // Arrange
+        // Arrange — pump is off (normal scheduled operation)
         var coord = MakeCoordinator(mainPumpOn: false);
 
         // Act
         await _sut.CheckCoordinatorAlertsAsync(coord);
 
-        // Assert
-        await _alertRepo.Received().UpsertAsync(
-            Arg.Is<Alert>(a =>
-                a.Category == "pump_failure" &&
-                a.Severity == "critical"),
+        // Assert — pump_failure alert creation was disabled (issue #68)
+        await _alertRepo.DidNotReceive().UpsertAsync(
+            Arg.Is<Alert>(a => a.Category == "pump_failure"),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task CheckCoordinatorAlertsAsync_PumpOn_AutoResolvesPumpFailureAlert()
+    public async Task CheckCoordinatorAlertsAsync_AlwaysAutoResolvesPumpFailureAlert()
     {
-        // Arrange
-        var coord = MakeCoordinator(mainPumpOn: true);
+        // Arrange — existing pump_failure alert from old logic
+        var coord = MakeCoordinator(mainPumpOn: false);
         var existingAlert = MakeActiveAlert("farm-1:coord-1:pump_failure");
         _alertRepo.GetActiveAlertByKeyAsync("farm-1:coord-1:pump_failure", Arg.Any<CancellationToken>())
             .Returns(existingAlert);
@@ -375,7 +373,7 @@ public class AlertServiceTests
         // Act
         await _sut.CheckCoordinatorAlertsAsync(coord);
 
-        // Assert
+        // Assert — stale pump_failure alerts are always auto-resolved
         await _alertRepo.Received().ResolveAsync("alert-123", Arg.Any<CancellationToken>());
     }
 
