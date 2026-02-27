@@ -134,6 +134,12 @@ public class ReservoirTelemetryPayload
     public float LightLux { get; set; }
     public float TempC { get; set; }
     public int WifiRssi { get; set; }
+    // Water quality — previously missing, needed by frontend charts
+    public float Ph { get; set; }
+    public float EcMsCm { get; set; }
+    public float WaterLevelPct { get; set; }
+    public float WaterTempC { get; set; }
+    public bool MainPumpOn { get; set; }
 }
 
 /// <summary>

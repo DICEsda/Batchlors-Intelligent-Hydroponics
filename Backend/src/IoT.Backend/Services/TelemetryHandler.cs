@@ -365,7 +365,23 @@ public class TelemetryHandler : BackgroundService
 
             _logger.LogDebug("Updated coordinator twin {CoordId} with reservoir telemetry", coordId);
 
-            // 4. Update coordinator entity with reservoir sensor data, then check alert thresholds
+            // 4. Broadcast reservoir telemetry to WebSocket clients
+            var wsPayload = new ReservoirTelemetryPayload
+            {
+                ReservoirId = coordId,
+                SiteId = farmId,
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                TempC = telemetry.TempC,
+                WifiRssi = telemetry.WifiRssi,
+                Ph = telemetry.Ph ?? 0f,
+                EcMsCm = telemetry.EcMsCm ?? 0f,
+                WaterLevelPct = telemetry.WaterLevelPct ?? 0f,
+                WaterTempC = telemetry.WaterTempC ?? 0f,
+                MainPumpOn = telemetry.MainPumpOn ?? false
+            };
+            await _broadcaster.BroadcastReservoirTelemetryAsync(wsPayload);
+
+            // 5. Update coordinator entity with reservoir sensor data, then check alert thresholds
             try
             {
                 var coordinator = await _coordinatorRepository.GetByFarmAndIdAsync(farmId, coordId);
